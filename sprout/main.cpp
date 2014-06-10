@@ -1441,7 +1441,9 @@ int main(int argc, char *argv[])
                                  PJSIP_MOD_PRIORITY_UA_PROXY_LAYER,
                                  hss_connection,
                                  icscf_acr_factory,
-                                 scscf_selector);
+                                 scscf_selector,
+                                 enum_service,
+                                 opt.enforce_global_only_lookups);
 
     if (icscf_proxy == NULL)
     {

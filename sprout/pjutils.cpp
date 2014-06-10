@@ -1420,6 +1420,38 @@ bool PJUtils::is_uri_phone_number(pjsip_uri* uri)
            (PJSIP_URI_SCHEME_IS_SIP(uri) && (pj_strcmp2(&((pjsip_sip_uri*)uri)->user_param, "phone") == 0)))));
 }
 
+void PJUtils::translate_sip_uri_to_tel_uri(std::string& uri)
+{
+  size_t sip_index = 0;
+  size_t user_phone_index = 0;
+
+  sip_index = uri.find("sip");
+  user_phone_index = uri.find("user=phone");
+
+  if ((sip_index == 0) && (user_phone_index != std::string::npos))
+  {
+    uri.replace(sip_index, 3, "sip");
+    uri.erase(user_phone_index, 10);
+  }
+  else
+  {
+    LOG_ERROR("URI %s does not represent a phone number", uri.c_str());
+  }
+}
+
+// Determines whether a user string represents a global number.
+//
+// @returns PJ_TRUE if so, PJ_FALSE if not.
+pj_bool_t PJUtils::is_user_global(const std::string& user)
+{
+  if (user.size() > 0 && user[0] == '+')
+  {
+    return PJ_TRUE;
+  }
+
+  return PJ_FALSE;
+}
+
 // Return true if there are no route headers, or there is exactly one,
 // which is local
 bool PJUtils::check_route_headers(pjsip_rx_data* rdata)

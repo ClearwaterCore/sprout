@@ -63,12 +63,16 @@ ICSCFProxy::ICSCFProxy(pjsip_endpoint* endpt,
                        int priority,
                        HSSConnection* hss,
                        ACRFactory* acr_factory,
-                       SCSCFSelector* scscf_selector) :
+                       SCSCFSelector* scscf_selector,
+                       EnumService* enum_service,
+                       bool enforce_global_only_lookups) :
   BasicProxy(endpt, "mod-icscf", priority, false),
   _port(port),
   _hss(hss),
   _scscf_selector(scscf_selector),
-  _acr_factory(acr_factory)
+  _acr_factory(acr_factory),
+  _enum_service(enum_service),
+  _global_only_lookups(enforce_global_only_lookups)
 {
 }
 
@@ -274,7 +278,20 @@ pj_status_t ICSCFProxy::UASTsx::init(pjsip_rx_data* rdata)
       // Terminating request.
       LOG_DEBUG("Terminating request");
       _case = SessionCase::TERMINATING;
-      impu = PJUtils::public_id_from_uri(PJUtils::term_served_user(msg));
+      pjsip_uri* uri = PJUtils::term_served_user(msg);
+      impu = PJUtils::public_id_from_uri(uri);
+
+      if ((PJSIP_URI_SCHEME_IS_SIP(uri)) &&
+          (pj_strcmp2(&((pjsip_sip_uri*)uri)->user_param, "phone") == 0))
+      {
+        PJUtils::translate_sip_uri_to_tel_uri(impu);
+        pjsip_uri* new_uri = (pjsip_uri*)PJUtils::uri_from_string(impu, _req->pool);
+        if ((new_uri != NULL) && (PJSIP_URI_SCHEME_IS_TEL(new_uri)))
+        {
+          LOG_DEBUG("Change request URI from SIP URI to tel URI %s", impu.c_str());
+          msg->line.req.uri = new_uri;
+        }
+      }
     }
 
     // Create an LIR router to handle the HSS interactions and S-CSCF
@@ -357,6 +374,32 @@ int ICSCFProxy::UASTsx::calculate_targets()
 
       // Remove the P-Profile-Key header if present.
       PJUtils::remove_hdr(_req->msg, &STR_P_PROFILE_KEY);
+    }
+  }
+  else if ((status_code == PJSIP_SC_NOT_FOUND) &&
+           (_case == SessionCase::TERMINATING) &&
+           (PJSIP_URI_SCHEME_IS_TEL(_req->msg->line.req.uri)))
+  {
+    std::string user = PJUtils::public_id_from_uri((pjsip_uri*)_req->msg->line.req.uri);
+
+    if ((!((ICSCFProxy*)_proxy)->_global_only_lookups) ||
+        (PJUtils::is_user_global(user)))
+    {
+      std::string new_uri = ((ICSCFProxy*)_proxy)->_enum_service->lookup_uri_from_user(user, _trail);
+      if (!new_uri.empty())
+      {
+        pjsip_uri* req_uri = (pjsip_uri*)PJUtils::uri_from_string(new_uri, _req->pool);
+        if (req_uri != NULL)
+        {
+          LOG_DEBUG("Update request URI to %s", new_uri.c_str());
+          _req->msg->line.req.uri = req_uri;
+          status_code = PJSIP_SC_OK;
+        }
+        else
+        {
+          LOG_WARNING("Badly formed URI %s from ENUM translation", new_uri.c_str());
+        }
+      }
     }
   }
 
