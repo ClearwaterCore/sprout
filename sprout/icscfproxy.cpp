@@ -287,12 +287,11 @@ pj_status_t ICSCFProxy::UASTsx::init(pjsip_rx_data* rdata)
       if ((PJSIP_URI_SCHEME_IS_SIP(uri)) &&
           (pj_strcmp2(&((pjsip_sip_uri*)uri)->user_param, "phone") == 0))
       {
-        PJUtils::translate_sip_uri_to_tel_uri(impu);
-        pjsip_uri* new_uri = (pjsip_uri*)PJUtils::uri_from_string(impu, _req->pool);
-        if ((new_uri != NULL) && (PJSIP_URI_SCHEME_IS_TEL(new_uri)))
+        pjsip_tel_uri* tel_uri = PJUtils::translate_sip_uri_to_tel_uri((pjsip_sip_uri*)uri);
+        if ((tel_uri != NULL) && (PJSIP_URI_SCHEME_IS_TEL(tel_uri)))
         {
           LOG_DEBUG("Change request URI from SIP URI to tel URI %s", impu.c_str());
-          msg->line.req.uri = new_uri;
+          msg->line.req.uri = (pjsip_uri*)tel_uri;
         }
       }
     }

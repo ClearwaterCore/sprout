@@ -216,7 +216,7 @@ bool is_emergency_registration(pjsip_contact_hdr* contact_hdr);
 
 bool is_uri_phone_number(pjsip_uri* uri);
 
-void translate_sip_uri_to_tel_uri(std::string& uri);
+pjsip_tel_uri* translate_sip_uri_to_tel_uri(const pjsip_sip_uri* sip_uri);
 
 pj_bool_t is_user_global(const std::string& user);
 

@@ -1908,17 +1908,17 @@ void UASTransaction::proxy_calculate_targets(pjsip_msg* msg,
 static pj_status_t translate_request_uri(pjsip_tx_data* tdata, SAS::TrailId trail)
 {
   pj_status_t status = PJ_SUCCESS;
+  pjsip_uri* req_uri = tdata->msg->line.req.uri;
   std::string user;
-  std::string uri;
 
   // Determine whether we have a SIP URI or a tel URI
-  if (PJSIP_URI_SCHEME_IS_SIP(tdata->msg->line.req.uri))
+  if (PJSIP_URI_SCHEME_IS_SIP(req_uri))
   {
-    user = PJUtils::pj_str_to_string(&((pjsip_sip_uri*)tdata->msg->line.req.uri)->user);
+    user = PJUtils::pj_str_to_string(&((pjsip_sip_uri*)req_uri)->user);
   }
-  else if (PJSIP_URI_SCHEME_IS_TEL(tdata->msg->line.req.uri))
+  else if (PJSIP_URI_SCHEME_IS_TEL(req_uri))
   {
-    user = PJUtils::public_id_from_uri((pjsip_uri*)tdata->msg->line.req.uri);
+    user = PJUtils::public_id_from_uri(req_uri);
   }
 
   // Check whether we have a global number or whether we allow
@@ -1927,34 +1927,34 @@ static pj_status_t translate_request_uri(pjsip_tx_data* tdata, SAS::TrailId trai
   {
     // Perform an ENUM lookup if we have a tel URI, or if we have
     // a SIP URI which is being treated as a phone number
-    if ((PJUtils::is_uri_phone_number(tdata->msg->line.req.uri)) ||
+    if ((PJUtils::is_uri_phone_number(req_uri)) ||
         (!user_phone && is_user_numeric(user)))
     {
       LOG_DEBUG("Performing ENUM lookup for user %s", user.c_str());
-      uri = enum_service->lookup_uri_from_user(user, trail);
+      std::string new_user = enum_service->lookup_uri_from_user(user, trail);
 
-      if (!uri.empty())
+      if (!new_user.empty())
       {
-        pjsip_uri* req_uri = (pjsip_uri*)PJUtils::uri_from_string(uri, tdata->pool);
-        if (req_uri != NULL)
+        pjsip_uri* new_req_uri = (pjsip_uri*)PJUtils::uri_from_string(new_user, tdata->pool);
+        if (new_req_uri != NULL)
         {
-          LOG_DEBUG("Update request URI to %s", uri.c_str());
-          tdata->msg->line.req.uri = req_uri;
+          LOG_DEBUG("Update request URI to %s", new_user.c_str());
+          tdata->msg->line.req.uri = new_req_uri;
         }
         else
         {
-          LOG_WARNING("Badly formed URI %s from ENUM translation", uri.c_str());
+          LOG_WARNING("Badly formed URI %s from ENUM translation", new_user.c_str());
           status = PJ_EINVAL;
         }
       }
-      else if (PJUtils::is_uri_phone_number(tdata->msg->line.req.uri))
+      else if (PJUtils::is_uri_phone_number(req_uri))
       {
         LOG_DEBUG("Could not find ENUM entry for telephone number");
         status = PJ_ENOTFOUND;
       }
     }
   }
-  else if (PJUtils::is_uri_phone_number(tdata->msg->line.req.uri))
+  else if (PJUtils::is_uri_phone_number(req_uri))
   {
     LOG_WARNING("Unable to resolve URI phone number %s using ENUM", user.c_str());
     status = PJ_EUNKNOWN;

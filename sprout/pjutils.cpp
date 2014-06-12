@@ -1420,23 +1420,37 @@ bool PJUtils::is_uri_phone_number(pjsip_uri* uri)
            (PJSIP_URI_SCHEME_IS_SIP(uri) && (pj_strcmp2(&((pjsip_sip_uri*)uri)->user_param, "phone") == 0)))));
 }
 
-void PJUtils::translate_sip_uri_to_tel_uri(std::string& uri)
+pjsip_tel_uri* PJUtils::translate_sip_uri_to_tel_uri(const pjsip_sip_uri* sip_uri)
 {
-  size_t sip_index = 0;
-  size_t user_phone_index = 0;
+  pjsip_tel_uri* tel_uri;
 
-  sip_index = uri.find("sip");
-  user_phone_index = uri.find("user=phone");
+  tel_uri->number = sip_uri->user;
+  tel_uri->context.slen = 0;
+  tel_uri->other_param.next = NULL;
 
-  if ((sip_index == 0) && (user_phone_index != std::string::npos))
+  pjsip_param* isub = pjsip_param_find(&sip_uri->other_param, &STR_ISUB);
+  if (isub != NULL)
   {
-    uri.replace(sip_index, 3, "sip");
-    uri.erase(user_phone_index, 10);
+    tel_uri->isub_param.slen = isub->value.slen;
+    tel_uri->isub_param.ptr = isub->value.ptr;
   }
   else
   {
-    LOG_ERROR("URI %s does not represent a phone number", uri.c_str());
+    tel_uri->isub_param.slen = 0;
   }
+
+  pjsip_param* ext = pjsip_param_find(&sip_uri->other_param, &STR_EXT);
+  if (ext != NULL)
+  {
+    tel_uri->ext_param.slen = ext->value.slen;
+    tel_uri->ext_param.ptr = ext->value.ptr;
+  }
+  else
+  {
+    tel_uri->ext_param.slen = 0;
+  }
+
+  return tel_uri;
 }
 
 // Determines whether a user string represents a global number.
