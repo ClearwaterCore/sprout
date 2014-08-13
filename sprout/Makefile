@@ -215,8 +215,8 @@ LDFLAGS += -lmemcached \
            -lzmq \
            -levhtp \
            -levent \
-           -levent_pthreads
-
+           -levent_pthreads \
+           -lc
 # Test build fakes out cURL
 LDFLAGS_BUILD += -lcurl -lsas
 
