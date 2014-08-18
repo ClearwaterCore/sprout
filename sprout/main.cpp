@@ -38,6 +38,7 @@ extern "C" {
 #include <pjsip.h>
 #include <pjlib-util.h>
 #include <pjlib.h>
+#include "syslog_facade.h"
 }
 
 #include <unistd.h>
@@ -435,6 +436,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
         }
         else
         {
+	  syslog(SYSLOG_ERR, "Fatal - The P-CSCF untrusted and trusted ports specified in /etc/clearwater/config must be in a range from 1 to 65535 but are both 0");
           LOG_ERROR("P-CSCF ports %s invalid", pj_optarg);
           return -1;
         }
@@ -450,6 +452,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
       }
       else
       {
+	syslog(SYSLOG_ERR, "Fatal - The S-CSCF port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of 0");
         LOG_ERROR("S-CSCF port %s is invalid\n", pj_optarg);
         return -1;
       }
@@ -464,6 +467,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
       }
       else
       {
+	syslog(SYSLOG_ERR, "Fatal - The I-CSCF port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of 0");
         LOG_ERROR("I-CSCF port %s is invalid", pj_optarg);
         return -1;
       }
@@ -477,6 +481,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
       }
       else
       {
+	syslog(SYSLOG_ERR, "Fatal - The WebRTC port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of 0");
         LOG_ERROR("WebRTC port %s is invalid", pj_optarg);
         return -1;
       }
@@ -594,7 +599,6 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
 
     case 'M':
       options->store_servers = std::string(pj_optarg);
-      LOG_INFO("Using memcached store with configuration file %s", pj_optarg);
       break;
 
     case 'm':
@@ -615,6 +619,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
         }
         else
         {
+	  syslog(SYSLOG_ERR, "The sas_server option in /etc/clearwater/config is invalid or not configured");
           LOG_WARNING("Invalid --sas option, SAS disabled");
         }
       }
@@ -867,6 +872,8 @@ void exception_handler(int sig)
   signal(SIGABRT, SIG_DFL);
   signal(SIGSEGV, SIG_DFL);
 
+  syslog(SYSLOG_ERR, "Sprout crashing with Signal %d", sig);
+  closelog();
   // Log the signal, along with a backtrace.
   LOG_BACKTRACE("Signal %d caught", sig);
 
@@ -1077,6 +1084,8 @@ int main(int argc, char *argv[])
   opt.daemon = PJ_FALSE;
   opt.interactive = PJ_FALSE;
 
+  openlog("sprout", SYSLOG_PID, SYSLOG_LOCAL6);
+  syslog(SYSLOG_NOTICE, "Sprout started");
   status = init_logging_options(argc, argv, &opt);
 
   if (status != PJ_SUCCESS)
@@ -1086,6 +1095,7 @@ int main(int argc, char *argv[])
 
   if (opt.daemon && opt.interactive)
   {
+    closelog();
     LOG_ERROR("Cannot specify both --daemon and --interactive");
     return 1;
   }
@@ -1132,7 +1142,8 @@ int main(int argc, char *argv[])
   status = init_options(argc, argv, &opt);
   if (status != PJ_SUCCESS)
   {
-    return 1;
+    closelog();
+	return 1;
   }
 
   if (opt.analytics_enabled)
@@ -1144,12 +1155,16 @@ int main(int argc, char *argv[])
 
   if ((!opt.pcscf_enabled) && (!opt.scscf_enabled) && (!opt.icscf_enabled))
   {
+    syslog(SYSLOG_ERR, "Fatal - Must enable P-CSCF, S-CSCF or I-CSCF in /etc/clearwater/config");
+    closelog();
     LOG_ERROR("Must enable P-CSCF, S-CSCF or I-CSCF");
     return 1;
   }
 
   if ((opt.pcscf_enabled) && ((opt.scscf_enabled) || (opt.icscf_enabled)))
   {
+    syslog(SYSLOG_ERR, "Fatal - Cannot enable both P-CSCF and S/I-CSCF in /etc/clearwater/config");
+    closelog();
     LOG_ERROR("Cannot enable both P-CSCF and S/I-CSCF");
     return 1;
   }
@@ -1157,18 +1172,24 @@ int main(int argc, char *argv[])
   if ((opt.pcscf_enabled) &&
       (opt.upstream_proxy == ""))
   {
+    syslog(SYSLOG_ERR, "Fatal - Must enable P-CSCF, S-CSCF or I-CSCF in /etc/clearwater/config");
+    closelog();
     LOG_ERROR("Cannot enable P-CSCF without specifying --routing-proxy");
     return 1;
   }
 
   if ((opt.ibcf) && (!opt.pcscf_enabled))
   {
+    syslog(SYSLOG_ERR, "Fatal - Must enable P-CSCF, S-CSCF or I-CSCF in /etc/clearwater/config");
+    closelog();
     LOG_ERROR("Cannot enable IBCF without also enabling P-CSCF");
     return 1;
   }
 
   if ((opt.webrtc_port != 0 ) && (!opt.pcscf_enabled))
   {
+    syslog(SYSLOG_ERR, "Fatal - WebRTC port is specified and P-CSCF must be  enabled but isn't in /etc/clearwater/config");
+    closelog();
     LOG_ERROR("Cannot enable WebRTC without also enabling P-CSCF");
     return 1;
   }
@@ -1176,18 +1197,24 @@ int main(int argc, char *argv[])
   if (((opt.scscf_enabled) || (opt.icscf_enabled)) &&
       (opt.hss_server == ""))
   {
+    syslog(SYSLOG_ERR, "Fatal - S/I-CSCF enabled with no Homestead server specified in /etc/clearwater/config");
+    closelog();
     LOG_ERROR("S/I-CSCF enabled with no Homestead server");
     return 1;
   }
 
   if ((opt.auth_enabled) && (opt.hss_server == ""))
   {
+    syslog(SYSLOG_ERR, "Fatal - Authentication enabled, but no Homestead server specified in /etc/clearwater/config");
+    closelog();
     LOG_ERROR("Authentication enable, but no Homestead server specified");
     return 1;
   }
 
   if ((opt.xdm_server != "") && (opt.hss_server == ""))
   {
+    syslog(SYSLOG_ERR, "Fatal - Homer XDM service is configured but no Homestead server specified in /etc/clearwater/config");
+    closelog();
     LOG_ERROR("XDM server configured for services, but no Homestead server specified");
     return 1;
   }
@@ -1204,6 +1231,8 @@ int main(int argc, char *argv[])
 
   if (opt.scscf_enabled && (opt.chronos_service == ""))
   {
+    syslog(SYSLOG_ERR, "Fatal - S-CSCF enabled with no Chronos service specified in /etc/clearwater/config");
+    closelog();
     LOG_ERROR("S-CSCF enabled with no Chronos service");
     return 1;
   }
@@ -1274,6 +1303,7 @@ int main(int argc, char *argv[])
 
   if (status != PJ_SUCCESS)
   {
+    syslog(SYSLOG_ERR, "Fatal - Error initializing sip interfaces with error %s", PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Error initializing stack %s", PJUtils::pj_status_to_string(status).c_str());
     return 1;
   }
@@ -1328,6 +1358,7 @@ int main(int argc, char *argv[])
   }
   else
   {
+    syslog(SYSLOG_NOTICE, "Sprout did not start a connection to Ralf because Ralf is not enabled"); 
     // Ralf is not enabled, so create a null ACRFactory for all components.
     scscf_acr_factory = new ACRFactory();
     bgcf_acr_factory = new ACRFactory();
@@ -1428,6 +1459,8 @@ int main(int argc, char *argv[])
 
     if (local_data_store == NULL)
     {
+      syslog(SYSLOG_ERR, "Fatal - Failed to connect to the memcache data store");
+      closelog();
       LOG_ERROR("Failed to connect to data store");
       exit(0);
     }
@@ -1483,6 +1516,8 @@ int main(int argc, char *argv[])
 
     if (status != PJ_SUCCESS)
     {
+      syslog(SYSLOG_ERR, "Fatal - Failed to send a service-route header to the S-CSCF service");
+      closelog();
       LOG_ERROR("Failed to enable S-CSCF registrar");
       return 1;
     }
@@ -1497,6 +1532,8 @@ int main(int argc, char *argv[])
 
     if (status != PJ_SUCCESS)
     {
+      syslog(SYSLOG_ERR, "Fatal - Failed to register the SUBSCRIBE handlers with the SIP stack");
+      closelog();
       LOG_ERROR("Failed to enable subscription module");
       return 1;
     }
@@ -1669,6 +1706,8 @@ int main(int argc, char *argv[])
   status = start_stack();
   if (status != PJ_SUCCESS)
   {
+    syslog(SYSLOG_ERR, "Fatal - The SIP stack failed to initialize with error, %s", PJUtils::pj_status_to_string(status).c_str());
+    closelog();
     LOG_ERROR("Error starting SIP stack, %s", PJUtils::pj_status_to_string(status).c_str());
     return 1;
   }
@@ -1702,6 +1741,7 @@ int main(int argc, char *argv[])
     }
     catch (HttpStack::Exception& e)
     {
+      syslog(SYSLOG_ERR, "An HTTP interface failed to initialize in  %s with error  %d\n", e._func, e._rc);
       LOG_ERROR("Caught HttpStack::Exception - %s - %d\n", e._func, e._rc);
     }
   }
@@ -1709,6 +1749,7 @@ int main(int argc, char *argv[])
   // Wait here until the quite semaphore is signaled.
   sem_wait(&term_sem);
 
+  syslog(SYSLOG_ERR, "Sprout is ending -- Shutting down");
   if (opt.scscf_enabled)
   {
     try
@@ -1718,6 +1759,7 @@ int main(int argc, char *argv[])
     }
     catch (HttpStack::Exception& e)
     {
+      syslog(SYSLOG_ERR, "The HTTP interfaces encountered an error when stopping the HTTP stack in %s with error %d\n", e._func, e._rc);
       LOG_ERROR("Caught HttpStack::Exception - %s - %d\n", e._func, e._rc);
     }
   }
@@ -1799,6 +1841,7 @@ int main(int argc, char *argv[])
 
   sem_destroy(&quiescing_sem);
   sem_destroy(&term_sem);
+  closelog();
 
   return 0;
 }
