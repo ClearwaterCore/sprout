@@ -43,6 +43,7 @@ extern "C" {
 #include <pjsip.h>
 #include <pjlib-util.h>
 #include <pjlib.h>
+#include "syslog_facade.h"
 }
 #include <arpa/inet.h>
 
@@ -390,6 +391,7 @@ static pj_bool_t on_rx_msg(pjsip_rx_data* rdata)
     // The queue has not been serviced for sufficiently long to imply that
     // all the worker threads are deadlock, so exit the process so it will be
     // restarted.
+    syslog(SYSLOG_ERR, "Fatal - Sprout detected a fatal software deadlock affecting SIP communication");
     LOG_ERROR("Detected worker thread deadlock - exiting");
     abort();
   }
@@ -560,6 +562,7 @@ pj_status_t create_udp_transport(int port, pj_str_t& host)
 
   if (status != PJ_SUCCESS)
   {
+    syslog(SYSLOG_ERR, "Failed to start a SIP UDP interface for port %d with error %s", port, PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Failed to start UDP transport for port %d (%s)", port, PJUtils::pj_status_to_string(status).c_str());
   }
 
@@ -596,7 +599,10 @@ pj_status_t create_tcp_listener_transport(int port, pj_str_t& host, pjsip_tpfact
   else
   {
     status = PJ_EAFNOTSUP;
-    LOG_ERROR("Failed to start TCP transport for port %d (%s)",
+    syslog(SYSLOG_ERR, "Failed to start a SIP TCP service for port %d with error %s",
+              port,
+              PJUtils::pj_status_to_string(status).c_str());
+    LOG_ERROR("Failed to start TCP transport for port %d  (%s)",
               port,
               PJUtils::pj_status_to_string(status).c_str());
     return status;
@@ -610,7 +616,10 @@ pj_status_t create_tcp_listener_transport(int port, pj_str_t& host, pjsip_tpfact
 
   if (status != PJ_SUCCESS)
   {
-    LOG_ERROR("Failed to start TCP transport for port %d (%s)",
+    syslog(SYSLOG_ERR, "Failed to start a SIP TCP service for host port %d with error %s",
+              port,
+              PJUtils::pj_status_to_string(status).c_str());
+    LOG_ERROR("Failed to start TCP listener transport for port %d (%s)",
               port,
               PJUtils::pj_status_to_string(status).c_str());
   }
@@ -668,6 +677,7 @@ public:
     {
       destroy_tcp_listener_transport(stack_data.pcscf_untrusted_port,
                                      stack_data.pcscf_untrusted_tcp_factory);
+      syslog(SYSLOG_ERR, "The untrusted P-CSCF service on port %d has ended", stack_data.pcscf_untrusted_port);
     }
   }
 
@@ -679,16 +689,19 @@ public:
     {
       destroy_tcp_listener_transport(stack_data.pcscf_trusted_port,
                                      stack_data.pcscf_trusted_tcp_factory);
+      syslog(SYSLOG_ERR, "The trusted P-CSCF service on port %d has ended", stack_data.pcscf_trusted_port);
     }
     if (stack_data.scscf_tcp_factory != NULL)
     {
       destroy_tcp_listener_transport(stack_data.scscf_port,
                                      stack_data.scscf_tcp_factory);
+      syslog(SYSLOG_ERR, "The S-CSCF service on port %d has ended", stack_data.scscf_port);
     }
     if (stack_data.icscf_tcp_factory != NULL)
     {
       destroy_tcp_listener_transport(stack_data.icscf_port,
                                      stack_data.icscf_tcp_factory);
+      syslog(SYSLOG_ERR, "The I-CSCF service on port %d has ended", stack_data.icscf_port);
     }
   }
 
@@ -955,6 +968,15 @@ pj_status_t init_stack(const std::string& system_name,
     status = start_transports(stack_data.pcscf_untrusted_port,
                               stack_data.public_host,
                               &stack_data.pcscf_untrusted_tcp_factory);
+    if (status == PJ_SUCCESS)
+    {
+      syslog(SYSLOG_NOTICE, "The untrusted P-CSCF service on port %d was started", stack_data.pcscf_untrusted_port);
+    }
+    else
+    {
+      syslog(SYSLOG_ERR, "The untrusted P-CSCF service on port %d failed to initialize", stack_data.pcscf_untrusted_port)
+;
+    }
     PJ_ASSERT_RETURN(status == PJ_SUCCESS, status);
   }
 
@@ -964,6 +986,15 @@ pj_status_t init_stack(const std::string& system_name,
     status = start_transports(stack_data.scscf_port,
                               stack_data.public_host,
                               &stack_data.scscf_tcp_factory);
+    if (status == PJ_SUCCESS)
+    {
+      syslog(SYSLOG_NOTICE, "The S-CSCF service on port %d is now available", stack_data.scscf_port);
+    }
+    else
+    {
+      syslog(SYSLOG_ERR, "The S-CSCF service on port %d failed to initialize", stack_data.scscf_port)
+;
+    }
     PJ_ASSERT_RETURN(status == PJ_SUCCESS, status);
   }
 
@@ -973,6 +1004,15 @@ pj_status_t init_stack(const std::string& system_name,
     status = start_transports(stack_data.icscf_port,
                               stack_data.public_host,
                               &stack_data.icscf_tcp_factory);
+    if (status == PJ_SUCCESS)
+    {
+      syslog(SYSLOG_NOTICE, "The I-CSCF service on port %d is now available", stack_data.icscf_port);
+    }
+    else
+    {
+      syslog(SYSLOG_ERR, "The I-CSCF service on port %d failed to initialize", stack_data.icscf_port)
+;
+    }
     PJ_ASSERT_RETURN(status == PJ_SUCCESS, status);
   }
 

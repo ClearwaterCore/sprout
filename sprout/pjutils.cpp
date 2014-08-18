@@ -44,6 +44,7 @@
 extern "C" {
 #include <pjlib-util.h>
 #include <pjlib.h>
+#include "syslog_facade.h"
 }
 
 #include "stack.h"
@@ -1014,6 +1015,10 @@ pj_status_t PJUtils::send_request(pjsip_tx_data* tdata,
     // off the state data and request here.  Also, this is an unexpected
     // error rather than an indication that the destination server is down,
     // so we don't blacklist.
+    syslog(SYSLOG_ERR, "Failed to send SIP request to %s with error %s",
+              PJUtils::uri_to_string(PJSIP_URI_IN_ROUTING_HDR,
+                                     PJUtils::next_hop(tdata->msg)).c_str(),
+	                             PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Failed to send request to %s",
               PJUtils::uri_to_string(PJSIP_URI_IN_ROUTING_HDR,
                                      PJUtils::next_hop(tdata->msg)).c_str());
@@ -1144,6 +1149,10 @@ pj_status_t PJUtils::send_request_stateless(pjsip_tx_data* tdata, int retries)
     // and the request here.  Also, this would be an unexpected error rather
     // than an indication that the selected destination server is down, so we
     // don't blacklist.
+    syslog(SYSLOG_ERR, "Failed to send SIP request to %s with error %s",
+              PJUtils::uri_to_string(PJSIP_URI_IN_ROUTING_HDR,
+                                     PJUtils::next_hop(tdata->msg)).c_str(),
+	                             PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Failed to send request to %s",
               PJUtils::uri_to_string(PJSIP_URI_IN_ROUTING_HDR,
                                      PJUtils::next_hop(tdata->msg)).c_str());
