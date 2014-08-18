@@ -39,7 +39,7 @@
 	url = git@github.com:Metaswitch/sas-client.git
 [submodule "modules/cpp-common"]
 	path = modules/cpp-common
-	url = git@github.com:Metaswitch/cpp-common.git
+	url = git@github.com:ClearwaterCore/cpp-common.git
 [submodule "modules/libevhtp"]
 	path = modules/libevhtp
 	url = git@github.com:Metaswitch/libevhtp.git
