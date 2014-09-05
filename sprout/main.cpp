@@ -202,6 +202,42 @@ struct options
     { NULL,                0, 0, 0}
   };
 
+static const char* signal_description[] =
+  {
+    "Hangup", // 1
+    "Terminal Interrupt",
+    "Terminal Quit",
+    "Illegal Instruction",
+    "Trace/Breakpoint",
+    "Process Abort",
+    "Bus Error",
+    "Arithmetic Error",
+    "Kill",
+    "USR1", // 10
+    "Segment Trap",
+    "USR2",
+    "PIPE",
+    "Alarm",
+    "Termination",
+    "Stack Fault",
+    "CHLD",
+    "CONT",
+    "Stop",
+    "Terminal stop", // 20
+    "TTIN",
+    "TTOU",
+    "URG",
+    "XCPU",
+    "XFSZ",
+    "VTALRM",
+    "PROF",
+    "WINCH",
+    "POLL",
+    "LOST",
+    "Power", // 30
+    "System"
+  };
+
 static std::string pj_options_description = "p:s:i:l:D:c:C:n:e:I:A:R:M:S:H:T:o:q:X:E:x:f:u:g:r:P:w:a:F:L:K:G:B:dth";
 
 static sem_t term_sem;
@@ -400,7 +436,6 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
         }
         else
         {
-	  syslog(SYSLOG_ERR, "Fatal - The P-CSCF untrusted and trusted ports specified in /etc/clearwater/config must be in a range from 1 to 65535 but are both 0");
           LOG_ERROR("P-CSCF ports %s invalid", pj_optarg);
           return -1;
         }
@@ -445,7 +480,6 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
       }
       else
       {
-	syslog(SYSLOG_ERR, "Fatal - The WebRTC port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of 0");
         LOG_ERROR("WebRTC port %s is invalid", pj_optarg);
         return -1;
       }
@@ -789,8 +823,8 @@ void exception_handler(int sig)
   // Reset the signal handlers so that another exception will cause a crash.
   signal(SIGABRT, SIG_DFL);
   signal(SIGSEGV, SIG_DFL);
-
-  syslog(SYSLOG_ERR, "Sprout crashing with Signal %d", sig);
+  const char* signamep = (sig >= SIGHUP and sig <= SIGSYS) ? signal_description[sig-1] : "Unknown";
+  syslog(SYSLOG_ERR, "Fatal - Sprout has exited or crashed with signal %s", signamep);
   closelog();
   // Log the signal, along with a backtrace.
   LOG_BACKTRACE("Signal %d caught", sig);
@@ -1075,7 +1109,6 @@ int main(int argc, char *argv[])
 
   if ((opt.pcscf_enabled) && ((opt.scscf_enabled) || (opt.icscf_enabled)))
   {
-    syslog(SYSLOG_ERR, "Fatal - Cannot enable both P-CSCF and S/I-CSCF in /etc/clearwater/config");
     closelog();
     LOG_ERROR("Cannot enable both P-CSCF and S/I-CSCF");
     return 1;
@@ -1084,7 +1117,6 @@ int main(int argc, char *argv[])
   if ((opt.pcscf_enabled) &&
       (opt.upstream_proxy == ""))
   {
-    syslog(SYSLOG_ERR, "Fatal - Must enable P-CSCF, S-CSCF or I-CSCF in /etc/clearwater/config");
     closelog();
     LOG_ERROR("Cannot enable P-CSCF without specifying --routing-proxy");
     return 1;
@@ -1092,7 +1124,6 @@ int main(int argc, char *argv[])
 
   if ((opt.ibcf) && (!opt.pcscf_enabled))
   {
-    syslog(SYSLOG_ERR, "Fatal - Must enable P-CSCF, S-CSCF or I-CSCF in /etc/clearwater/config");
     closelog();
     LOG_ERROR("Cannot enable IBCF without also enabling P-CSCF");
     return 1;
@@ -1100,7 +1131,6 @@ int main(int argc, char *argv[])
 
   if ((opt.webrtc_port != 0 ) && (!opt.pcscf_enabled))
   {
-    syslog(SYSLOG_ERR, "Fatal - WebRTC port is specified and P-CSCF must be  enabled but isn't in /etc/clearwater/config");
     closelog();
     LOG_ERROR("Cannot enable WebRTC without also enabling P-CSCF");
     return 1;
@@ -1486,7 +1516,6 @@ int main(int argc, char *argv[])
                                  opt.emerg_reg_accepted);
     if (status != PJ_SUCCESS)
     {
-      syslog(SYSLOG_ERR, "Fatal - The P-CSCF service failed to initialize");
       closelog();
       LOG_ERROR("Failed to enable P-CSCF edge proxy");
       return 1;
@@ -1498,7 +1527,6 @@ int main(int argc, char *argv[])
       status = init_websockets((unsigned short)opt.webrtc_port);
       if (status != PJ_SUCCESS)
       {
-	syslog(SYSLOG_ERR,"Fatal - Could not initialize the WebRTC interface with error %s",PJUtils::pj_status_to_string(status).c_str());
 	closelog();
         LOG_ERROR("Error initializing websockets, %s",
                   PJUtils::pj_status_to_string(status).c_str());
@@ -1520,7 +1548,7 @@ int main(int argc, char *argv[])
 
     if (icscf_proxy == NULL)
     {
-      syslog(SYSLOG_ERR, "Fatal - Failed to initialize the  I-CSCF service");
+      syslog(SYSLOG_ERR, "Fatal - The I-CSCF service failed to initialize");
       closelog();
       LOG_ERROR("Failed to enable I-CSCF proxy");
       return 1;

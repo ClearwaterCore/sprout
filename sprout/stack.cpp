@@ -701,7 +701,7 @@ public:
     {
       destroy_tcp_listener_transport(stack_data.icscf_port,
                                      stack_data.icscf_tcp_factory);
-      syslog(SYSLOG_ERR, "The I-CSCF service on port %d has ended", stack_data.icscf_port);
+      syslog(SYSLOG_ERR, "The I-CSCF service on port %d is no longer available", stack_data.icscf_port);
     }
   }
 
