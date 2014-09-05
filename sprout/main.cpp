@@ -487,7 +487,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
       }
       else
       {
-	syslog(SYSLOG_ERR, "Fatal - The S-CSCF port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of 0");
+	syslog(SYSLOG_ERR, "Fatal - The S-CSCF port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of %s", pj_optarg);
         LOG_ERROR("S-CSCF port %s is invalid\n", pj_optarg);
         return -1;
       }
@@ -502,7 +502,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
       }
       else
       {
-	syslog(SYSLOG_ERR, "Fatal - The I-CSCF port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of 0");
+	syslog(SYSLOG_ERR, "Fatal - The I-CSCF port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of %s", pj_optarg);
         LOG_ERROR("I-CSCF port %s is invalid", pj_optarg);
         return -1;
       }
