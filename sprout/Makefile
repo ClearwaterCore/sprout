@@ -45,6 +45,7 @@ TARGET_SOURCES := logger.cpp \
                   dnsresolver.cpp \
                   bgcfservice.cpp \
                   log.cpp \
+                  sproutdcea.cpp \
                   pjutils.cpp \
                   statistic.cpp \
                   zmq_lvc.cpp \
