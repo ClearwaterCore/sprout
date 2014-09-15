@@ -86,6 +86,12 @@ HSSConnection::~HSSConnection()
   _http = NULL;
 }
 
+/// Set a monitor to track HTTP REST communication state, and set/clear
+/// alarms based upon recent activity.
+void HSSConnection::set_comm_monitor(CommunicationMonitor* comm_monitor)
+{
+  _http->set_comm_monitor(comm_monitor);
+}
 
 /// Get an Authentication Vector as JSON object. Caller is responsible for deleting.
 HTTPCode HSSConnection::get_auth_vector(const std::string& private_user_identity,

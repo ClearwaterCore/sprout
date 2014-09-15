@@ -95,6 +95,8 @@ extern "C" {
 #include "mobiletwinned.h"
 #include "mementoappserver.h"
 #include "call_list_store.h"
+#include "alarm.h"
+#include "communicationmonitor.h"
 
 enum OptionTypes
 {
@@ -1015,6 +1017,30 @@ int main(int argc, char *argv[])
   SproutletProxy* sproutlet_proxy = NULL;
   std::list<Sproutlet*> sproutlets;
 
+  CommunicationMonitor chronos_comm_monitor("sprout", "SPROUT_CHRONOS_COMM_ERROR_CLEAR",
+                                                      "SPROUT_CHRONOS_COMM_ERROR_MAJOR");
+
+  CommunicationMonitor enum_comm_monitor("sprout", "SPROUT_ENUM_COMM_ERROR_CLEAR",
+                                                   "SPROUT_ENUM_COMM_ERROR_MAJOR");
+
+  CommunicationMonitor hss_comm_monitor("sprout", "SPROUT_HOMESTEAD_COMM_ERROR_CLEAR",
+                                                  "SPROUT_HOMESTEAD_COMM_ERROR_CRITICAL");
+
+  CommunicationMonitor memcached_comm_monitor("sprout", "SPROUT_MEMCACHED_COMM_ERROR_CLEAR",
+                                                        "SPROUT_MEMCACHED_COMM_ERROR_CRITICAL");
+
+  CommunicationMonitor memcached_remote_comm_monitor("sprout", "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CLEAR",
+                                                               "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CRITICAL");
+
+  CommunicationMonitor ralf_comm_monitor("sprout", "SPROUT_RALF_COMM_ERROR_CLEAR", 
+                                                   "SPROUT_RALF_COMM_ERROR_MAJOR");
+
+  AlarmPair vbucket_alarms("sprout", "SPROUT_VBUCKET_ERROR_CLEAR",
+                                     "SPROUT_VBUCKET_ERROR_MAJOR");
+
+  AlarmPair remote_vbucket_alarms("sprout", "SPROUT_REMOTE_VBUCKET_ERROR_CLEAR",
+                                            "SPROUT_REMOTE_VBUCKET_ERROR_MAJOR");
+
   // Set up our exception signal handler for asserts and segfaults.
   signal(SIGABRT, exception_handler);
   signal(SIGSEGV, exception_handler);
@@ -1243,6 +1269,10 @@ int main(int argc, char *argv[])
   seed = (unsigned int)now.sec ^ (unsigned int)now.msec ^ getpid();
   srand(seed);
 
+  // Start the alarm request agent
+  AlarmReqAgent::get_instance().start();
+  Alarm::clear_all("sprout");
+
   // Start the load monitor
   load_monitor = new LoadMonitor(TARGET_LATENCY, MAX_TOKENS, INITIAL_TOKEN_RATE, MIN_TOKEN_RATE);
 
@@ -1291,6 +1321,8 @@ int main(int argc, char *argv[])
                                          load_monitor,
                                          stack_data.stats_aggregator,
                                          SASEvent::HttpLogLevel::PROTOCOL);
+
+    ralf_connection->set_comm_monitor(&ralf_comm_monitor);
   }
 
   // Initialise the OPTIONS handling module.
@@ -1304,6 +1336,8 @@ int main(int argc, char *argv[])
                                        http_resolver,
                                        load_monitor,
                                        stack_data.stats_aggregator);
+
+    hss_connection->set_comm_monitor(&hss_comm_monitor);
   }
 
   if (ralf_connection != NULL)
@@ -1354,6 +1388,8 @@ int main(int argc, char *argv[])
     chronos_connection = new ChronosConnection(opt.chronos_service,
                                                chronos_callback_host,
                                                http_resolver);
+
+    chronos_connection->set_comm_monitor(&chronos_comm_monitor);
   }
 
   if (opt.pcscf_enabled)
@@ -1412,11 +1448,15 @@ int main(int argc, char *argv[])
       // Use memcached store.
       LOG_STATUS("Using memcached compatible store with ASCII protocol");
       local_data_store = (Store*)new MemcachedStore(false, opt.store_servers);
+      ((MemcachedStore*)local_data_store)->set_comm_monitor(&memcached_comm_monitor);
+      ((MemcachedStore*)local_data_store)->set_vbucket_alarms(&vbucket_alarms);
       if (opt.remote_store_servers != "")
       {
         // Use remote memcached store too.
         LOG_STATUS("Using remote memcached compatible store with ASCII protocol");
         remote_data_store = (Store*)new MemcachedStore(false, opt.remote_store_servers);
+        ((MemcachedStore*)local_data_store)->set_comm_monitor(&memcached_remote_comm_monitor);
+        ((MemcachedStore*)local_data_store)->set_vbucket_alarms(&remote_vbucket_alarms);
       }
     }
     else
@@ -1466,6 +1506,7 @@ int main(int argc, char *argv[])
     if (!opt.enum_server.empty())
     {
       enum_service = new DNSEnumService(opt.enum_server, opt.enum_suffix);
+      ((DNSEnumService*)enum_service)->set_comm_monitor(&enum_comm_monitor);
     }
     else if (!opt.enum_file.empty())
     {
@@ -1708,6 +1749,9 @@ int main(int argc, char *argv[])
 
   // Wait here until the quite semaphore is signaled.
   sem_wait(&term_sem);
+
+  // Stop the alarm request agent
+  AlarmReqAgent::get_instance().stop();
 
   if (opt.scscf_enabled)
   {

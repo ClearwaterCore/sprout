@@ -80,7 +80,9 @@ TARGET_SOURCES := logger.cpp \
                   bgcfsproutlet.cpp \
                   icscfsproutlet.cpp \
                   contact_filtering.cpp \
-                  mobiletwinned.cpp
+                  mobiletwinned.cpp \
+                  alarm.cpp \
+                  communicationmonitor.cpp
 
 TARGET_SOURCES_BUILD := main.cpp
 

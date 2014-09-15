@@ -239,7 +239,8 @@ DNSEnumService::DNSEnumService(const std::string& dns_server,
                                const std::string& dns_suffix,
                                const DNSResolverFactory* resolver_factory) :
                                _dns_suffix(dns_suffix),
-                               _resolver_factory(resolver_factory)
+                               _resolver_factory(resolver_factory),
+                               _comm_monitor(NULL)
 {
   // Initialize the ares library.  This might have already been done by curl
   // but it's safe to do it twice.
@@ -281,6 +282,12 @@ DNSEnumService::~DNSEnumService()
 
   delete _resolver_factory;
   _resolver_factory = NULL;
+}
+
+
+void DNSEnumService::set_comm_monitor(CommunicationMonitor* comm_monitor)
+{
+  _comm_monitor = comm_monitor;
 }
 
 
@@ -386,6 +393,20 @@ std::string DNSEnumService::lookup_uri_from_user(const std::string& user, SAS::T
     SAS::report_event(event);
     // On failure, we must return an empty (rather than incomplete) string.
     string = std::string("");
+  }
+
+  // Peg state of last communication attempt (which may potentially set/clear
+  // an associated alarm). 
+  if (_comm_monitor)
+  {
+    if (failed)
+    {
+      _comm_monitor->inform_failure();
+    }
+    else
+    {
+      _comm_monitor->inform_success();
+    }
   }
 
   return string;

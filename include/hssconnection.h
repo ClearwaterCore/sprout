@@ -64,6 +64,8 @@ public:
                 LastValueCache *stats_aggregator);
   ~HSSConnection();
 
+  void set_comm_monitor(CommunicationMonitor* comm_monitor);
+
   HTTPCode get_auth_vector(const std::string& private_user_id,
                            const std::string& public_user_id,
                            const std::string& auth_type,
