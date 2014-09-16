@@ -46,334 +46,334 @@
 / Effect:
 / Action:
 **********************************************************/
-SysLog1<const char*> CL_SPROUT_INVALID_S_CSCF_PORT
+PDLog1<const char*> CL_SPROUT_INVALID_S_CSCF_PORT
   (
    CL_SPROUT_ID + 1,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The S-CSCF port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of %s",
    "The scscf=<port> port value is outside the permitted range",
    "The sprout application will exit.",
    "Correct the port value.  Typically this is set to port value 5054 as an example"
    );
-SysLog1<const char*> CL_SPROUT_INVALID_I_CSCF_PORT
+PDLog1<const char*> CL_SPROUT_INVALID_I_CSCF_PORT
   (
    CL_SPROUT_ID + 2,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - The I-CSCF port specified in /etc/clearwater/config must be in a range from 1 to 65535 but has a value of %s",
    "The icscf=<port> value is outside the permitted range",
    "The sprout application will exit",
    "Correct the port value.  Typically this is set to 5052"
    );
-SysLog CL_SPROUT_INVALID_SAS_OPTION 
+PDLog CL_SPROUT_INVALID_SAS_OPTION 
   (
    CL_SPROUT_ID + 3,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The sas_server option in /etc/clearwater/config is invalid or not configured",
    "The interface to the SAS is not specified.",
    "No call traces will appear in the sas",
    "Set the fully qualified sas hostname for the sas_server=<host> option.  Example: sas_server=sas-1.os3.richlab.datcon.co.uk.  The application must be restarted to take effect."
    );
-SysLog1<const char*> CL_SPROUT_CRASH
+PDLog1<const char*> CL_SPROUT_CRASH
   (
    CL_SPROUT_ID + 4,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - Sprout has exited or crashed with signal %s",
    "Sprout has encountered a fatal software error or has been terminated",
    "The Sprout application will restart.",
    "This error can occur if Sprout has been terminated by operator command.  Check the craft log to see if Monit has reported a sprout timeout.  This would be reported as a 'poll_sprout' failed.  Monit will restart sprout for this case.  Actual crashes such as abort, segment trap, bus error trap, should be reported as a problem. "
    );
-SysLog CL_SPROUT_STARTED
+PDLog CL_SPROUT_STARTED
   (
    CL_SPROUT_ID + 5,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Sprout started",
    "The Sprout application is starting.",
    "Normal",
    "None"
    );
-SysLog CL_SPROUT_NO_PSI_CSCF
+PDLog CL_SPROUT_NO_PSI_CSCF
   (
    CL_SPROUT_ID + 6,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - Must enable P-CSCF, S-CSCF or I-CSCF in /etc/clearwater/config",
    "Neither a P-CSCF, S-CSCF, nor an I-CSCF was configured in the /etc/clearwater/config",
    "The Sprout application will exit until the problem is fixed.",
    "The P-CSCF is configured by setting the pcscf=<port> option.  The I-CSCF is configured by setting the scfcf=<port> option.  The I-CSCF is configured by setting the icscf=<port> option."
    );
-SysLog CL_SPROUT_SI_CSCF_NO_HOMESTEAD
+PDLog CL_SPROUT_SI_CSCF_NO_HOMESTEAD
   (
    CL_SPROUT_ID + 7,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - S/I-CSCF enabled with no Homestead server specified in /etc/clearwater/config",
    "The S-CSCF and/or the I-CSCF options (scscf=<port>, icscf=<port>) were configured in the /etc/clearwater/config file but no Homestead was configured in the same file.",
    "The Sprout application will exit until the problem is fixed.",
    "Set the hs_hostname=<fully-qualified-homestead-name> option in the /etc/clearwater/config file.  Example: hs_hostname=homestead-1.os3.richlab.datcon.co.uk"
    );
-SysLog CL_SPROUT_AUTH_NO_HOMESTEAD
+PDLog CL_SPROUT_AUTH_NO_HOMESTEAD
   (
    CL_SPROUT_ID + 8,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - Authentication enabled, but no Homestead server specified in /etc/clearwater/config",
    "The hs_hostname was not set in the /etc/clearwater/config file",
    "The Sprout application will exit.",
    "Set the hs_hostname=<fully-qualified-homestead-name> option in the /etc/clearwater/config file.  Example: hs_hostname=homestead-1.os3.richlab.datcon.co.uk"
    );
-SysLog CL_SPROUT_XDM_NO_HOMESTEAD
+PDLog CL_SPROUT_XDM_NO_HOMESTEAD
   (
    CL_SPROUT_ID + 9,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - Homer XDM service is configured but no Homestead server specified in /etc/clearwater/config",
    "",
    "",
    ""
    );
-SysLog CL_SPROUT_S_CSCF_NO_CHRONOS
+PDLog CL_SPROUT_S_CSCF_NO_CHRONOS
   (
    CL_SPROUT_ID + 10,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - S-CSCF enabled with no Chronos service specified in /etc/clearwater/config",
    "The chronos_hostname=<host:port> was not set in /etc/clearwater/config",
    "The Sprout application will exit.",
    "Set the chronos_hostname=<host:port> option in the /etc/clearwater/config. Example: chronos_hostname=localhost:7253 "
    );
-SysLog CL_SPROUT_BAD_S_CSCF_JSON
+PDLog CL_SPROUT_BAD_S_CSCF_JSON
   (
    CL_SPROUT_ID + 11,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "2011 - Fatal - Missing or malformed /etc/clearwater/s-cscf.json file",
    "",
    "",
    ""
    );
-SysLog1<const char*> CL_SPROUT_SIP_INIT_IFC_FAIL
+PDLog1<const char*> CL_SPROUT_SIP_INIT_IFC_FAIL
   (
    CL_SPROUT_ID + 12,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - Error initializing sip interfaces with error %s",
    "",
    "",
    ""
    );
-SysLog CL_SPROUT_NO_RALF_CONFIGURED
+PDLog CL_SPROUT_NO_RALF_CONFIGURED
   (
    CL_SPROUT_ID + 13,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "2013 - Sprout did not start a connection to Ralf because Ralf is not enabled",
    "",
    "",
    ""
    );
-SysLog CL_SPROUT_MEMCACHE_CONN_FAIL
+PDLog CL_SPROUT_MEMCACHE_CONN_FAIL
   (
    CL_SPROUT_ID + 14,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - Failed to connect to the memcache data store",
    "",
    "",
    ""
    );
-SysLog1<const char*> CL_SPROUT_INIT_SERVICE_ROUTE_FAIL
+PDLog1<const char*> CL_SPROUT_INIT_SERVICE_ROUTE_FAIL
   (
    CL_SPROUT_ID + 15,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - Failed to send a service-route header to the S-CSCF service %s",
    "On initialization Sprout sends a service route request.  This failed.",
    "The S-CSCF was not enabled",
    "The Sprout application fails.  Report the problem as a softwae issue."
    );
-SysLog1<const char*> CL_SPROUT_REG_SUBSCRIBER_HAND_FAIL
+PDLog1<const char*> CL_SPROUT_REG_SUBSCRIBER_HAND_FAIL
   (
    CL_SPROUT_ID + 16,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - Failed to register the SUBSCRIBE handlers with the SIP stack %s",
    "",
    "",
    ""
    );
-SysLog1<const char*> CL_SPROUT_S_CSCF_INIT_FAIL
+PDLog1<const char*> CL_SPROUT_S_CSCF_INIT_FAIL
   (
    CL_SPROUT_ID + 17,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - The S-CSCF service failed to initialize %s",
    "The S-CSCF did not initialize",
    "The S-CSCF proxy is not enabled.",
    "Report the error."
    );
-SysLog CL_SPROUT_I_CSCF_INIT_FAIL 
+PDLog CL_SPROUT_I_CSCF_INIT_FAIL 
   (
    CL_SPROUT_ID + 18,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - The I-CSCF service failed to initialize",
    "",
    "",
    ""
    );
-SysLog1<const char*> CL_SPROUT_SIP_STACK_INIT_FAIL
+PDLog1<const char*> CL_SPROUT_SIP_STACK_INIT_FAIL
   (
    CL_SPROUT_ID + 19,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - The SIP stack failed to initialize with error, %s",
    "",
    "",
    ""
    );
-SysLog2<const char*, int> CL_SPROUT_HTTP_IFC_FAIL
+PDLog2<const char*, int> CL_SPROUT_HTTP_IFC_FAIL
   (
    CL_SPROUT_ID + 20,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "An HTTP interface failed to initializeor start in %s with error %d",
    "",
    "",
    ""
    );
-SysLog CL_SPROUT_ENDED 
+PDLog CL_SPROUT_ENDED 
   (
    CL_SPROUT_ID + 21,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Sprout is ending -- Shutting down",
    "",
    "",
    ""
    );
-SysLog2<const char*, int> CL_SPROUT_HTTP_IFC_STOP_FAIL
+PDLog2<const char*, int> CL_SPROUT_HTTP_IFC_STOP_FAIL
   (
    CL_SPROUT_ID + 22,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The HTTP interfaces encountered an error when stopping the HTTP stack in %s with error %d",
    "",
    "",
    ""
    );
-SysLog2<const char*, const char*> CL_SPROUT_SIP_SEND_REQUEST_ERR
+PDLog2<const char*, const char*> CL_SPROUT_SIP_SEND_REQUEST_ERR
   (
    CL_SPROUT_ID + 23,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Failed to send SIP request to %s with error %s",
    "",
    "",
    ""
    );
-SysLog CL_SPROUT_SIP_DEADLOCK
+PDLog CL_SPROUT_SIP_DEADLOCK
   (
    CL_SPROUT_ID + 24,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Fatal - Sprout detected a fatal software deadlock affecting SIP communication",
    "",
    "",
    ""
    );
-SysLog2<int, const char*> CL_SPROUT_SIP_UDP_IFC_START_FAIL
+PDLog2<int, const char*> CL_SPROUT_SIP_UDP_IFC_START_FAIL
   (
    CL_SPROUT_ID + 25,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Failed to start a SIP UDP interface for port %d with error %s",
    "",
    "",
    ""
    );
-SysLog2<int, const char*> CL_SPROUT_SIP_TCP_START_FAIL
+PDLog2<int, const char*> CL_SPROUT_SIP_TCP_START_FAIL
   (
    CL_SPROUT_ID + 26,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Failed to start a SIP TCP transport for port %d with error %s",
    "",
    "",
    ""
    );
-SysLog2<int, const char*> CL_SPROUT_SIP_TCP_SERVICE_START_FAIL
+PDLog2<int, const char*> CL_SPROUT_SIP_TCP_SERVICE_START_FAIL
   (
    CL_SPROUT_ID + 27,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "Failed to start a SIP TCP service for port %d with error %s",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_UNTRUSTED_P_CSCF_END 
+PDLog1<int> CL_SPROUT_UNTRUSTED_P_CSCF_END 
   (
    CL_SPROUT_ID + 28,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The untrusted P-CSCF service on port %d has ended",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_TRUSTED_P_CSCF_END
+PDLog1<int> CL_SPROUT_TRUSTED_P_CSCF_END
   (
    CL_SPROUT_ID + 29,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The trusted P-CSCF service on port %d has ended",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_S_CSCF_END
+PDLog1<int> CL_SPROUT_S_CSCF_END
   (
    CL_SPROUT_ID + 30,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The S-CSCF service on port %d has ended",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_I_CSCF_END
+PDLog1<int> CL_SPROUT_I_CSCF_END
   (
    CL_SPROUT_ID + 31,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The I-CSCF service on port %d has ended",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_UNTRUSTED_P_CSCF_STARTED
+PDLog1<int> CL_SPROUT_UNTRUSTED_P_CSCF_STARTED
   (
    CL_SPROUT_ID + 32,
-   SYSLOG_NOTICE,
+   PDLOG_NOTICE,
    "The untrusted P-CSCF service on port %d was started",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_P_CSCF_INIT_FAIL
+PDLog1<int> CL_SPROUT_P_CSCF_INIT_FAIL
   (
    CL_SPROUT_ID + 33,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The untrusted P-CSCF service on port %d failed to initialize",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_S_CSCF_AVAIL
+PDLog1<int> CL_SPROUT_S_CSCF_AVAIL
   (
    CL_SPROUT_ID + 34,
-   SYSLOG_NOTICE,
+   PDLOG_NOTICE,
    "The S-CSCF service on port %d is now available",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_S_CSCF_INIT_FAIL2
+PDLog1<int> CL_SPROUT_S_CSCF_INIT_FAIL2
   (
    CL_SPROUT_ID + 35,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The S-CSCF service on port %d failed to initialize",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_I_CSCF_AVAIL
+PDLog1<int> CL_SPROUT_I_CSCF_AVAIL
   (
    CL_SPROUT_ID + 36,
-   SYSLOG_NOTICE,
+   PDLOG_NOTICE,
    "The I-CSCF service on port %d is now available",
    "",
    "",
    ""
    );
-SysLog1<int> CL_SPROUT_I_CSCF_INIT_FAIL2
+PDLog1<int> CL_SPROUT_I_CSCF_INIT_FAIL2
   (
    CL_SPROUT_ID + 37,
-   SYSLOG_ERR,
+   PDLOG_ERR,
    "The I-CSCF service on port %d failed to initialize",
    "",
    "",
