@@ -44,7 +44,6 @@ TARGET_SOURCES := logger.cpp \
                   dnsresolver.cpp \
                   bgcfservice.cpp \
                   log.cpp \
-                  sproutdcea.cpp \
                   pjutils.cpp \
                   statistic.cpp \
                   zmq_lvc.cpp \
@@ -74,8 +73,7 @@ TARGET_SOURCES := logger.cpp \
                   httpstack_utils.cpp \
                   handlers.cpp \
                   ipv6utils.cpp \
-                  contact_filtering.cpp \
-                  cpp_common_dcea.cpp
+                  contact_filtering.cpp
 
 TARGET_SOURCES_BUILD := main.cpp
 
