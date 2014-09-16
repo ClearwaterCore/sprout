@@ -1030,7 +1030,7 @@ int main(int argc, char *argv[])
   opt.daemon = PJ_FALSE;
   opt.interactive = PJ_FALSE;
 
-  openlog("sprout", SYSLOG_PID, SYSLOG_LOCAL6);
+  openlog("sprout", PDLOG_PID, PDLOG_LOCAL6);
   CL_SPROUT_STARTED.log();
   status = init_logging_options(argc, argv, &opt);
 
