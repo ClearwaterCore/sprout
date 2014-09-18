@@ -55,11 +55,14 @@ class HssConnectionTest : public BaseTest
 {
   FakeHttpResolver _resolver;
   HSSConnection _hss;
+  CommunicationMonitor _cm;
 
   HssConnectionTest() :
     _resolver("10.42.42.42"),
-    _hss("narcissus", &_resolver, NULL, NULL)
+    _hss("narcissus", &_resolver, NULL, NULL),
+    _cm("sprout", "SPROUT_HOMESTEAD_COMM_ERROR_CLEAR", "SPROUT_HOMESTEAD_COMM_ERROR_CRITICAL")
   {
+    _hss.set_comm_monitor(&_cm);
     fakecurl_responses.clear();
     fakecurl_responses_with_body[std::make_pair("http://10.42.42.42:80/impu/pubid42/reg-data", "{\"reqtype\": \"reg\"}")] =
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"

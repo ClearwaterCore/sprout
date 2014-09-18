@@ -401,7 +401,7 @@ std::string DNSEnumService::lookup_uri_from_user(const std::string& user, SAS::T
   {
     if (failed)
     {
-      _comm_monitor->inform_failure();
+      _comm_monitor->inform_failure(); // LCOV_EXCL_LINE - No UT for comm fail 
     }
     else
     {
