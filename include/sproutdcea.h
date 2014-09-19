@@ -87,7 +87,7 @@ static const PDLog1<const char*> CL_SPROUT_CRASH
    "Fatal - Sprout has exited or crashed with signal %s",
    "Sprout has encountered a fatal software error or has been terminated",
    "The Sprout application will restart.",
-   4,
+   3,
    "This error can occur if Sprout has been terminated by operator command.",
    "Check the craft log to see if Monit has reported a sprout timeout.  This would be reported as a 'poll_sprout' failed.  Monit will restart sprout for this case.",
    "Actual crashes such as abort, segment trap, bus error trap, should be reported as a problem. "
@@ -423,10 +423,9 @@ static const PDLog1<int> CL_SPROUT_I_CSCF_AVAIL
    PDLOG_NOTICE,
    "The I-CSCF service on port %d is now available",
    "The I-CSCF service is now available.",
-   "Call processing is no longer available.",
-   2,
-   "(1). Restart the Sprout application.",
-   "(2).  If the problem persists report the issue."
+   "Normal.",
+   1,
+   "None"
    );
 static const PDLog1<int> CL_SPROUT_I_CSCF_INIT_FAIL2
   (
