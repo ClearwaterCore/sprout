@@ -261,11 +261,11 @@ static const PDLog CL_SPROUT_ENDED
    PDLogBase::CL_SPROUT_ID + 21,
    PDLOG_ERR,
    "Sprout is ending -- Shutting down",
-  "Sprout has been terminated by monit or has exited",
-  "Sprout services are not longer available",
+   "Sprout has been terminated by monit or has exited",
+   "Sprout services are no longer available",
    2,
-  "(1)This occurs normally when Sprout is stopped.",
-  "(2). If Sprout failed to respond then monit can restart Chronos.  Report this issue."
+   "(1)This occurs normally when Sprout is stopped.",
+   "(2). If Sprout failed to respond then monit can restart Chronos.  Report this issue."
    );
 static const PDLog2<const char*, int> CL_SPROUT_HTTP_IFC_STOP_FAIL
   (
