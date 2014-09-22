@@ -108,7 +108,8 @@ enum OptionTypes
   OPT_MEMENTO_THREADS,
   OPT_CALL_LIST_TTL,
   OPT_MEMENTO_ENABLED,
-  OPT_GEMINI_ENABLED
+  OPT_GEMINI_ENABLED,
+  OPT_ALARMS_ENABLED
 };
 
 struct options
@@ -167,6 +168,7 @@ struct options
   int                    call_list_ttl;
   pj_bool_t              memento_enabled;
   pj_bool_t              gemini_enabled;
+  pj_bool_t              alarms_enabled;
   int                    worker_threads;
   pj_bool_t              log_to_file;
   std::string            log_directory;
@@ -222,6 +224,7 @@ struct options
     { "call-list-ttl", required_argument, 0, OPT_CALL_LIST_TTL},
     { "memento-enabled", no_argument, 0, OPT_MEMENTO_ENABLED},
     { "gemini-enabled", no_argument, 0, OPT_GEMINI_ENABLED},
+    { "alarms-enabled", no_argument, 0, OPT_ALARMS_ENABLED},
     { "log-level",         required_argument, 0, 'L'},
     { "daemon",            no_argument,       0, 'd'},
     { "interactive",       no_argument,       0, 't'},
@@ -343,6 +346,7 @@ static void usage(void)
        "     --call-list-ttl N      Time to store call lists entries (default: 604800)\n"
        "     --memento-enabled      Whether the memento AS is enabled (default: false)\n"
        "     --gemini-enabled       Whether the gemini AS is enabled (default: false)\n"
+       "     --alarms-enabled       Whether SNMP alarms are enabled (default: false)\n"
        " -F, --log-file <directory>\n"
        "                            Log to file in specified directory\n"
        " -L, --log-level N          Set log level to N (default: 4)\n"
@@ -800,6 +804,11 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
       LOG_INFO("Gemini AS is enabled");
       break;
 
+    case OPT_ALARMS_ENABLED:
+      options->alarms_enabled = PJ_TRUE;
+      LOG_INFO("SNMP alarms are enabled");
+      break;
+
     case 'h':
       usage();
       return -1;
@@ -1016,30 +1025,14 @@ int main(int argc, char *argv[])
   CallListStore::Store* call_list_store = NULL;
   SproutletProxy* sproutlet_proxy = NULL;
   std::list<Sproutlet*> sproutlets;
-
-  CommunicationMonitor chronos_comm_monitor("sprout", "SPROUT_CHRONOS_COMM_ERROR_CLEAR",
-                                                      "SPROUT_CHRONOS_COMM_ERROR_MAJOR");
-
-  CommunicationMonitor enum_comm_monitor("sprout", "SPROUT_ENUM_COMM_ERROR_CLEAR",
-                                                   "SPROUT_ENUM_COMM_ERROR_MAJOR");
-
-  CommunicationMonitor hss_comm_monitor("sprout", "SPROUT_HOMESTEAD_COMM_ERROR_CLEAR",
-                                                  "SPROUT_HOMESTEAD_COMM_ERROR_CRITICAL");
-
-  CommunicationMonitor memcached_comm_monitor("sprout", "SPROUT_MEMCACHED_COMM_ERROR_CLEAR",
-                                                        "SPROUT_MEMCACHED_COMM_ERROR_CRITICAL");
-
-  CommunicationMonitor memcached_remote_comm_monitor("sprout", "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CLEAR",
-                                                               "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CRITICAL");
-
-  CommunicationMonitor ralf_comm_monitor("sprout", "SPROUT_RALF_COMM_ERROR_CLEAR", 
-                                                   "SPROUT_RALF_COMM_ERROR_MAJOR");
-
-  AlarmPair vbucket_alarms("sprout", "SPROUT_VBUCKET_ERROR_CLEAR",
-                                     "SPROUT_VBUCKET_ERROR_MAJOR");
-
-  AlarmPair remote_vbucket_alarms("sprout", "SPROUT_REMOTE_VBUCKET_ERROR_CLEAR",
-                                            "SPROUT_REMOTE_VBUCKET_ERROR_MAJOR");
+  CommunicationMonitor* chronos_comm_monitor = NULL;
+  CommunicationMonitor* enum_comm_monitor = NULL;
+  CommunicationMonitor* hss_comm_monitor = NULL;
+  CommunicationMonitor* memcached_comm_monitor = NULL;
+  CommunicationMonitor* memcached_remote_comm_monitor = NULL;
+  CommunicationMonitor* ralf_comm_monitor = NULL;
+  AlarmPair* vbucket_alarms = NULL;
+  AlarmPair* remote_vbucket_alarms = NULL;
 
   // Set up our exception signal handler for asserts and segfaults.
   signal(SIGABRT, exception_handler);
@@ -1098,6 +1091,7 @@ int main(int argc, char *argv[])
   opt.call_list_ttl = 604800;
   opt.memento_enabled = PJ_FALSE;
   opt.gemini_enabled = PJ_FALSE;
+  opt.alarms_enabled = PJ_FALSE;
   opt.log_to_file = PJ_FALSE;
   opt.log_level = 0;
   opt.daemon = PJ_FALSE;
@@ -1269,9 +1263,37 @@ int main(int argc, char *argv[])
   seed = (unsigned int)now.sec ^ (unsigned int)now.msec ^ getpid();
   srand(seed);
 
-  // Start the alarm request agent
-  AlarmReqAgent::get_instance().start();
-  Alarm::clear_all("sprout");
+  if ((! opt.pcscf_enabled) && opt.alarms_enabled)
+  {
+    // Create Sprout's alarm objects
+    chronos_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_CHRONOS_COMM_ERROR_CLEAR",
+                                                              "SPROUT_CHRONOS_COMM_ERROR_MAJOR");
+
+    enum_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_ENUM_COMM_ERROR_CLEAR",
+                                                           "SPROUT_ENUM_COMM_ERROR_MAJOR");
+
+    hss_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_HOMESTEAD_COMM_ERROR_CLEAR",
+                                                          "SPROUT_HOMESTEAD_COMM_ERROR_CRITICAL");
+
+    memcached_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_MEMCACHED_COMM_ERROR_CLEAR",
+                                                                "SPROUT_MEMCACHED_COMM_ERROR_CRITICAL");
+
+    memcached_remote_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CLEAR",
+                                                                       "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CRITICAL");
+
+    ralf_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_RALF_COMM_ERROR_CLEAR", 
+                                                           "SPROUT_RALF_COMM_ERROR_MAJOR");
+
+    vbucket_alarms = new AlarmPair("sprout", "SPROUT_VBUCKET_ERROR_CLEAR",
+                                             "SPROUT_VBUCKET_ERROR_MAJOR");
+
+    remote_vbucket_alarms = new AlarmPair("sprout", "SPROUT_REMOTE_VBUCKET_ERROR_CLEAR",
+                                                    "SPROUT_REMOTE_VBUCKET_ERROR_MAJOR");
+
+    // Start the alarm request agent
+    AlarmReqAgent::get_instance().start();
+    Alarm::clear_all("sprout");
+  }
 
   // Start the load monitor
   load_monitor = new LoadMonitor(TARGET_LATENCY, MAX_TOKENS, INITIAL_TOKEN_RATE, MIN_TOKEN_RATE);
@@ -1322,7 +1344,7 @@ int main(int argc, char *argv[])
                                          stack_data.stats_aggregator,
                                          SASEvent::HttpLogLevel::PROTOCOL);
 
-    ralf_connection->set_comm_monitor(&ralf_comm_monitor);
+    ralf_connection->set_comm_monitor(ralf_comm_monitor);
   }
 
   // Initialise the OPTIONS handling module.
@@ -1337,7 +1359,7 @@ int main(int argc, char *argv[])
                                        load_monitor,
                                        stack_data.stats_aggregator);
 
-    hss_connection->set_comm_monitor(&hss_comm_monitor);
+    hss_connection->set_comm_monitor(hss_comm_monitor);
   }
 
   if (ralf_connection != NULL)
@@ -1389,7 +1411,7 @@ int main(int argc, char *argv[])
                                                chronos_callback_host,
                                                http_resolver);
 
-    chronos_connection->set_comm_monitor(&chronos_comm_monitor);
+    chronos_connection->set_comm_monitor(chronos_comm_monitor);
   }
 
   if (opt.pcscf_enabled)
@@ -1448,15 +1470,15 @@ int main(int argc, char *argv[])
       // Use memcached store.
       LOG_STATUS("Using memcached compatible store with ASCII protocol");
       local_data_store = (Store*)new MemcachedStore(false, opt.store_servers);
-      ((MemcachedStore*)local_data_store)->set_comm_monitor(&memcached_comm_monitor);
-      ((MemcachedStore*)local_data_store)->set_vbucket_alarms(&vbucket_alarms);
+      ((MemcachedStore*)local_data_store)->set_comm_monitor(memcached_comm_monitor);
+      ((MemcachedStore*)local_data_store)->set_vbucket_alarms(vbucket_alarms);
       if (opt.remote_store_servers != "")
       {
         // Use remote memcached store too.
         LOG_STATUS("Using remote memcached compatible store with ASCII protocol");
         remote_data_store = (Store*)new MemcachedStore(false, opt.remote_store_servers);
-        ((MemcachedStore*)local_data_store)->set_comm_monitor(&memcached_remote_comm_monitor);
-        ((MemcachedStore*)local_data_store)->set_vbucket_alarms(&remote_vbucket_alarms);
+        ((MemcachedStore*)local_data_store)->set_comm_monitor(memcached_remote_comm_monitor);
+        ((MemcachedStore*)local_data_store)->set_vbucket_alarms(remote_vbucket_alarms);
       }
     }
     else
@@ -1506,7 +1528,7 @@ int main(int argc, char *argv[])
     if (!opt.enum_server.empty())
     {
       enum_service = new DNSEnumService(opt.enum_server, opt.enum_suffix);
-      ((DNSEnumService*)enum_service)->set_comm_monitor(&enum_comm_monitor);
+      ((DNSEnumService*)enum_service)->set_comm_monitor(enum_comm_monitor);
     }
     else if (!opt.enum_file.empty())
     {
@@ -1750,9 +1772,6 @@ int main(int argc, char *argv[])
   // Wait here until the quite semaphore is signaled.
   sem_wait(&term_sem);
 
-  // Stop the alarm request agent
-  AlarmReqAgent::get_instance().stop();
-
   if (opt.scscf_enabled)
   {
     try
@@ -1829,6 +1848,22 @@ int main(int argc, char *argv[])
 
   delete analytics_logger;
   delete analytics_logger_logger;
+
+  if ((! opt.pcscf_enabled) && opt.alarms_enabled)
+  {
+    // Stop the alarm request agent
+    AlarmReqAgent::get_instance().stop();
+
+    // Delete Sprout's alarm objects
+    delete chronos_comm_monitor;
+    delete enum_comm_monitor;
+    delete hss_comm_monitor;
+    delete memcached_comm_monitor;
+    delete memcached_remote_comm_monitor;
+    delete ralf_comm_monitor;
+    delete vbucket_alarms;
+    delete remote_vbucket_alarms;
+  }
 
   // Unregister the handlers that use semaphores (so we can safely destroy
   // them).
