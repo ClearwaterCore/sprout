@@ -708,7 +708,6 @@ public:
     {
       destroy_tcp_listener_transport(stack_data.pcscf_untrusted_port,
                                      stack_data.pcscf_untrusted_tcp_factory);
-      CL_SPROUT_UNTRUSTED_P_CSCF_END.log(stack_data.pcscf_untrusted_port);
     }
   }
 
@@ -720,7 +719,6 @@ public:
     {
       destroy_tcp_listener_transport(stack_data.pcscf_trusted_port,
                                      stack_data.pcscf_trusted_tcp_factory);
-      CL_SPROUT_TRUSTED_P_CSCF_END.log(stack_data.pcscf_trusted_port);
     }
     if (stack_data.scscf_tcp_factory != NULL)
     {
@@ -998,15 +996,6 @@ pj_status_t init_stack(const std::string& system_name,
     status = start_transports(stack_data.pcscf_untrusted_port,
                               stack_data.public_host,
                               &stack_data.pcscf_untrusted_tcp_factory);
-    if (status == PJ_SUCCESS)
-    {
-      CL_SPROUT_UNTRUSTED_P_CSCF_STARTED.log(stack_data.pcscf_untrusted_port);
-    }
-    else
-    {
-      CL_SPROUT_P_CSCF_INIT_FAIL.log(stack_data.pcscf_untrusted_port)
-;
-    }
     PJ_ASSERT_RETURN(status == PJ_SUCCESS, status);
   }
 

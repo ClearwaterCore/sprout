@@ -78,7 +78,7 @@ static const PDLog CL_SPROUT_INVALID_SAS_OPTION
    "No call traces will appear in the sas",
    2,
    "Set the fully qualified sas hostname for the sas_server=<host> option.",
-   "Example: sas_server=sas-1.os3.richlab.datcon.co.uk.  The Sprout application must be restarted to take effect."
+   "Consult the Clearwater Core Installation document."
    );
 static const PDLog1<const char*> CL_SPROUT_CRASH
   (
@@ -106,11 +106,10 @@ static const PDLog CL_SPROUT_NO_PSI_CSCF
   (
    PDLogBase::CL_SPROUT_ID + 6,
    PDLOG_ERR,
-   "Fatal - Must enable P-CSCF, S-CSCF or I-CSCF in /etc/clearwater/config",
-   "Neither a P-CSCF, S-CSCF, nor an I-CSCF was configured in the /etc/clearwater/config",
+   "Fatal - Must enable S-CSCF or I-CSCF in /etc/clearwater/config",
+   "Neither an S-CSCF nor an I-CSCF was configured in the /etc/clearwater/config",
    "The Sprout application will exit until the problem is fixed.",
-   3,
-   "The P-CSCF is configured by setting the pcscf=<port> option.",
+   2,
    "The S-CSCF is configured by setting the scfcf=<port> option.",
    "The I-CSCF is configured by setting the icscf=<port> option."
    );
@@ -122,28 +121,30 @@ static const PDLog CL_SPROUT_SI_CSCF_NO_HOMESTEAD
    "The S-CSCF and/or the I-CSCF options (scscf=<port>, icscf=<port>) were configured in the /etc/clearwater/config file but no Homestead was configured in the same file.",
    "The Sprout application will exit until the problem is fixed.",
    2,
-   "Set the hs_hostname=<fully-qualified-homestead-name> option in the /etc/clearwater/config file.",
-   "Example: hs_hostname=homestead-1.os3.richlab.datcon.co.uk"
+   "Set the hs_realm=<hostname>.<zone> option in the /etc/clearwater/config file.",
+   "Consult the Clearwater Core Installation document."
    );
 static const PDLog CL_SPROUT_AUTH_NO_HOMESTEAD
   (
    PDLogBase::CL_SPROUT_ID + 8,
    PDLOG_ERR,
    "Fatal - Authentication enabled, but no Homestead server specified in /etc/clearwater/config",
-   "The hs_hostname was not set in the /etc/clearwater/config file",
+   "The hs_realm was not set in the /etc/clearwater/config file",
    "The Sprout application will exit.",
-   1,
-   "Set the hs_hostname=<fully-qualified-homestead-name> option in the /etc/clearwater/config file.  Example: hs_hostname=homestead-1.os3.richlab.datcon.co.uk"
+   2,
+   "Set the hs_realm=<hostname>.<zone> option in the /etc/clearwater/config file.",
+   "Consult the Clearwater Core Installation document."
    );
 static const PDLog CL_SPROUT_XDM_NO_HOMESTEAD
   (
    PDLogBase::CL_SPROUT_ID + 9,
    PDLOG_ERR,
    "Fatal - Homer XDM service is configured but no Homestead server specified in /etc/clearwater/config",
-   "The hs_hostname was not set in the /etc/clearwater/config file",
+   "The hs_realm was not set in the /etc/clearwater/config file",
    "The Sprout application will exit.",
-   1,
-   "Set the hs_hostname=<fully-qualified-homestead-name> option in the /etc/clearwater/config file.  Example: hs_hostname=homestead-1.os3.richlab.datcon.co.uk"
+   2,
+   "Set the hs_realm=<hostname>.<zone> option in the /etc/clearwater/config file.",
+   "Consult the Clearwater Core Installation document."
    );
 static const PDLog CL_SPROUT_S_CSCF_NO_CHRONOS
   (
@@ -152,8 +153,9 @@ static const PDLog CL_SPROUT_S_CSCF_NO_CHRONOS
    "Fatal - S-CSCF enabled with no Chronos service specified in /etc/clearwater/config",
    "The chronos_hostname=<host:port> was not set in /etc/clearwater/config",
    "The Sprout application will exit.",
-   1,
-   "Set the chronos_hostname=<host:port> option in the /etc/clearwater/config. Example: chronos_hostname=localhost:7253 "
+   2,
+   "Set the chronos_hostname=<host:port> option in the /etc/clearwater/config.",
+   "Consult the Clearwater Core Installation document."
    );
 static const PDLog CL_SPROUT_BAD_S_CSCF_JSON
   (
@@ -184,7 +186,7 @@ static const PDLog CL_SPROUT_NO_RALF_CONFIGURED
    "Billing service will not be available.",
    2,
    "Correct the /etc/clearwater/config file.",
-   "Example: ralf_hostname=ralf.os3.richlab.datcon.co.uk:10888"
+   "Consult the Clearwater Core Installation document."
    );
 static const PDLog CL_SPROUT_MEMCACHE_CONN_FAIL
   (
@@ -254,7 +256,7 @@ static const PDLog2<const char*, int> CL_SPROUT_HTTP_IFC_FAIL
    "The timeout handlers for Sprout could not be registered with Chronos.",
    "Timeout events won't occur.",
    1,
-   "Restart Sprout.  if this does not restart the issue report it."
+   "Restart Sprout.  If does not restart report the issue."
    );
 static const PDLog CL_SPROUT_ENDED 
   (
@@ -333,26 +335,6 @@ static const PDLog2<int, const char*> CL_SPROUT_SIP_TCP_SERVICE_START_FAIL
    "(2). If the problem persists, restart the sprout application.",
    "(3). If the problem does not clear report the issue"
    );
-static const PDLog1<int> CL_SPROUT_UNTRUSTED_P_CSCF_END 
-  (
-   PDLogBase::CL_SPROUT_ID + 28,
-   PDLOG_ERR,
-   "The untrusted P-CSCF service on port %d has ended",
-   "The untrusted P-CSCF service is no longer available.",
-   "The untrusted P-CSCF service is no longer available.",
-   1,
-   "Restart Sprout."
-   );
-static const PDLog1<int> CL_SPROUT_TRUSTED_P_CSCF_END
-  (
-   PDLogBase::CL_SPROUT_ID + 29,
-   PDLOG_ERR,
-   "The trusted P-CSCF service on port %d has ended",
-   "The trusted P-CSCF service is no longer available.",
-   "This may affect call processing",
-   1,
-   "Restart Sprout."
-   );
 static const PDLog1<int> CL_SPROUT_S_CSCF_END
   (
    PDLogBase::CL_SPROUT_ID + 30,
@@ -373,28 +355,7 @@ static const PDLog1<int> CL_SPROUT_I_CSCF_END
    "Call processing is no longer available.",
    2,
    "(1). Restart the Sprout application.",
-   "(2).  If the problem persists report the issue."
-   );
-static const PDLog1<int> CL_SPROUT_UNTRUSTED_P_CSCF_STARTED
-  (
-   PDLogBase::CL_SPROUT_ID + 32,
-   PDLOG_NOTICE,
-   "The untrusted P-CSCF service on port %d was started",
-   "The untrusted P-CSCF service is now available.",
-   "Normal",
-   1,
-   "None"
-   );
-static const PDLog1<int> CL_SPROUT_P_CSCF_INIT_FAIL
-  (
-   PDLogBase::CL_SPROUT_ID + 33,
-   PDLOG_ERR,
-   "The untrusted P-CSCF service on port %d failed to initialize",
-   "The untrusted P-CSCF service is not available.",
-   "This will affect call processing.",
-   2,
-   "(1). Restart the Sprout application.",
-   "(2).  If the problem persists report the issue."
+   "(2). If the problem persists report the issue."
    );
 static const PDLog1<int> CL_SPROUT_S_CSCF_AVAIL
   (
