@@ -87,7 +87,7 @@ extern "C" {
 #include "chronosconnection.h"
 #include "handlers.h"
 #include "httpstack.h"
-#include "sprout_log_definitions.h"
+#include "sprout_ent_definitions.h"
 
 enum OptionTypes
 {
