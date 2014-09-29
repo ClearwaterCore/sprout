@@ -46,7 +46,7 @@ extern "C" {
 #include <pjlib.h>
 }
 
-#include "sprout_log_definitions.h"
+#include "sprout_ent_definitions.h"
 
 #include "stack.h"
 #include "log.h"

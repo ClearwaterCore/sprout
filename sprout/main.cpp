@@ -95,6 +95,7 @@ extern "C" {
 #include "mobiletwinned.h"
 #include "mementoappserver.h"
 #include "call_list_store.h"
+#include "sprout_ent_definitions.h"
 
 enum OptionTypes
 {
