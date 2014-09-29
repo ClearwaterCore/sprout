@@ -87,7 +87,7 @@ extern "C" {
 #include "chronosconnection.h"
 #include "handlers.h"
 #include "httpstack.h"
-#include "sproutdcea.h"
+#include "sprout_log_definitions.h"
 
 enum OptionTypes
 {
@@ -1249,7 +1249,7 @@ int main(int argc, char *argv[])
 
   if (status != PJ_SUCCESS)
   {
-    CL_SPROUT_SIP_INIT_IFC_FAIL.log(PJUtils::pj_status_to_string(status).c_str());
+    CL_SPROUT_SIP_INIT_INTERFACE_FAIL.log(PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Error initializing stack %s", PJUtils::pj_status_to_string(status).c_str());
     return 1;
   }
@@ -1593,7 +1593,7 @@ int main(int argc, char *argv[])
     }
     catch (HttpStack::Exception& e)
     {
-      CL_SPROUT_HTTP_IFC_FAIL.log(e._func, e._rc);
+      CL_SPROUT_HTTP_INTERFACE_FAIL.log(e._func, e._rc);
       LOG_ERROR("Caught HttpStack::Exception - %s - %d\n", e._func, e._rc);
     }
   }
@@ -1611,7 +1611,7 @@ int main(int argc, char *argv[])
     }
     catch (HttpStack::Exception& e)
     {
-      CL_SPROUT_HTTP_IFC_STOP_FAIL.log(e._func, e._rc);
+      CL_SPROUT_HTTP_INTERFACE_STOP_FAIL.log(e._func, e._rc);
       LOG_ERROR("Caught HttpStack::Exception - %s - %d\n", e._func, e._rc);
     }
   }

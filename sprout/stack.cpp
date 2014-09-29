@@ -74,7 +74,7 @@ extern "C" {
 #include "quiescing_manager.h"
 #include "load_monitor.h"
 #include "counter.h"
-#include "sproutdcea.h"
+#include "sprout_log_definitions.h"
 
 class StackQuiesceHandler;
 
