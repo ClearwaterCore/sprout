@@ -139,6 +139,7 @@ get_settings()
         [ "$enforce_global_only_lookups" != "Y" ] || global_only_lookups_arg="--enforce-global-only-lookups"
         [ "$memento_enabled" != "Y" ] || memento_enabled_arg="--memento-enabled"
         [ "$gemini_enabled" != "Y" ] || gemini_enabled_arg="--gemini-enabled"
+        [ ! -z "$snmp_ip" ] && alarms_enabled_arg="--alarms-enabled"
 }
 
 #
@@ -184,6 +185,7 @@ do_start()
                      $global_only_lookups_arg
                      $memento_enabled_arg
                      $gemini_enabled_arg
+                     $alarms_enabled_arg
                      -T $local_ip
                      -o 9888
                      -a $log_directory
