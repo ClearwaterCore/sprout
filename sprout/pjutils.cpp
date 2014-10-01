@@ -1201,8 +1201,8 @@ pj_status_t PJUtils::send_request(pjsip_tx_data* tdata,
     // error rather than an indication that the destination server is down,
     // so we don't blacklist.
     CL_SPROUT_SIP_SEND_REQUEST_ERR.log(PJUtils::uri_to_string(PJSIP_URI_IN_ROUTING_HDR,
-                                     PJUtils::next_hop(tdata->msg)).c_str(),
-	                             PJUtils::pj_status_to_string(status).c_str());
+				       PJUtils::next_hop(tdata->msg)).c_str(),
+	                               PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Failed to send request to %s",
               PJUtils::uri_to_string(PJSIP_URI_IN_ROUTING_HDR,
                                      PJUtils::next_hop(tdata->msg)).c_str());
@@ -1334,8 +1334,8 @@ pj_status_t PJUtils::send_request_stateless(pjsip_tx_data* tdata, int retries)
     // than an indication that the selected destination server is down, so we
     // don't blacklist.
     CL_SPROUT_SIP_SEND_REQUEST_ERR.log(PJUtils::uri_to_string(PJSIP_URI_IN_ROUTING_HDR,
-                                     PJUtils::next_hop(tdata->msg)).c_str(),
-	                             PJUtils::pj_status_to_string(status).c_str());
+                                       PJUtils::next_hop(tdata->msg)).c_str(),
+	                               PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Failed to send request to %s",
               PJUtils::uri_to_string(PJSIP_URI_IN_ROUTING_HDR,
                                      PJUtils::next_hop(tdata->msg)).c_str());
