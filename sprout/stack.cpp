@@ -595,7 +595,7 @@ pj_status_t create_udp_transport(int port, pj_str_t& host)
 
   if (status != PJ_SUCCESS)
   {
-    CL_SPROUT_SIP_UDP_IFC_START_FAIL.log(port, PJUtils::pj_status_to_string(status).c_str());
+    CL_SPROUT_SIP_UDP_INTERFACE_START_FAIL.log(port, PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Failed to start UDP transport for port %d (%s)", port, PJUtils::pj_status_to_string(status).c_str());
   }
 

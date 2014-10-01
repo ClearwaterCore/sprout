@@ -1574,6 +1574,7 @@ int main(int argc, char *argv[])
                                          opt.enforce_global_only_lookups);
     if (scscf_sproutlet == NULL)
     {
+      CL_SPROUT_S_CSCF_INIT_FAIL.log();
       LOG_ERROR("Failed to create S-CSCF Sproutlet");
       return 1;
     }
@@ -1584,6 +1585,7 @@ int main(int argc, char *argv[])
                                                       bgcf_acr_factory);
     if (bgcf_sproutlet == NULL)
     {
+      CL_SPROUT_BGCF_INIT_FAIL.log();
       LOG_ERROR("Failed to create BGCF Sproutlet");
       return 1;
     }
