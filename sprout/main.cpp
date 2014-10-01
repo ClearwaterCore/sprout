@@ -228,42 +228,6 @@ struct options
     { NULL,                0, 0, 0}
   };
 
-static const char* signal_description[] =
-  {
-    "Hangup", // 1
-    "Terminal Interrupt",
-    "Terminal Quit",
-    "Illegal Instruction",
-    "Trace/Breakpoint",
-    "Process Abort",
-    "Bus Error",
-    "Arithmetic Error",
-    "Kill",
-    "USR1", // 10
-    "Segment Trap",
-    "USR2",
-    "PIPE",
-    "Alarm",
-    "Termination",
-    "Stack Fault",
-    "CHLD",
-    "CONT",
-    "Stop",
-    "Terminal stop", // 20
-    "TTIN",
-    "TTOU",
-    "URG",
-    "XCPU",
-    "XFSZ",
-    "VTALRM",
-    "PROF",
-    "WINCH",
-    "POLL",
-    "LOST",
-    "Power", // 30
-    "System"
-  };
-
 static std::string pj_options_description = "p:s:i:l:D:c:C:n:e:I:A:R:M:S:H:T:o:q:X:E:x:f:u:g:r:P:w:a:F:L:K:G:B:dth";
 
 static sem_t term_sem;
@@ -905,7 +869,7 @@ void exception_handler(int sig)
   // Reset the signal handlers so that another exception will cause a crash.
   signal(SIGABRT, SIG_DFL);
   signal(SIGSEGV, SIG_DFL);
-  const char* signamep = (sig >= SIGHUP and sig <= SIGSYS) ? signal_description[sig-1] : "Unknown";
+  const char* signamep = (sig >= SIGHUP and sig <= SIGSYS) ? signalnames[sig-1] : "Unknown";
   CL_SPROUT_CRASH.log(signamep);
   closelog();
   // Log the signal, along with a backtrace.
@@ -1189,7 +1153,7 @@ int main(int argc, char *argv[])
 
   if ((!opt.pcscf_enabled) && (!opt.scscf_enabled) && (!opt.icscf_enabled))
   {
-    CL_SPROUT_NO_PSI_CSCF.log();
+    CL_SPROUT_NO_SI_CSCF.log();
     closelog();
     LOG_ERROR("Must enable P-CSCF, S-CSCF or I-CSCF");
     return 1;

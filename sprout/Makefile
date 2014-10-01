@@ -64,6 +64,7 @@ TARGET_SOURCES := logger.cpp \
                   scscfselector.cpp	\
                   acr.cpp \
                   signalhandler.cpp	\
+                  signalnames.cpp \
                   subscription.cpp \
                   notify_utils.cpp \
                   unique.cpp \
