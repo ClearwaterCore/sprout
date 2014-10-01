@@ -597,6 +597,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
 
     case 'M':
       options->store_servers = std::string(pj_optarg);
+      LOG_INFO("Using memcached store with configuration file %s", pj_optarg);
       break;
 
     case 'm':
@@ -1141,7 +1142,7 @@ int main(int argc, char *argv[])
   if (status != PJ_SUCCESS)
   {
     closelog();
-	return 1;
+    return 1;
   }
 
   if (opt.analytics_enabled)

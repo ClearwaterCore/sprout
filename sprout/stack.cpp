@@ -650,7 +650,7 @@ pj_status_t create_tcp_listener_transport(int port, pj_str_t& host, pjsip_tpfact
   {
     CL_SPROUT_SIP_TCP_SERVICE_START_FAIL.log(port,
 					     PJUtils::pj_status_to_string(status).c_str());
-    LOG_ERROR("Failed to start TCP listener transport for port %d (%s)",
+    LOG_ERROR("Failed to start TCP transport for port %d (%s)",
               port,
               PJUtils::pj_status_to_string(status).c_str());
   }
