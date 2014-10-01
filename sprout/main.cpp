@@ -1575,6 +1575,7 @@ int main(int argc, char *argv[])
     if (scscf_sproutlet == NULL)
     {
       CL_SPROUT_S_CSCF_INIT_FAIL.log();
+      closelog();
       LOG_ERROR("Failed to create S-CSCF Sproutlet");
       return 1;
     }
@@ -1586,6 +1587,7 @@ int main(int argc, char *argv[])
     if (bgcf_sproutlet == NULL)
     {
       CL_SPROUT_BGCF_INIT_FAIL.log();
+      closelog();
       LOG_ERROR("Failed to create BGCF Sproutlet");
       return 1;
     }
@@ -1600,6 +1602,7 @@ int main(int argc, char *argv[])
     if (scscf_selector == NULL)
     {
       LOG_ERROR("Failed to create S-CSCF selector");
+      closelog();
       return 1;
     }
 
@@ -1610,6 +1613,8 @@ int main(int argc, char *argv[])
                                                          scscf_selector);
     if (icscf_sproutlet == NULL)
     {
+      CL_SPROUT_I_CSCF_INIT_FAIL.log();
+      closelog();
       LOG_ERROR("Failed to create I-CSCF Sproutlet");
       return 1;
     }
@@ -1695,6 +1700,7 @@ int main(int argc, char *argv[])
     if (sproutlet_proxy == NULL)
     {
       LOG_ERROR("Failed to create SproutletProxy");
+      closelog();
       return 1;
     }
   }

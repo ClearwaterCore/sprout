@@ -204,11 +204,11 @@ static const PDLog1<const char*> CL_SPROUT_REG_SUBSCRIBER_HAND_FAIL
   "The Application will exit.",
   "Report this issue to support."
 );
-static const PDLog1<const char*> CL_SPROUT_S_CSCF_INIT_FAIL
+static const PDLog CL_SPROUT_S_CSCF_INIT_FAIL
 (
   PDLogBase::CL_SPROUT_ID + 17,
   PDLOG_ERR,
-  "Fatal - The S-CSCF service failed to initialize %s",
+  "Fatal - The S-CSCF service failed to initialize",
   "The S-CSCF did not initialize",
   "The S-CSCF proxy is not enabled.",
   "Report this issue to support."
@@ -279,7 +279,7 @@ static const PDLog CL_SPROUT_SIP_DEADLOCK
   "A SIP interface has failed.",
   "Report the issue to support."
 );
-static const PDLog2<int, const char*> CL_SPROUT_SIP_UDP_IFC_START_FAIL
+static const PDLog2<int, const char*> CL_SPROUT_SIP_UDP_IINTERFACE_START_FAIL
 (
   PDLogBase::CL_SPROUT_ID + 25,
   PDLOG_ERR,
@@ -309,6 +309,16 @@ static const PDLog2<int, const char*> CL_SPROUT_SIP_TCP_SERVICE_START_FAIL
   "(1). Check to see that the scscf_port or icscf_port in the /etc/clearwater/config file do not conflict with any other service. "
   "(2). If the problem persists, restart the application. "
   "(3). If the problem does not clear report the issue"
+);
+static const PDLog CL_SPROUT_BGCF_INIT_FAIL
+(
+  PDLogBase::CL_SPROUT_ID + 28,
+  PDLOG_ERR,
+  "Failed to start BGCF service",
+  "The Application could not start the BGCF service.",
+  "This may affect call processing.",
+  "Check the installation manual for BGCF configuration. "
+  "If this does not resolve the issue report the issue to support."
 );
 static const PDLog1<int> CL_SPROUT_S_CSCF_END
 (
