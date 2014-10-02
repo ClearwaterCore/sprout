@@ -279,7 +279,7 @@ static const PDLog CL_SPROUT_SIP_DEADLOCK
   "A SIP interface has failed.",
   "Report the issue to support."
 );
-static const PDLog2<int, const char*> CL_SPROUT_SIP_UDP_IINTERFACE_START_FAIL
+static const PDLog2<int, const char*> CL_SPROUT_SIP_UDP_INTERFACE_START_FAIL
 (
   PDLogBase::CL_SPROUT_ID + 25,
   PDLOG_ERR,
