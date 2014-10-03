@@ -67,5 +67,5 @@ EOF
 chmod 0644 /etc/monit/conf.d/sprout.monit
 
 # Force monit to reload its configuration
-service monit reload
+reload clearwater-monit
 
