@@ -64,6 +64,7 @@ TARGET_SOURCES := logger.cpp \
                   scscfselector.cpp	\
                   acr.cpp \
                   signalhandler.cpp	\
+                  signalnames.cpp \
                   subscription.cpp \
                   notify_utils.cpp \
                   unique.cpp \
@@ -217,8 +218,8 @@ LDFLAGS += -lmemcached \
            -lzmq \
            -levhtp \
            -levent \
-           -levent_pthreads
-
+           -levent_pthreads \
+           -lc
 # Test build fakes out cURL
 LDFLAGS_BUILD += -lcurl -lsas
 
