@@ -1287,9 +1287,11 @@ int main(int argc, char *argv[])
   seed = (unsigned int)now.sec ^ (unsigned int)now.msec ^ getpid();
   srand(seed);
 
-  if ((! opt.pcscf_enabled) && opt.alarms_enabled)
+  if ((opt.icscf_enabled || opt.scscf_enabled) && opt.alarms_enabled)
   {
-    // Create Sprout's alarm objects
+    // Create Sprout's alarm objects. Note that the alarm identifier strings must match those
+    // in the alarm definition JSON file exactly.
+
     chronos_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_CHRONOS_COMM_ERROR_CLEAR",
                                                               "SPROUT_CHRONOS_COMM_ERROR_MAJOR");
 
@@ -1894,7 +1896,7 @@ int main(int argc, char *argv[])
   delete analytics_logger;
   delete analytics_logger_logger;
 
-  if ((! opt.pcscf_enabled) && opt.alarms_enabled)
+  if ((opt.icscf_enabled || opt.scscf_enabled) && opt.alarms_enabled)
   {
     // Stop the alarm request agent
     AlarmReqAgent::get_instance().stop();

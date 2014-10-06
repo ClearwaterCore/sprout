@@ -395,7 +395,7 @@ std::string DNSEnumService::lookup_uri_from_user(const std::string& user, SAS::T
     string = std::string("");
   }
 
-  // Peg state of last communication attempt (which may potentially set/clear
+  // Report state of last communication attempt (which may potentially set/clear
   // an associated alarm). 
   if (_comm_monitor)
   {
