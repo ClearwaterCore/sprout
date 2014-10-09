@@ -125,7 +125,7 @@
     },
 
     {
-      "identifier" : "ENUM_COMM_ERROR_MAJOR",
+      "identifier" : "SPROUT_ENUM_COMM_ERROR_MAJOR",
       "index" : 1006,
       "severity" : "MAJOR",
       "cause" : "UNDERLAYING_RESOURCE_UNAVAILABLE",
