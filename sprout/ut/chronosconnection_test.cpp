@@ -54,15 +54,14 @@ using namespace std;
 class ChronosConnectionTest : public BaseTest
 {
   FakeHttpResolver _resolver;
-  ChronosConnection _chronos;
   CommunicationMonitor _cm;
+  ChronosConnection _chronos;
 
   ChronosConnectionTest() :
     _resolver("10.42.42.42"),
-    _chronos("narcissus", "localhost:9888", &_resolver),
-    _cm("sprout", "SPROUT_CHRONOS_COMM_ERROR_CLEAR", "SPROUT_CHRONOS_COMM_ERROR_MAJOR")
+    _cm("sprout", "SPROUT_CHRONOS_COMM_ERROR_CLEAR", "SPROUT_CHRONOS_COMM_ERROR_MAJOR"),
+    _chronos("narcissus", "localhost:9888", &_resolver, &_cm)
   {
-    _chronos.set_comm_monitor(&_cm);
     fakecurl_responses.clear();
   }
 

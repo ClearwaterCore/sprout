@@ -112,12 +112,9 @@ class DNSEnumService : public EnumService
 public:
   DNSEnumService(const std::string& dns_server = "127.0.0.1",
                  const std::string& dns_suffix = ".e164.arpa",
-                 const DNSResolverFactory* resolver_factory = new DNSResolverFactory());
+                 const DNSResolverFactory* resolver_factory = new DNSResolverFactory(),
+                 CommunicationMonitor* comm_monitor = NULL);
   ~DNSEnumService();
-
-  // Set a monitor to track enum communication state, and set/clear
-  // alarms based upon recent activity.
-  void set_comm_monitor(CommunicationMonitor* comm_monitor);
 
   std::string lookup_uri_from_user(const std::string& user, SAS::TrailId trail) const;
 

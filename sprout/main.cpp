@@ -73,6 +73,7 @@ extern "C" {
 #include "registrar.h"
 #include "authentication.h"
 #include "options.h"
+#include "dnsresolver.h"
 #include "enumservice.h"
 #include "bgcfservice.h"
 #include "pjutils.h"
@@ -1344,9 +1345,8 @@ int main(int argc, char *argv[])
                                          "connected_ralfs",
                                          load_monitor,
                                          stack_data.stats_aggregator,
-                                         SASEvent::HttpLogLevel::PROTOCOL);
-
-    ralf_connection->set_comm_monitor(ralf_comm_monitor);
+                                         SASEvent::HttpLogLevel::PROTOCOL,
+                                         ralf_comm_monitor);
   }
 
   // Initialise the OPTIONS handling module.
@@ -1359,9 +1359,8 @@ int main(int argc, char *argv[])
     hss_connection = new HSSConnection(opt.hss_server,
                                        http_resolver,
                                        load_monitor,
-                                       stack_data.stats_aggregator);
-
-    hss_connection->set_comm_monitor(hss_comm_monitor);
+                                       stack_data.stats_aggregator,
+                                       hss_comm_monitor);
   }
 
   if (ralf_connection != NULL)
@@ -1411,9 +1410,8 @@ int main(int argc, char *argv[])
                chronos_callback_host.c_str());
     chronos_connection = new ChronosConnection(opt.chronos_service,
                                                chronos_callback_host,
-                                               http_resolver);
-
-    chronos_connection->set_comm_monitor(chronos_comm_monitor);
+                                               http_resolver,
+                                               chronos_comm_monitor);
   }
 
   if (opt.pcscf_enabled)
@@ -1471,16 +1469,18 @@ int main(int argc, char *argv[])
     {
       // Use memcached store.
       LOG_STATUS("Using memcached compatible store with ASCII protocol");
-      local_data_store = (Store*)new MemcachedStore(false, opt.store_servers);
-      ((MemcachedStore*)local_data_store)->set_comm_monitor(memcached_comm_monitor);
-      ((MemcachedStore*)local_data_store)->set_vbucket_alarms(vbucket_alarms);
+      local_data_store = (Store*)new MemcachedStore(false, 
+                                                    opt.store_servers,
+                                                    memcached_comm_monitor,
+                                                    vbucket_alarms);
       if (opt.remote_store_servers != "")
       {
         // Use remote memcached store too.
         LOG_STATUS("Using remote memcached compatible store with ASCII protocol");
-        remote_data_store = (Store*)new MemcachedStore(false, opt.remote_store_servers);
-        ((MemcachedStore*)local_data_store)->set_comm_monitor(memcached_remote_comm_monitor);
-        ((MemcachedStore*)local_data_store)->set_vbucket_alarms(remote_vbucket_alarms);
+        remote_data_store = (Store*)new MemcachedStore(false, 
+                                                       opt.remote_store_servers,
+                                                       memcached_remote_comm_monitor,
+                                                       remote_vbucket_alarms);
       }
     }
     else
@@ -1529,8 +1529,10 @@ int main(int argc, char *argv[])
     // Create Enum and BGCF services required for S-CSCF.
     if (!opt.enum_server.empty())
     {
-      enum_service = new DNSEnumService(opt.enum_server, opt.enum_suffix);
-      ((DNSEnumService*)enum_service)->set_comm_monitor(enum_comm_monitor);
+      enum_service = new DNSEnumService(opt.enum_server,
+                                        opt.enum_suffix,
+                                        new DNSResolverFactory(),
+                                        enum_comm_monitor);
     }
     else if (!opt.enum_file.empty())
     {
