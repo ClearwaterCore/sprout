@@ -52,6 +52,8 @@ using ::testing::InSequence;
 using ::testing::SafeMatcherCast;
 using ::testing::StrEq;
 
+static const char issuer[] = "sprout";
+
 MATCHER_P(VoidPointeeEqualsInt, value, "") 
 {
   return (*((int*)arg) == value);
@@ -61,8 +63,8 @@ class AlarmTest : public ::testing::Test
 {
 public:
   AlarmTest() :
-    _alarm("me", "MY_ALARM"),
-    _alarm_pair("me", "MY_CLEAR_ALARM", "MY_SET_ALARM"),
+    _alarm(issuer, AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR, AlarmDef::CRITICAL),
+    _alarm_pair(issuer, AlarmDef::SPROUT_CHRONOS_COMM_ERROR, AlarmDef::MAJOR),
     _c(1),
     _s(2)
   {
@@ -113,7 +115,7 @@ class AlarmQueueErrorTest : public ::testing::Test
 {
 public:
   AlarmQueueErrorTest() :
-    _alarm("me", "MY_ALARM")
+    _alarm(issuer, AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR, AlarmDef::CRITICAL)
   {
     AlarmReqAgent::get_instance().start();
   }
@@ -131,7 +133,7 @@ class AlarmZmqErrorTest : public ::testing::Test
 {
 public:
   AlarmZmqErrorTest() :
-    _alarm("me", "MY_ALARM"),
+    _alarm(issuer, AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR, AlarmDef::CRITICAL),
     _c(1),
     _s(2)
   {
@@ -164,11 +166,11 @@ TEST_F(AlarmTest, IssueAlarm)
       .Times(1)
       .WillOnce(Return(0));
 
-    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("me"),2,ZMQ_SNDMORE))
+    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr(issuer),strlen(issuer),ZMQ_SNDMORE))
       .Times(1)
       .WillOnce(Return(0));
 
-    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("MY_ALARM"),8,0))
+    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("1001.3"),6,0))
       .Times(1)
       .WillOnce(Return(0));
 
@@ -189,7 +191,7 @@ TEST_F(AlarmTest, ClearAlarms)
       .Times(1)
       .WillOnce(Return(0));
 
-    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("me"),2,0))
+    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr(issuer),strlen(issuer),0))
       .Times(1)
       .WillOnce(Return(0));
 
@@ -197,7 +199,7 @@ TEST_F(AlarmTest, ClearAlarms)
       .Times(1)
       .WillOnce(Return(0));
   }
-  Alarm::clear_all("me");
+  Alarm::clear_all(issuer);
   _mz.call_complete(ZmqInterface::ZMQ_RECV, 5);
 }
 
@@ -209,11 +211,11 @@ TEST_F(AlarmTest, PairSetNotAlarmed)
     .Times(1)
     .WillOnce(Return(0));
 
-  EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("me"),2,ZMQ_SNDMORE))
+  EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr(issuer),strlen(issuer),ZMQ_SNDMORE))
     .Times(1)
     .WillOnce(Return(0));
 
-  EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("MY_SET_ALARM"),12,0))
+  EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("1004.4"),6,0))
     .Times(1)
     .WillOnce(Return(0));
 
@@ -276,11 +278,11 @@ TEST_F(AlarmTest, PairClearAlarmed)
       .Times(1)
       .WillOnce(Return(0));
 
-    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("me"),2,ZMQ_SNDMORE))
+    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr(issuer),strlen(issuer),ZMQ_SNDMORE))
       .Times(1)
       .WillOnce(Return(0));
 
-    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("MY_CLEAR_ALARM"),14,0))
+    EXPECT_CALL(_mz, zmq_send(_,VoidPointeeEqualsStr("1004.1"),6,0))
       .Times(1)
       .WillOnce(Return(0));
 

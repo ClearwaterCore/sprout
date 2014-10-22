@@ -52,9 +52,9 @@ check program poll_sprout with path "/usr/share/clearwater/bin/poll_sprout.sh"
 
 check process sprout pidfile /var/run/sprout.pid
 
-  start program   = "/bin/bash -c '/usr/share/clearwater/bin/issue_alarm.py monit SPROUT_PROC_FAIL_CRITICAL; /etc/init.d/sprout start'"
-  stop program    = "/bin/bash -c '/usr/share/clearwater/bin/issue_alarm.py monit SPROUT_PROC_FAIL_CRITICAL; /etc/init.d/sprout stop'"
-  restart program = "/bin/bash -c '/usr/share/clearwater/bin/issue_alarm.py monit SPROUT_PROC_FAIL_CRITICAL; /etc/init.d/sprout abort-restart'"
+  start program   = "/bin/bash -c '/usr/share/clearwater/bin/issue_alarm.py monit 1000.3; /etc/init.d/sprout start'"
+  stop program    = "/bin/bash -c '/usr/share/clearwater/bin/issue_alarm.py monit 1000.3; /etc/init.d/sprout stop'"
+  restart program = "/bin/bash -c '/usr/share/clearwater/bin/issue_alarm.py monit 1000.3; /etc/init.d/sprout abort-restart'"
 
   if memory is greater than 80% for 3 cycles
      then restart
@@ -62,10 +62,10 @@ check process sprout pidfile /var/run/sprout.pid
   if uptime < 30 seconds
      then exec "/bin/true"
      else if succeeded
-         then exec "/usr/share/clearwater/bin/issue_alarm.py monit SPROUT_PROC_FAIL_CLEAR"
+         then exec "/usr/share/clearwater/bin/issue_alarm.py monit 1000.1"
 EOF
 chmod 0644 /etc/monit/conf.d/sprout.monit
 
 # Force monit to reload its configuration
-reload clearwater-monit
+reload clearwater-monit &> /dev/null || true
 

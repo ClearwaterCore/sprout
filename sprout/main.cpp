@@ -1266,32 +1266,31 @@ int main(int argc, char *argv[])
 
   if ((opt.icscf_enabled || opt.scscf_enabled) && opt.alarms_enabled)
   {
-    // Create Sprout's alarm objects. Note that the alarm identifier strings must match those
-    // in the alarm definition JSON file exactly.
+    // Create Sprout's alarm objects. 
 
-    chronos_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_CHRONOS_COMM_ERROR_CLEAR",
-                                                              "SPROUT_CHRONOS_COMM_ERROR_MAJOR");
+    chronos_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_CHRONOS_COMM_ERROR, 
+                                                              AlarmDef::MAJOR);
 
-    enum_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_ENUM_COMM_ERROR_CLEAR",
-                                                           "SPROUT_ENUM_COMM_ERROR_MAJOR");
+    enum_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_ENUM_COMM_ERROR,
+                                                           AlarmDef::MAJOR);
 
-    hss_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_HOMESTEAD_COMM_ERROR_CLEAR",
-                                                          "SPROUT_HOMESTEAD_COMM_ERROR_CRITICAL");
+    hss_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR,
+                                                          AlarmDef::CRITICAL);
 
-    memcached_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_MEMCACHED_COMM_ERROR_CLEAR",
-                                                                "SPROUT_MEMCACHED_COMM_ERROR_CRITICAL");
+    memcached_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_MEMCACHED_COMM_ERROR,
+                                                                AlarmDef::CRITICAL);
 
-    memcached_remote_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CLEAR",
-                                                                       "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CRITICAL");
+    memcached_remote_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_REMOTE_MEMCACHED_COMM_ERROR,
+                                                                       AlarmDef::CRITICAL);
 
-    ralf_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_RALF_COMM_ERROR_CLEAR", 
-                                                           "SPROUT_RALF_COMM_ERROR_MAJOR");
+    ralf_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_RALF_COMM_ERROR, 
+                                                           AlarmDef::MAJOR);
 
-    vbucket_alarms = new AlarmPair("sprout", "SPROUT_VBUCKET_ERROR_CLEAR",
-                                             "SPROUT_VBUCKET_ERROR_MAJOR");
+    vbucket_alarms = new AlarmPair("sprout", AlarmDef::SPROUT_VBUCKET_ERROR,
+                                             AlarmDef::MAJOR);
 
-    remote_vbucket_alarms = new AlarmPair("sprout", "SPROUT_REMOTE_VBUCKET_ERROR_CLEAR",
-                                                    "SPROUT_REMOTE_VBUCKET_ERROR_MAJOR");
+    remote_vbucket_alarms = new AlarmPair("sprout", AlarmDef::SPROUT_REMOTE_VBUCKET_ERROR,
+                                                    AlarmDef::MAJOR);
 
     // Start the alarm request agent
     AlarmReqAgent::get_instance().start();
