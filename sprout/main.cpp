@@ -457,7 +457,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
       }
       else
       {
-	CL_SPROUT_INVALID_S_CSCF_PORT.log(pj_optarg);
+  CL_SPROUT_INVALID_S_CSCF_PORT.log(pj_optarg);
         LOG_ERROR("S-CSCF port %s is invalid\n", pj_optarg);
         return -1;
       }
@@ -472,7 +472,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
       }
       else
       {
-	CL_SPROUT_INVALID_I_CSCF_PORT.log(pj_optarg);
+  CL_SPROUT_INVALID_I_CSCF_PORT.log(pj_optarg);
         LOG_ERROR("I-CSCF port %s is invalid", pj_optarg);
         return -1;
       }
@@ -624,7 +624,7 @@ static pj_status_t init_options(int argc, char *argv[], struct options *options)
         }
         else
         {
-	  CL_SPROUT_INVALID_SAS_OPTION.log();
+    CL_SPROUT_INVALID_SAS_OPTION.log();
           LOG_WARNING("Invalid --sas option, SAS disabled");
         }
       }
@@ -1307,7 +1307,7 @@ int main(int argc, char *argv[])
     memcached_remote_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CLEAR",
                                                                        "SPROUT_REMOTE_MEMCACHED_COMM_ERROR_CRITICAL");
 
-    ralf_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_RALF_COMM_ERROR_CLEAR", 
+    ralf_comm_monitor = new CommunicationMonitor("sprout", "SPROUT_RALF_COMM_ERROR_CLEAR",
                                                            "SPROUT_RALF_COMM_ERROR_MAJOR");
 
     vbucket_alarms = new AlarmPair("sprout", "SPROUT_VBUCKET_ERROR_CLEAR",
@@ -1599,14 +1599,19 @@ int main(int argc, char *argv[])
     }
 
     // Create the S-CSCF and BGCF Sproutlets.
-    std::string scscf_uri = std::string(stack_data.scscf_uri.ptr, stack_data.scscf_uri.slen);
-    std::string bgcf_uri = "sip:bgcf." + scscf_uri.substr(4);
+    std::string scscf_cluster_uri = std::string(stack_data.scscf_uri.ptr,
+                                                stack_data.scscf_uri.slen);
+    std::string scscf_node_uri = "sip:" +
+                                 std::string(stack_data.local_host.ptr,
+                                             stack_data.local_host.slen) +
+                                 ":" + std::to_string(opt.scscf_port);
+    std::string bgcf_uri = "sip:bgcf." + scscf_cluster_uri.substr(4);
     std::string icscf_uri;
     if (opt.icscf_enabled)
     {
       // Create a local I-CSCF URI by replacing the S-CSCF port number in the
       // S-CSCF URI with the I-CSCF port number.
-      icscf_uri = scscf_uri;
+      icscf_uri = scscf_cluster_uri;
       size_t pos = icscf_uri.find(std::to_string(opt.scscf_port));
 
       if (pos != std::string::npos)
@@ -1618,7 +1623,7 @@ int main(int argc, char *argv[])
       else
       {
         // No port number, so best we can do is strap icscf. on the front.
-        icscf_uri = "sip:icscf." + scscf_uri.substr(4);
+        icscf_uri = "sip:icscf." + scscf_cluster_uri.substr(4);
       }
     }
     else
@@ -1627,7 +1632,8 @@ int main(int argc, char *argv[])
     }
 
     SCSCFSproutlet* scscf_sproutlet =
-                      new SCSCFSproutlet(scscf_uri,
+                      new SCSCFSproutlet(scscf_cluster_uri,
+                                         scscf_node_uri,
                                          icscf_uri,
                                          bgcf_uri,
                                          opt.scscf_port,
