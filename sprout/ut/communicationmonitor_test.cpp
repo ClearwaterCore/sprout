@@ -52,7 +52,8 @@ class CommunicationMonitorTest : public ::testing::Test
 {
 public:
   CommunicationMonitorTest() :
-    _cm(&_mp)
+    _ma(new MockAlarm()),
+    _cm(_ma)
   {
     cwtest_completely_control_time();
   }
@@ -63,54 +64,54 @@ public:
   }
 
 private:
-  MockAlarmPair _mp;
+  MockAlarm* _ma;
   CommunicationMonitor _cm;
 };
 
 TEST_F(CommunicationMonitorTest, SuccessNoUpdate)
 {
-  EXPECT_CALL(_mp, alarmed()).Times(0);
+  EXPECT_CALL(*_ma, alarmed()).Times(0);
   _cm.inform_success();
 }
 
 TEST_F(CommunicationMonitorTest, FailureNoUpdate)
 {
-  EXPECT_CALL(_mp, alarmed()).Times(0);
+  EXPECT_CALL(*_ma, alarmed()).Times(0);
   _cm.inform_failure();
 }
 
 TEST_F(CommunicationMonitorTest, UpdateNoAlarmSuccessCleared)
 {
   cwtest_advance_time_ms(16000);
-  EXPECT_CALL(_mp, alarmed()).Times(2).WillRepeatedly(Return(false));
-  EXPECT_CALL(_mp, set()).Times(0);
-  EXPECT_CALL(_mp, clear()).Times(0);
+  EXPECT_CALL(*_ma, alarmed()).Times(2).WillRepeatedly(Return(false));
+  EXPECT_CALL(*_ma, set()).Times(0);
+  EXPECT_CALL(*_ma, clear()).Times(0);
   _cm.inform_success();
 }
 
 TEST_F(CommunicationMonitorTest, UpdateNoAlarmFailureSet)
 {
   cwtest_advance_time_ms(31000);
-  EXPECT_CALL(_mp, alarmed()).Times(2).WillRepeatedly(Return(true));
-  EXPECT_CALL(_mp, set()).Times(0);
-  EXPECT_CALL(_mp, clear()).Times(0);
+  EXPECT_CALL(*_ma, alarmed()).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(*_ma, set()).Times(0);
+  EXPECT_CALL(*_ma, clear()).Times(0);
   _cm.inform_failure();
 }
 
 TEST_F(CommunicationMonitorTest, UpdateAlarmFailureCleared)
 {
   cwtest_advance_time_ms(16000);
-  EXPECT_CALL(_mp, alarmed()).Times(2).WillRepeatedly(Return(false));
-  EXPECT_CALL(_mp, set()).Times(1);
-  EXPECT_CALL(_mp, clear()).Times(0);
+  EXPECT_CALL(*_ma, alarmed()).Times(2).WillRepeatedly(Return(false));
+  EXPECT_CALL(*_ma, set()).Times(1);
+  EXPECT_CALL(*_ma, clear()).Times(0);
   _cm.inform_failure();
 }
 
 TEST_F(CommunicationMonitorTest, UpdateAlarmSuccessSet)
 {
   cwtest_advance_time_ms(31000);
-  EXPECT_CALL(_mp, alarmed()).Times(2).WillRepeatedly(Return(true));
-  EXPECT_CALL(_mp, set()).Times(0);
-  EXPECT_CALL(_mp, clear()).Times(1);
+  EXPECT_CALL(*_ma, alarmed()).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(*_ma, set()).Times(0);
+  EXPECT_CALL(*_ma, clear()).Times(1);
   _cm.inform_success();
 }

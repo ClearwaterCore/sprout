@@ -982,8 +982,8 @@ int main(int argc, char* argv[])
   CommunicationMonitor* memcached_comm_monitor = NULL;
   CommunicationMonitor* memcached_remote_comm_monitor = NULL;
   CommunicationMonitor* ralf_comm_monitor = NULL;
-  AlarmPair* vbucket_alarms = NULL;
-  AlarmPair* remote_vbucket_alarms = NULL;
+  Alarm* vbucket_alarm = NULL;
+  Alarm* remote_vbucket_alarm = NULL;
 
   // Set up our exception signal handler for asserts and segfaults.
   signal(SIGABRT, exception_handler);
@@ -1217,33 +1217,33 @@ int main(int argc, char* argv[])
   {
     // Create Sprout's alarm objects. 
 
-    chronos_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_CHRONOS_COMM_ERROR, 
-                                                              AlarmDef::MAJOR);
+    chronos_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_CHRONOS_COMM_ERROR, 
+                                                                        AlarmDef::MAJOR));
 
-    enum_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_ENUM_COMM_ERROR,
-                                                           AlarmDef::MAJOR);
+    enum_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_ENUM_COMM_ERROR,
+                                                                     AlarmDef::MAJOR));
 
-    hss_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR,
-                                                          AlarmDef::CRITICAL);
+    hss_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR,
+                                                                    AlarmDef::CRITICAL));
 
-    memcached_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_MEMCACHED_COMM_ERROR,
-                                                                AlarmDef::CRITICAL);
+    memcached_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_MEMCACHED_COMM_ERROR,
+                                                                          AlarmDef::CRITICAL));
 
-    memcached_remote_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_REMOTE_MEMCACHED_COMM_ERROR,
-                                                                       AlarmDef::CRITICAL);
+    memcached_remote_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_REMOTE_MEMCACHED_COMM_ERROR,
+                                                                                 AlarmDef::CRITICAL));
 
-    ralf_comm_monitor = new CommunicationMonitor("sprout", AlarmDef::SPROUT_RALF_COMM_ERROR, 
-                                                           AlarmDef::MAJOR);
+    ralf_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_RALF_COMM_ERROR, 
+                                                                     AlarmDef::MAJOR));
 
-    vbucket_alarms = new AlarmPair("sprout", AlarmDef::SPROUT_VBUCKET_ERROR,
-                                             AlarmDef::MAJOR);
+    vbucket_alarm = new Alarm("sprout", AlarmDef::SPROUT_VBUCKET_ERROR,
+                                        AlarmDef::MAJOR);
 
-    remote_vbucket_alarms = new AlarmPair("sprout", AlarmDef::SPROUT_REMOTE_VBUCKET_ERROR,
-                                                    AlarmDef::MAJOR);
+    remote_vbucket_alarm = new Alarm("sprout", AlarmDef::SPROUT_REMOTE_VBUCKET_ERROR,
+                                               AlarmDef::MAJOR);
 
     // Start the alarm request agent
     AlarmReqAgent::get_instance().start();
-    Alarm::clear_all("sprout");
+    AlarmState::clear_all("sprout");
   }
 
   // Start the load monitor
@@ -1416,7 +1416,7 @@ int main(int argc, char* argv[])
       local_data_store = (Store*)new MemcachedStore(false, 
                                                     opt.store_servers,
                                                     memcached_comm_monitor,
-                                                    vbucket_alarms);
+                                                    vbucket_alarm);
       if (opt.remote_store_servers != "")
       {
         // Use remote memcached store too.
@@ -1424,7 +1424,7 @@ int main(int argc, char* argv[])
         remote_data_store = (Store*)new MemcachedStore(false, 
                                                        opt.remote_store_servers,
                                                        memcached_remote_comm_monitor,
-                                                       remote_vbucket_alarms);
+                                                       remote_vbucket_alarm);
       }
     }
     else
@@ -1641,8 +1641,8 @@ int main(int argc, char* argv[])
     delete memcached_comm_monitor;
     delete memcached_remote_comm_monitor;
     delete ralf_comm_monitor;
-    delete vbucket_alarms;
-    delete remote_vbucket_alarms;
+    delete vbucket_alarm;
+    delete remote_vbucket_alarm;
   }
 
   // Unregister the handlers that use semaphores (so we can safely destroy

@@ -63,8 +63,8 @@ class AlarmTest : public ::testing::Test
 {
 public:
   AlarmTest() :
-    _alarm(issuer, AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR, AlarmDef::CRITICAL),
-    _alarm_pair(issuer, AlarmDef::SPROUT_CHRONOS_COMM_ERROR, AlarmDef::MAJOR),
+    _alarm_state(issuer, AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR, AlarmDef::CRITICAL),
+    _alarm(issuer, AlarmDef::SPROUT_CHRONOS_COMM_ERROR, AlarmDef::MAJOR),
     _c(1),
     _s(2)
   {
@@ -105,8 +105,8 @@ public:
 
 private:
   MockZmqInterface _mz;
+  AlarmState _alarm_state;
   Alarm _alarm;
-  AlarmPair _alarm_pair;
   int _c;
   int _s;
 };
@@ -115,7 +115,7 @@ class AlarmQueueErrorTest : public ::testing::Test
 {
 public:
   AlarmQueueErrorTest() :
-    _alarm(issuer, AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR, AlarmDef::CRITICAL)
+    _alarm_state(issuer, AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR, AlarmDef::CRITICAL)
   {
     AlarmReqAgent::get_instance().start();
   }
@@ -126,14 +126,14 @@ public:
   }
 
 private:
-  Alarm _alarm;
+  AlarmState _alarm_state;
 };
 
 class AlarmZmqErrorTest : public ::testing::Test
 {
 public:
   AlarmZmqErrorTest() :
-    _alarm(issuer, AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR, AlarmDef::CRITICAL),
+    _alarm_state(issuer, AlarmDef::SPROUT_HOMESTEAD_COMM_ERROR, AlarmDef::CRITICAL),
     _c(1),
     _s(2)
   {
@@ -147,7 +147,7 @@ public:
 
 private:
   MockZmqInterface _mz;
-  Alarm _alarm;
+  AlarmState _alarm_state;
   int _c;
   int _s;
 };
@@ -178,7 +178,7 @@ TEST_F(AlarmTest, IssueAlarm)
       .Times(1)
       .WillOnce(Return(0));
   }
-  _alarm.issue();
+  _alarm_state.issue();
   _mz.call_complete(ZmqInterface::ZMQ_RECV, 5);
 }
 
@@ -199,7 +199,7 @@ TEST_F(AlarmTest, ClearAlarms)
       .Times(1)
       .WillOnce(Return(0));
   }
-  Alarm::clear_all(issuer);
+  AlarmState::clear_all(issuer);
   _mz.call_complete(ZmqInterface::ZMQ_RECV, 5);
 }
 
@@ -223,7 +223,7 @@ TEST_F(AlarmTest, PairSetNotAlarmed)
     .Times(1)
     .WillOnce(Return(0));
 
-  _alarm_pair.set();
+  _alarm.set();
   _mz.call_complete(ZmqInterface::ZMQ_RECV, 5);
 }
 
@@ -240,18 +240,18 @@ TEST_F(AlarmTest, PairSetAlarmed)
       .Times(1)
       .WillOnce(Return(0));
 
-    _alarm_pair.set();
+    _alarm.set();
     _mz.call_complete(ZmqInterface::ZMQ_RECV, 5);
   }
 
   EXPECT_CALL(_mz, zmq_send(_,_,_,_)).Times(0);
-  _alarm_pair.set();
+  _alarm.set();
 }
 
 TEST_F(AlarmTest, PairClearNotAlarmed)
 {
   EXPECT_CALL(_mz, zmq_send(_,_,_,_)).Times(0);
-  _alarm_pair.clear();
+  _alarm.clear();
 }
 
 TEST_F(AlarmTest, PairClearAlarmed)
@@ -267,7 +267,7 @@ TEST_F(AlarmTest, PairClearAlarmed)
       .Times(1)
       .WillOnce(Return(0));
 
-    _alarm_pair.set();
+    _alarm.set();
     _mz.call_complete(ZmqInterface::ZMQ_RECV, 5);
   }
 
@@ -290,7 +290,7 @@ TEST_F(AlarmTest, PairClearAlarmed)
       .Times(1)
       .WillOnce(Return(0));
 
-    _alarm_pair.clear();
+    _alarm.clear();
     _mz.call_complete(ZmqInterface::ZMQ_RECV, 5);
   }
 }
@@ -300,7 +300,7 @@ TEST_F(AlarmQueueErrorTest, Overflow)
   CapturingTestLogger log;
   for (int idx = 0; idx < AlarmReqAgent::MAX_Q_DEPTH+1; idx++)
   {
-    _alarm.issue();
+    _alarm_state.issue();
   }
   EXPECT_TRUE(log.contains("queue overflowed"));
 }
@@ -373,7 +373,7 @@ TEST_F(AlarmZmqErrorTest, Send)
   EXPECT_CALL(_mz, zmq_ctx_destroy(_)).WillOnce(Return(0));
 
   EXPECT_TRUE(AlarmReqAgent::get_instance().start());
-  _alarm.issue();
+  _alarm_state.issue();
   _mz.call_complete(ZmqInterface::ZMQ_SEND, 5);
 
   AlarmReqAgent::get_instance().stop();
@@ -394,7 +394,7 @@ TEST_F(AlarmZmqErrorTest, Receive)
   EXPECT_CALL(_mz, zmq_ctx_destroy(_)).WillOnce(Return(0));
 
   EXPECT_TRUE(AlarmReqAgent::get_instance().start());
-  _alarm.issue();
+  _alarm_state.issue();
   _mz.call_complete(ZmqInterface::ZMQ_RECV, 5);
 
   AlarmReqAgent::get_instance().stop();
