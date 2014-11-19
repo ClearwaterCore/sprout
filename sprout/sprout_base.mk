@@ -70,7 +70,8 @@ TARGET_SOURCES := logger.cpp \
                   ipv6utils.cpp \
                   contact_filtering.cpp \
                   sproutletproxy.cpp \
-                  pluginloader.cpp
+                  pluginloader.cpp \
+		  signalnames.cpp
 
 TARGET_SOURCES_BUILD := main.cpp
 
