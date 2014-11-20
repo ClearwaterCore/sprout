@@ -1225,6 +1225,7 @@ pj_status_t PJUtils::send_request(pjsip_tx_data* tdata,
       // will have happened in the callback.
       status = PJ_SUCCESS;
     }
+  }
   else
   {
     // Failed to resolve the destination or failed to create a PJSIP UAC
