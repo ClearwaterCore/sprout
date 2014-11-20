@@ -121,10 +121,7 @@ get_settings()
 
         [ -z "$enum_server" ] || enum_server_arg="--enum $enum_server"
         [ -z "$enum_suffix" ] || enum_suffix_arg="--enum-suffix $enum_suffix"
-        if [ $ENUM_FILE_ENABLED = Y ]
-        then
-          [ -z "$enum_file" ] || enum_file_arg="--enum-file $enum_file"
-        fi
+        [ -z "$enum_file" ] || enum_file_arg="--enum-file $enum_file"
 
         if [ $MMTEL_SERVICES_ENABLED = Y ]
         then
