@@ -45,6 +45,7 @@ extern "C" {
 #include <pjlib.h>
 #include "pjsip-simple/evsub.h"
 }
+
 #include <arpa/inet.h>
 
 // Common STL includes.
@@ -74,6 +75,7 @@ extern "C" {
 #include "quiescing_manager.h"
 #include "load_monitor.h"
 #include "counter.h"
+#include "sprout_ent_definitions.h"
 
 class StackQuiesceHandler;
 
@@ -430,6 +432,7 @@ static pj_bool_t on_rx_msg(pjsip_rx_data* rdata)
     // The queue has not been serviced for sufficiently long to imply that
     // all the worker threads are deadlock, so exit the process so it will be
     // restarted.
+    CL_SPROUT_SIP_DEADLOCK.log();
     LOG_ERROR("Detected worker thread deadlock - exiting");
     abort();
   }
@@ -600,6 +603,7 @@ pj_status_t create_udp_transport(int port, pj_str_t& host)
 
   if (status != PJ_SUCCESS)
   {
+    CL_SPROUT_SIP_UDP_INTERFACE_START_FAIL.log(port, PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Failed to start UDP transport for port %d (%s)", port, PJUtils::pj_status_to_string(status).c_str());
   }
 
@@ -636,7 +640,9 @@ pj_status_t create_tcp_listener_transport(int port, pj_str_t& host, pjsip_tpfact
   else
   {
     status = PJ_EAFNOTSUP;
-    LOG_ERROR("Failed to start TCP transport for port %d (%s)",
+    CL_SPROUT_SIP_TCP_START_FAIL.log(port,
+				     PJUtils::pj_status_to_string(status).c_str());
+    LOG_ERROR("Failed to start TCP transport for port %d  (%s)",
               port,
               PJUtils::pj_status_to_string(status).c_str());
     return status;
@@ -650,6 +656,8 @@ pj_status_t create_tcp_listener_transport(int port, pj_str_t& host, pjsip_tpfact
 
   if (status != PJ_SUCCESS)
   {
+    CL_SPROUT_SIP_TCP_SERVICE_START_FAIL.log(port,
+					     PJUtils::pj_status_to_string(status).c_str());
     LOG_ERROR("Failed to start TCP transport for port %d (%s)",
               port,
               PJUtils::pj_status_to_string(status).c_str());
@@ -724,11 +732,13 @@ public:
     {
       destroy_tcp_listener_transport(stack_data.scscf_port,
                                      stack_data.scscf_tcp_factory);
+      CL_SPROUT_S_CSCF_END.log(stack_data.scscf_port);
     }
     if (stack_data.icscf_tcp_factory != NULL)
     {
       destroy_tcp_listener_transport(stack_data.icscf_port,
                                      stack_data.icscf_tcp_factory);
+      CL_SPROUT_I_CSCF_END.log(stack_data.icscf_port);
     }
   }
 
@@ -1003,6 +1013,15 @@ pj_status_t init_stack(const std::string& system_name,
     status = start_transports(stack_data.scscf_port,
                               stack_data.public_host,
                               &stack_data.scscf_tcp_factory);
+    if (status == PJ_SUCCESS)
+    {
+      CL_SPROUT_S_CSCF_AVAIL.log(stack_data.scscf_port);
+    }
+    else
+    {
+      CL_SPROUT_S_CSCF_INIT_FAIL2.log(stack_data.scscf_port)
+;
+    }
     PJ_ASSERT_RETURN(status == PJ_SUCCESS, status);
   }
 
@@ -1012,6 +1031,15 @@ pj_status_t init_stack(const std::string& system_name,
     status = start_transports(stack_data.icscf_port,
                               stack_data.public_host,
                               &stack_data.icscf_tcp_factory);
+    if (status == PJ_SUCCESS)
+    {
+      CL_SPROUT_I_CSCF_AVAIL.log(stack_data.icscf_port);
+    }
+    else
+    {
+      CL_SPROUT_I_CSCF_INIT_FAIL2.log(stack_data.icscf_port)
+;
+    }
     PJ_ASSERT_RETURN(status == PJ_SUCCESS, status);
   }
 
