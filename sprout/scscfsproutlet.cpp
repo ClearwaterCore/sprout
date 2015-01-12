@@ -1186,7 +1186,7 @@ void SCSCFSproutletTsx::route_to_ue_bindings(pjsip_msg* req)
   {
     // Subscriber is not registered.  This is not necessarily an error case,
     // but make a SAS log for clarity.  The call will be rejected with a 480.
-    LOG_ERROR("Public ID %s not registered", public_id.c_str());
+    LOG_DEBUG("Public ID %s not registered", public_id.c_str());
     SAS::Event event(trail(), SASEvent::SCSCF_NOT_REGISTERED, 0);
     event.add_var_param(public_id);
     SAS::report_event(event);
