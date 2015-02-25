@@ -102,7 +102,9 @@ get_settings()
         [ -f /etc/clearwater/remote_cluster_settings ] && remote_memstore_arg="--remote-memstore /etc/clearwater/remote_cluster_settings"
 
         # Set up defaults for user settings then pull in any overrides.
-        # Sprout uses blocking look-up services, so must run multi-threaded.
+        # Sprout uses blocking look-up services, so must run multi-threaded and
+        # uses the same value for the number of threads servicing HTTP callbacks
+        # from Chronos and Homestead (see "--http_threads $num_worker_threads" below).
         num_pjsip_threads=1
         num_worker_threads=$(($(grep processor /proc/cpuinfo | wc -l) * 50))
         log_level=2
@@ -184,6 +186,7 @@ do_start()
                      --sas $sas_server,$NAME@$public_hostname
                      --pjsip-threads $num_pjsip_threads
                      --worker-threads $num_worker_threads
+                     --http_threads $num_worker_threads
                      --record-routing-model $sprout_rr_level
                      --default-session-expires $default_session_expires
                      --target-latency-us $target_latency_us
