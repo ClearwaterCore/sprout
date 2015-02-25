@@ -51,6 +51,8 @@
 #include "acr.h"
 #include "enumservice.h"
 
+typedef std::vector<std::string> str_vector;
+
 struct options
 {
   bool                   pcscf_enabled;
@@ -88,8 +90,8 @@ struct options
   std::string            store_servers;
   std::string            remote_store_servers;
   std::string            ralf_server;
-  std::string            dns_server;
-  std::string            enum_server;
+  str_vector             dns_servers;
+  str_vector             enum_servers;
   std::string            enum_suffix;
   std::string            enum_file;
   bool                   enforce_user_phone;
