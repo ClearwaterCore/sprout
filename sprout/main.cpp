@@ -242,8 +242,10 @@ static void usage(void)
        "                            If 'pcscf,icscf,as', it also Record-Routes between every AS.\n"
        " -G, --ralf <server>        Name/IP address of Ralf (Rf) billing server.\n"
        " -X, --xdms <server>        Name/IP address of XDM server\n"
-       "     --dns-server <server>  IP address of the DNS server to use (defaults to 127.0.0.1)\n"
-       " -E, --enum <server>        Name/IP address of ENUM server (can't be enabled at same\n"
+       "     --dns-server <server>[,<server2>,<server3>]\n"
+       "                            IP addresses of the DNS servers to use (defaults to 127.0.0.1)\n"
+       " -E, --enum <server>[,<server2>,<server3>]\n"
+       "                            IP addresses of ENUM server (can't be enabled at same\n"
        "                            time as -f)\n"
        " -x, --enum-suffix <suffix> Suffix appended to ENUM domains (default: .e164.arpa)\n"
        " -f, --enum-file <file>     JSON ENUM config file (can't be enabled at same time as\n"
@@ -586,8 +588,10 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
       break;
 
     case 'E':
-      options->enum_server = std::string(pj_optarg);
-      LOG_INFO("ENUM server set to %s", pj_optarg);
+      options->enum_servers.clear();
+      Utils::split_string(std::string(pj_optarg), ',', options->enum_servers, 0, false);
+      LOG_INFO("%d ENUM servers passed on the command line",
+               options->enum_servers.size());
       break;
 
     case 'x':
@@ -748,9 +752,11 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
       break;
 
     case OPT_DNS_SERVER:
-      options->dns_server = std::string(pj_optarg);
-      LOG_INFO("Using DNS server %s", pj_optarg);
-      break;
+      options->dns_servers.clear();
+      Utils::split_string(std::string(pj_optarg), ',', options->dns_servers, 0, false);
+      LOG_INFO("%d DNS servers passed on the command line",
+               options->dns_servers.size());
+    break;
 
     case 'h':
       usage();
@@ -1049,7 +1055,7 @@ int main(int argc, char* argv[])
   opt.http_address = "0.0.0.0";
   opt.http_port = 9888;
   opt.http_threads = 1;
-  opt.dns_server = "127.0.0.1";
+  opt.dns_servers.push_back("127.0.0.1");
   opt.billing_cdf = "";
   opt.emerg_reg_accepted = PJ_FALSE;
   opt.max_call_list_length = 0;
@@ -1228,7 +1234,7 @@ int main(int argc, char* argv[])
     LOG_WARNING("A registration expiry period should not be specified for P-CSCF");
   }
 
-  if ((!opt.enum_server.empty()) &&
+  if ((!opt.enum_servers.empty()) &&
       (!opt.enum_file.empty()))
   {
     LOG_WARNING("Both ENUM server and ENUM file lookup enabled - ignoring ENUM file");
@@ -1243,9 +1249,9 @@ int main(int argc, char* argv[])
 
   if ((opt.icscf_enabled || opt.scscf_enabled) && opt.alarms_enabled)
   {
-    // Create Sprout's alarm objects. 
+    // Create Sprout's alarm objects.
 
-    chronos_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_CHRONOS_COMM_ERROR, 
+    chronos_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_CHRONOS_COMM_ERROR,
                                                                         AlarmDef::MAJOR));
 
     enum_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_ENUM_COMM_ERROR,
@@ -1260,7 +1266,7 @@ int main(int argc, char* argv[])
     memcached_remote_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_REMOTE_MEMCACHED_COMM_ERROR,
                                                                                  AlarmDef::CRITICAL));
 
-    ralf_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_RALF_COMM_ERROR, 
+    ralf_comm_monitor = new CommunicationMonitor(new Alarm("sprout", AlarmDef::SPROUT_RALF_COMM_ERROR,
                                                                      AlarmDef::MAJOR));
 
     vbucket_alarm = new Alarm("sprout", AlarmDef::SPROUT_VBUCKET_ERROR,
@@ -1281,7 +1287,7 @@ int main(int argc, char* argv[])
                                  MIN_TOKEN_RATE);       // Minimum token fill rate (per sec).
 
   // Create a DNS resolver and a SIP specific resolver.
-  dns_resolver = new DnsCachedResolver(opt.dns_server);
+  dns_resolver = new DnsCachedResolver(opt.dns_servers);
   sip_resolver = new SIPResolver(dns_resolver);
 
   // Initialize the PJSIP stack and associated subsystems.
@@ -1350,9 +1356,9 @@ int main(int argc, char* argv[])
   if (opt.scscf_enabled)
   {
     // Create ENUM service required for S-CSCF.
-    if (!opt.enum_server.empty())
+    if (!opt.enum_servers.empty())
     {
-      enum_service = new DNSEnumService(opt.enum_server, 
+      enum_service = new DNSEnumService(opt.enum_servers,
                                         opt.enum_suffix,
                                         new DNSResolverFactory(),
                                         enum_comm_monitor);
@@ -1450,7 +1456,7 @@ int main(int argc, char* argv[])
       // Use memcached store.
       LOG_STATUS("Using memcached compatible store with ASCII protocol");
 
-      local_data_store = (Store*)new MemcachedStore(false, 
+      local_data_store = (Store*)new MemcachedStore(false,
                                                     opt.store_servers,
                                                     memcached_comm_monitor,
                                                     vbucket_alarm);
@@ -1467,7 +1473,7 @@ int main(int argc, char* argv[])
         // Use remote memcached store too.
         LOG_STATUS("Using remote memcached compatible store with ASCII protocol");
 
-        remote_data_store = (Store*)new MemcachedStore(false, 
+        remote_data_store = (Store*)new MemcachedStore(false,
                                                        opt.remote_store_servers,
                                                        memcached_remote_comm_monitor,
                                                        remote_vbucket_alarm);
