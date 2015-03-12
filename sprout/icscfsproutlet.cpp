@@ -462,6 +462,8 @@ void ICSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
 
     SAS::Event event(trail(), SASEvent::ICSCF_RCVD_ORIG_NON_REG, 0);
     event.add_var_param(impu);
+    event.add_var_param(req->line.req.method.name.slen,
+                        req->line.req.method.name.ptr);
     SAS::report_event(event);
   }
   else
@@ -493,6 +495,8 @@ void ICSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
 
     SAS::Event event(trail(), SASEvent::ICSCF_RCVD_TERM_NON_REG, 0);
     event.add_var_param(impu);
+    event.add_var_param(req->line.req.method.name.slen,
+                        req->line.req.method.name.ptr);
     SAS::report_event(event);
   }
 
