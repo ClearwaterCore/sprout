@@ -145,6 +145,8 @@ namespace SASEvent
   const int BINDINGS_FROM_TARGETS = SPROUT_BASE + 0x0000D4;
   const int ALL_BINDINGS_FILTERED = SPROUT_BASE + 0x0000D5;
 
+  const int PROPAGATING_AGGREGATED_503_AS_500 = SPROUT_BASE + 0x0000E7;
+
 } //namespace SASEvent
 
 #endif

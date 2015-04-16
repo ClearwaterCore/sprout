@@ -1535,6 +1535,22 @@ void SproutletWrapper::process_actions(bool complete_after_actions)
     // be sent, and the Sproutlet has sent at least one final response, so
     // send this best response upstream.
     LOG_DEBUG("All UAC responded");
+
+    // If the best response is a 503, we must propagate this as a 500 in
+    // accordance with step 6, in 16.7 of RFC 3261 (the SIP spec), which says
+    // that, unless a node knows for certain that all subsequent requests that
+    // it receives are going to get bounced with 503s ("never" in the case of
+    // Clearwater), it should send a 500 upstream instead
+    if (_best_rsp->msg->line.status.code == PJSIP_SC_SERVICE_UNAVAILABLE)
+    {
+      LOG_DEBUG("Propagating aggregated 503 as a 500");
+      _best_rsp->msg->line.status.code   = PJSIP_SC_INTERNAL_SERVER_ERROR;
+      _best_rsp->msg->line.status.reason =
+                       *pjsip_get_status_text(PJSIP_SC_INTERNAL_SERVER_ERROR);
+      SAS::Event event(get_trail(_best_rsp), SASEvent::PROPAGATING_AGGREGATED_503_AS_500, 0);
+      SAS::report_event(event);
+    }
+
     tx_response(_best_rsp);
   }
 
