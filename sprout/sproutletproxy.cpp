@@ -974,6 +974,7 @@ SproutletWrapper::SproutletWrapper(SproutletProxy* proxy,
   _send_responses(),
   _pending_sends(0),
   _pending_responses(0),
+  _total_responses(0),
   _best_rsp(NULL),
   _complete(false),
   _forks(),
@@ -1536,12 +1537,22 @@ void SproutletWrapper::process_actions(bool complete_after_actions)
     // send this best response upstream.
     LOG_DEBUG("All UAC responded");
 
-    // If the best response is a 503, we must propagate this as a 500 in
+    // If the best response is a 503, we should propagate this as a 500 in
     // accordance with step 6, in 16.7 of RFC 3261 (the SIP spec), which says
     // that, unless a node knows for certain that all subsequent requests that
     // it receives are going to get bounced with 503s ("never" in the case of
     // Clearwater), it should send a 500 upstream instead
-    if (_best_rsp->msg->line.status.code == PJSIP_SC_SERVICE_UNAVAILABLE)
+    //
+    // Unfortunately, its only safe to do this here (in the sproutlet proxy) if
+    // we also aggregated more than one response.  Otherwise, if one sproutlet
+    // returns a 503 to an upstream sproutlet, the 503 will be converted before
+    // its made it out of the sprout node and the upstream node won't know to
+    // retry the request to a peer.  Changing the code so that it reliably
+    // converts 503s to 500s only when going to the wire is a significant fix
+    // which has been deferred to a GitHub issue
+    // (https://github.com/Metaswitch/sprout/issues/1002).
+    if ((_best_rsp->msg->line.status.code == PJSIP_SC_SERVICE_UNAVAILABLE) &&
+        (_total_responses > 1))
     {
       LOG_DEBUG("Propagating aggregated 503 as a 500");
       _best_rsp->msg->line.status.code   = PJSIP_SC_INTERNAL_SERVER_ERROR;
@@ -1637,6 +1648,7 @@ void SproutletWrapper::aggregate_response(pjsip_tx_data* rsp)
   {
     // 2xx response.
     LOG_DEBUG("Forward 2xx response");
+    _total_responses++;
 
     // Send this response immediately as a final response.
     if (_best_rsp != NULL)
@@ -1654,6 +1666,8 @@ void SproutletWrapper::aggregate_response(pjsip_tx_data* rsp)
   {
     // Final, non-OK response.  Is this the "best" response received so far?
     LOG_DEBUG("3xx/4xx/5xx/6xx response");
+    _total_responses++;
+
     if ((_best_rsp == NULL) ||
         (compare_sip_sc(status_code, _best_rsp->msg->line.status.code) > 0))
     {

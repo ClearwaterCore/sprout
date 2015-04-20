@@ -320,6 +320,7 @@ private:
 
   int _pending_sends;
   int _pending_responses;
+  int _total_responses;
   pjsip_tx_data* _best_rsp;
 
   bool _complete;
