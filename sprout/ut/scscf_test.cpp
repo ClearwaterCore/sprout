@@ -1983,6 +1983,42 @@ TEST_F(SCSCFTest, TestForkedFlow4)
   expect_all_tsx_done();
 }
 
+TEST_F(SCSCFTest, TestForkedFlow5)
+{
+  SCOPED_TRACE("");
+  pjsip_msg* out;
+  Message msg;
+  setupForkedFlow(msg);
+  ASSERT_EQ(3u, _tdata.size());
+
+  // Send 503s back from all of them
+  // Send final error from a third
+  inject_msg(respond_to_txdata(_tdata[_uris[0]], 503));
+  ASSERT_EQ(1, txdata_count());
+  ReqMatcher("ACK").matches(current_txdata()->msg);
+  free_txdata();
+
+  inject_msg(respond_to_txdata(_tdata[_uris[1]], 503));
+  ASSERT_EQ(1, txdata_count());
+  ReqMatcher("ACK").matches(current_txdata()->msg);
+  free_txdata();
+
+  // We'll get the aggregated message here also so txcount is now two
+  inject_msg(respond_to_txdata(_tdata[_uris[2]], 503));
+  ASSERT_EQ(2, txdata_count());
+  ReqMatcher("ACK").matches(current_txdata()->msg);
+  free_txdata();
+
+  // All downstream entities returned 503, so expect a 500 to be sent back (in
+  // accordance with 16.7, step 6 in RFC 3261)
+  out = current_txdata()->msg;
+  RespMatcher(500).matches(out);
+  free_txdata();
+
+  // All done!
+  expect_all_tsx_done();
+}
+
 // Test SIP Message flows
 TEST_F(SCSCFTest, TestSIPMessageSupport)
 {
