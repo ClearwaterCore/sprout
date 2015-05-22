@@ -116,6 +116,7 @@ struct options
   int                                  log_level;
   bool                                 interactive;
   bool                                 daemon;
+  int                                  sip_tcp_connect_timeout;
 };
 
 // Objects that must be shared with dynamically linked sproutlets must be

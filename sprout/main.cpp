@@ -108,7 +108,8 @@ enum OptionTypes
   OPT_CALL_LIST_TTL,
   OPT_ALARMS_ENABLED,
   OPT_DNS_SERVER,
-  OPT_TARGET_LATENCY_US
+  OPT_TARGET_LATENCY_US,
+  OPT_SIP_TCP_CONNECT_TIMEOUT
 };
 
 
@@ -164,6 +165,7 @@ const static struct pj_getopt_option long_opt[] =
   { "daemon",            no_argument,       0, 'd'},
   { "interactive",       no_argument,       0, 't'},
   { "help",              no_argument,       0, 'h'},
+  { "sip-tcp-connect-timeout",      required_argument, 0, OPT_SIP_TCP_CONNECT_TIMEOUT},
   { NULL,                0, 0, 0}
 };
 
@@ -285,6 +287,11 @@ static void usage(void)
        "     --memento-threads N    Number of Memento threads (default: 25)\n"
        "     --call-list-ttl N      Time to store call lists entries (default: 604800)\n"
        "     --alarms-enabled       Whether SNMP alarms are enabled (default: false)\n"
+       "     --bgcf-ignore-user-phone\n"
+       "                            Whether to ignore any ';user=phone' parameter in BGCF for the\n"
+       "                            purposes of route determination.\n"
+       "     --sip-tcp-connect-timeout <milliseconds>\n"
+       "                            The amount of time to wait for a SIP TCP connection to establish.\n"
        " -F, --log-file <directory>\n"
        "                            Log to file in specified directory\n"
        " -L, --log-level N          Set log level to N (default: 4)\n"
@@ -758,6 +765,12 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
                options->dns_servers.size());
     break;
 
+    case OPT_SIP_TCP_CONNECT_TIMEOUT:
+      options->sip_tcp_connect_timeout = atoi(pj_optarg);
+      LOG_INFO("SIP TCP connect timeout set to %d",
+               options->sip_tcp_connect_timeout);
+      break;
+
     case 'h':
       usage();
       return -1;
@@ -1067,6 +1080,7 @@ int main(int argc, char* argv[])
   opt.log_level = 0;
   opt.daemon = PJ_FALSE;
   opt.interactive = PJ_FALSE;
+  opt.sip_tcp_connect_timeout = 1000;
 
   boost::filesystem::path p = argv[0];
   openlog(p.filename().c_str(), PDLOG_PID, PDLOG_LOCAL6);
@@ -1308,6 +1322,7 @@ int main(int argc, char* argv[])
                       opt.worker_threads,
                       opt.record_routing_model,
                       opt.default_session_expires,
+                      opt.sip_tcp_connect_timeout,
                       quiescing_mgr,
                       load_monitor,
                       opt.billing_cdf);
