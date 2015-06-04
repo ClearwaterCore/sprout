@@ -1080,7 +1080,7 @@ int main(int argc, char* argv[])
   opt.log_level = 0;
   opt.daemon = PJ_FALSE;
   opt.interactive = PJ_FALSE;
-  opt.sip_tcp_connect_timeout = 1000;
+  opt.sip_tcp_connect_timeout = 2000;
 
   boost::filesystem::path p = argv[0];
   openlog(p.filename().c_str(), PDLOG_PID, PDLOG_LOCAL6);
