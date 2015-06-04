@@ -1172,7 +1172,7 @@ void SCSCFSproutletTsx::route_to_as(pjsip_msg* req, const std::string& server_na
                    _scscf->_session_continue_timeout_ms :
                    _scscf->_session_terminated_timeout_ms);
 
-    if (!schedule_timer(NULL, _liveness_timer, timeout))
+    if (timeout != 0)
     {
       if (!schedule_timer(NULL, _liveness_timer, timeout))
       {

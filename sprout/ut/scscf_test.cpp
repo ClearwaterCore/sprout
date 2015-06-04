@@ -3091,6 +3091,90 @@ TEST_F(SCSCFTest, DISABLED_DefaultHandlingTerminateTimeout)
 }
 
 
+// Disabled because terminated default handling is broken at the moment.
+TEST_F(SCSCFTest, DefaultHandlingTerminateDisabled)
+{
+  // Disable the liveness timer for session terminated ASs.
+  _scscf_sproutlet->set_session_terminated_timeout(0);
+
+  // Register an endpoint to act as the callee.
+  register_uri(_store, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+
+  // Set up an application server for the caller. It's default handling is set
+  // to session continue.
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", "UNREGISTERED",
+                                "<IMSSubscription><ServiceProfile>\n"
+                                "<PublicIdentity><Identity>sip:6505551000@homedomain</Identity></PublicIdentity>"
+                                "  <InitialFilterCriteria>\n"
+                                "    <Priority>1</Priority>\n"
+                                "    <TriggerPoint>\n"
+                                "    <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                                "    <SPT>\n"
+                                "      <ConditionNegated>0</ConditionNegated>\n"
+                                "      <Group>0</Group>\n"
+                                "      <Method>INVITE</Method>\n"
+                                "      <Extension></Extension>\n"
+                                "    </SPT>\n"
+                                "  </TriggerPoint>\n"
+                                "  <ApplicationServer>\n"
+                                "    <ServerName>sip:1.2.3.4:56789;transport=tcp</ServerName>\n"
+                                "    <DefaultHandling>1</DefaultHandling>\n"
+                                "  </ApplicationServer>\n"
+                                "  </InitialFilterCriteria>\n"
+                                "</ServiceProfile></IMSSubscription>");
+
+  TransportFlow tpCaller(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
+  TransportFlow tpAS1(TransportFlow::Protocol::TCP, stack_data.scscf_port, "1.2.3.4", 56789);
+  TransportFlow tpCallee(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.114.61.213", 5061);
+
+  // Caller sends INVITE
+  Message msg;
+  msg._via = "10.99.88.11:12345;transport=TCP";
+  msg._to = "6505551234@homedomain";
+  msg._route = "Route: <sip:homedomain;orig>";
+  msg._todomain = "";
+  msg._requri = "sip:6505551234@homedomain";
+
+  msg._method = "INVITE";
+  inject_msg(msg.get_request(), &tpCaller);
+  poll();
+  ASSERT_EQ(2, txdata_count());
+
+  // 100 Trying goes back to caller
+  pjsip_msg* out = current_txdata()->msg;
+  RespMatcher(100).matches(out);
+  tpCaller.expect_target(current_txdata(), true);  // Requests always come back on same transport
+  msg.set_route(out);
+  free_txdata();
+
+  // INVITE passed on to AS
+  out = current_txdata()->msg;
+  ReqMatcher r1("INVITE");
+  ASSERT_NO_FATAL_FAILURE(r1.matches(out));
+  free_txdata();
+
+  // Advance time without receiving a response. Nothing happens straight away.
+  cwtest_advance_time_ms(6000);
+  poll();
+  ASSERT_EQ(0, txdata_count());
+
+  // After another 26s the AS transaction times out and the call fails.
+  cwtest_advance_time_ms(26000);
+  poll();
+  ASSERT_EQ(1, txdata_count());
+  out = current_txdata()->msg;
+  RespMatcher(408).matches(out);
+  tpCaller.expect_target(current_txdata(), true);  // Requests always come back on same transport
+  free_txdata();
+
+  // Caller ACKs error response.
+  msg._method = "ACK";
+  inject_msg(msg.get_request(), &tpCaller);
+  poll();
+  ASSERT_EQ(0, txdata_count());
+}
+
+
 // Test DefaultHandling=CONTINUE for non-existent AS (where name does not resolve).
 TEST_F(SCSCFTest, DefaultHandlingContinueNonExistent)
 {
@@ -3333,6 +3417,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueResponsiveError)
   msg._method = "ACK";
   inject_msg(msg.get_request(), &tpBono);
 }
+
 
 TEST_F(SCSCFTest, DefaultHandlingContinueTimeout)
 {
