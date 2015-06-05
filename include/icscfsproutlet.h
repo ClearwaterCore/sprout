@@ -83,6 +83,13 @@ public:
                         const std::string& alias,
                         pjsip_msg* req);
 
+#ifdef UNIT_TEST
+  inline void set_global_only_lookups_enforced(bool enforce_global_only_lookups)
+  {
+    _global_only_lookups = enforce_global_only_lookups;
+  }
+#endif
+
 private:
 
   /// Returns the configured BGCF URI for this system.
@@ -104,6 +111,11 @@ private:
   inline bool get_user_phone() const
   {
     return _user_phone;
+  }
+
+  inline bool are_global_only_lookups_enforced() const
+  {
+    return _global_only_lookups;
   }
 
   /// Attempts to use ENUM to translate the specified Tel URI into a SIP URI.
