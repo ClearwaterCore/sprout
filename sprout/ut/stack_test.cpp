@@ -139,6 +139,7 @@ TEST_F(StackTest, DISABLED_SimpleLifeCycle)
                               9,                            // #worker threads
                               1,                            // RR strategy
                               60 * 10,                      // Session refresh interval
+                              2000,                         // TCP connection timeout
                               NULL,                         // Quiescing manager
                               NULL,                         // Load monitor
                               "");                          // CDF domain
