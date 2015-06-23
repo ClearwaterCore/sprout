@@ -119,7 +119,7 @@ LDFLAGS += -lmemcached \
            -lcurl \
            -lsas \
            -lboost_filesystem \
-	   -lz
+     -lz
 
 # Explicitly link some pjsip modules. Some plugins require symbols in them
 # (which sprout-base doesn't), and the plugins are dynamically linked at run
@@ -137,4 +137,4 @@ distclean: clean
 
 # Build rules for SIPp cryptographic modules.
 $(OBJ_DIR_TEST)/md5.o : $(SIPP_DIR)/md5.c
-	$(CXX) $(CPPFLAGS) -I$(SIPP_DIR) -c $(SIPP_DIR)/md5.c -o $@
+  $(CXX) $(CPPFLAGS) -I$(SIPP_DIR) -c $(SIPP_DIR)/md5.c -o $@
