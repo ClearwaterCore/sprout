@@ -666,6 +666,7 @@ pj_status_t create_tcp_listener_transport(int port, pj_str_t& host, pjsip_tpfact
   pj_sockaddr_cp(&cfg.bind_addr, &addr);
   pj_memcpy(&cfg.addr_name, &published_name, sizeof(published_name));
   cfg.async_cnt = 50;
+  cfg.connect_timeout_ms = stack_data.sip_tcp_connect_timeout;
 
   status = pjsip_tcp_transport_start3(stack_data.endpt, &cfg, tcp_factory);
 
@@ -871,6 +872,7 @@ pj_status_t init_stack(const std::string& system_name,
                        int num_worker_threads,
                        int record_routing_model,
                        const int default_session_expires,
+                       const int sip_tcp_connect_timeout,
                        QuiescingManager *quiescing_mgr_arg,
                        LoadMonitor *load_monitor_arg,
                        const std::string& cdf_domain)
@@ -917,6 +919,7 @@ pj_status_t init_stack(const std::string& system_name,
 
   // Copy other functional options to stack data.
   stack_data.default_session_expires = default_session_expires;
+  stack_data.sip_tcp_connect_timeout = sip_tcp_connect_timeout;
 
   // Work out local and public hostnames and cluster domain names.
   stack_data.local_host = (local_host != "") ? pj_str(local_host_cstr) : *pj_gethostname();
