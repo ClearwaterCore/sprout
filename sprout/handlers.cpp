@@ -120,9 +120,9 @@ static void report_sip_all_register_marker(SAS::TrailId trail, std::string uri_s
 
     // Create and report the marker.
     SAS::Marker sip_all_register(trail, MARKER_ID_SIP_ALL_REGISTER, 1u);
-    sip_all_register.add_var_param(uri_str);
-    // Add the DN parameter. If the user part is not numeric log the whole URI
-    // so that it displays properly in SAS.
+    sip_all_register.add_var_param(PJUtils::strip_uri_scheme(uri_str));
+    // Add the DN parameter. If the user part is not numeric just log it in
+    // its entirety.
     sip_all_register.add_var_param(PJUtils::is_user_numeric(user) ?
                                    PJUtils::remove_visual_separators(user) :
                                    PJUtils::pj_str_to_string(&user));
@@ -358,12 +358,18 @@ HTTPCode DeregistrationTask::parse_request(std::string body)
 
     for (size_t ii = 0; ii < registration_vals.size(); ++ii)
     {
+<<<<<<< HEAD
       Json::Value registration = registration_vals[(int)ii];
       std::string primary_impu;
       std::string impi = "";
 
       if ((registration.isMember("primary-impu")) &&
           ((registration)["primary-impu"].isString()))
+||||||| parent of f1f7aac... Be consistent with other devices when logging SIP URIs and non-numeric usernames
+      try
+=======
+      try
+>>>>>>> f1f7aac... Be consistent with other devices when logging SIP URIs and non-numeric usernames
       {
         primary_impu = registration["primary-impu"].asString();
 
