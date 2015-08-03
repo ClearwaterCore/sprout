@@ -358,18 +358,12 @@ HTTPCode DeregistrationTask::parse_request(std::string body)
 
     for (size_t ii = 0; ii < registration_vals.size(); ++ii)
     {
-<<<<<<< HEAD
       Json::Value registration = registration_vals[(int)ii];
       std::string primary_impu;
       std::string impi = "";
 
       if ((registration.isMember("primary-impu")) &&
           ((registration)["primary-impu"].isString()))
-||||||| parent of f1f7aac... Be consistent with other devices when logging SIP URIs and non-numeric usernames
-      try
-=======
-      try
->>>>>>> f1f7aac... Be consistent with other devices when logging SIP URIs and non-numeric usernames
       {
         primary_impu = registration["primary-impu"].asString();
 
