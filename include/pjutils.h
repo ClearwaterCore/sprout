@@ -145,15 +145,15 @@ pjsip_tx_data* clone_msg(pjsip_endpoint* endpt,
                          pjsip_tx_data* tdata);
 
 pj_status_t create_response(pjsip_endpoint *endpt,
-      		            const pjsip_rx_data *rdata,
-      		            int st_code,
-      		            const pj_str_t* st_text,
-      		            pjsip_tx_data **p_tdata);
+                            const pjsip_rx_data *rdata,
+                            int st_code,
+                            const pj_str_t* st_text,
+                            pjsip_tx_data **p_tdata);
 
 pj_status_t create_response(pjsip_endpoint *endpt,
                             const pjsip_tx_data *tdata,
                             int st_code,
-      		            const pj_str_t* st_text,
+                            const pj_str_t* st_text,
                             pjsip_tx_data **p_tdata);
 
 pj_status_t create_request_fwd(pjsip_endpoint *endpt,
@@ -266,6 +266,8 @@ pjsip_uri* translate_sip_uri_to_tel_uri(const pjsip_sip_uri* sip_uri,
 
 pj_bool_t is_user_global(const std::string& user);
 pj_bool_t is_user_global(const pj_str_t& user);
+
+std::string remove_visual_separators(const std::string& user);
 
 pj_bool_t is_user_numeric(const std::string& user);
 pj_bool_t is_user_numeric(const pj_str_t& user);
