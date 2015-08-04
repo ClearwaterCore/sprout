@@ -74,6 +74,8 @@ pj_str_t uri_to_pj_str(pjsip_uri_context_e context,
 std::string uri_to_string(pjsip_uri_context_e context,
                           const pjsip_uri* uri);
 
+std::string strip_uri_scheme(const std::string& uri);
+
 pjsip_uri* uri_from_string(const std::string& uri_s,
                            pj_pool_t* pool,
                            pj_bool_t force_name_addr=false);
@@ -145,15 +147,15 @@ pjsip_tx_data* clone_msg(pjsip_endpoint* endpt,
                          pjsip_tx_data* tdata);
 
 pj_status_t create_response(pjsip_endpoint *endpt,
-      		            const pjsip_rx_data *rdata,
-      		            int st_code,
-      		            const pj_str_t* st_text,
-      		            pjsip_tx_data **p_tdata);
+                            const pjsip_rx_data *rdata,
+                            int st_code,
+                            const pj_str_t* st_text,
+                            pjsip_tx_data **p_tdata);
 
 pj_status_t create_response(pjsip_endpoint *endpt,
                             const pjsip_tx_data *tdata,
                             int st_code,
-      		            const pj_str_t* st_text,
+                            const pj_str_t* st_text,
                             pjsip_tx_data **p_tdata);
 
 pj_status_t create_request_fwd(pjsip_endpoint *endpt,
@@ -266,6 +268,9 @@ pjsip_uri* translate_sip_uri_to_tel_uri(const pjsip_sip_uri* sip_uri,
 
 pj_bool_t is_user_global(const std::string& user);
 pj_bool_t is_user_global(const pj_str_t& user);
+
+std::string remove_visual_separators(const std::string& user);
+std::string remove_visual_separators(const pj_str_t& number);
 
 pj_bool_t is_user_numeric(const std::string& user);
 pj_bool_t is_user_numeric(const pj_str_t& user);
