@@ -125,8 +125,12 @@ static void report_sip_all_register_marker(SAS::TrailId trail, std::string uri_s
 
     // Create and report the marker.
     SAS::Marker sip_all_register(trail, MARKER_ID_SIP_ALL_REGISTER, 1u);
-    sip_all_register.add_var_param(uri_str);
-    sip_all_register.add_var_param(user.slen, user.ptr);
+    sip_all_register.add_var_param(PJUtils::strip_uri_scheme(uri_str));
+    // Add the DN parameter. If the user part is not numeric just log it in
+    // its entirety.
+    sip_all_register.add_var_param(PJUtils::is_user_numeric(user) ?
+                                   PJUtils::remove_visual_separators(user) :
+                                   PJUtils::pj_str_to_string(&user));
     SAS::report_marker(sip_all_register);
   }
   else
@@ -331,7 +335,7 @@ HTTPCode RegistrationTimeoutTask::parse_response(std::string body)
   if (doc.HasParseError())
   {
     LOG_INFO("Failed to parse opaque data as JSON: %s\nError: %s",
-             json_str.c_str(), 
+             json_str.c_str(),
              rapidjson::GetParseError_En(doc.GetParseError()));
     return HTTP_BAD_REQUEST;
   }
@@ -374,7 +378,7 @@ HTTPCode DeregistrationTask::parse_request(std::string body)
          reg_it != reg_arr.End();
          ++reg_it)
     {
-      try 
+      try
       {
         std::string primary_impu;
         std::string impi = "";
