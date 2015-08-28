@@ -537,6 +537,9 @@ void SCSCFSproutletTsx::on_rx_response(pjsip_msg* rsp, int fork_id)
         // The AS either timed out or returned a 5xx error, and default
         // handling is set to continue.
         LOG_DEBUG("Trigger default_handling=CONTINUE processing");
+        SAS::Event bypass_As(trail(), SASEvent::BYPASS_AS, 1);
+        SAS::report_event(bypass_As);
+
         _as_chain_link = _as_chain_link.next();
         pjsip_msg* req = original_request();
         if (_session_case->is_originating())
@@ -677,6 +680,8 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
       _session_case = &SessionCase::OriginatingCdiv;
       served_user = _as_chain_link.served_user();
 
+      sas_log_start_of_sesion_case(req, _session_case, served_user);
+
       // We might not be the terminating server any more, so we
       // should blank out the term_ioi parameter. If we are still
       // the terminating server, we'll fill it back in when we go
@@ -714,6 +719,8 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
       {
         LOG_DEBUG("Failed to retrieve ServiceProfile for %s", served_user.c_str());
         status_code = PJSIP_SC_NOT_FOUND;
+        SAS::Event no_ifcs(trail(), SASEvent::IFC_GET_FAILURE, 0);
+        SAS::report_event(no_ifcs);
       }
     }
     else
@@ -749,6 +756,9 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
 
     if (!served_user.empty())
     {
+      // SAS log the start of originating or terminating processing.
+      sas_log_start_of_sesion_case(req, _session_case, served_user);
+
       LOG_DEBUG("Looking up iFCs for %s for new AS chain", served_user.c_str());
       Ifcs ifcs;
       if (lookup_ifcs(served_user, ifcs))
@@ -760,6 +770,8 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
       {
         LOG_DEBUG("Failed to retrieve ServiceProfile for %s", served_user.c_str());
         status_code = PJSIP_SC_NOT_FOUND;
+        SAS::Event no_ifcs(trail(), SASEvent::IFC_GET_FAILURE, 1);
+        SAS::report_event(no_ifcs);
       }
 
       if (_session_case->is_terminating())
@@ -971,6 +983,10 @@ void SCSCFSproutletTsx::apply_terminating_services(pjsip_msg* req)
 /// Attempt to route the request to an application server.
 void SCSCFSproutletTsx::route_to_as(pjsip_msg* req, const std::string& server_name)
 {
+  SAS::Event invoke_as(trail(), SASEvent::SCSCF_INVOKING_AS, 0);
+  invoke_as.add_var_param(server_name);
+  SAS::report_event(invoke_as);
+
   // Check that the AS URI is well-formed.
   pjsip_sip_uri* as_uri = (pjsip_sip_uri*)
                         PJUtils::uri_from_string(server_name, get_pool(req));
@@ -1050,6 +1066,9 @@ void SCSCFSproutletTsx::route_to_as(pjsip_msg* req, const std::string& server_na
     // is set to allow it, but it feels better to fail the request for a
     // misconfiguration.)
     LOG_ERROR("Badly formed AS URI %s", server_name.c_str());
+    SAS::Event bad_uri(trail(), SASEvent::BAD_AS_URI, 0);
+    SAS::report_event(bad_uri);
+
     pjsip_msg* rsp = create_response(req, PJSIP_SC_BAD_GATEWAY);
     send_response(rsp);
     free_msg(req);
@@ -1148,6 +1167,9 @@ void SCSCFSproutletTsx::route_to_target(pjsip_msg* req)
   {
     // The RequestURI contains a Tel URI???
     LOG_INFO("Rejecting request with Tel: URI");
+    SAS::Event bad_uri(trail(), SASEvent::CANNOT_ROUTE_TO_TEL_URI, 0);
+    SAS::report_event(bad_uri);
+
     pjsip_msg* rsp = create_response(req, PJSIP_SC_NOT_FOUND);
     send_response(rsp);
     free_msg(req);
@@ -1223,6 +1245,10 @@ void SCSCFSproutletTsx::route_to_ue_bindings(pjsip_msg* req)
   }
   else
   {
+    SAS::Event route_to_ues(trail(), SASEvent::SCSCF_ROUTING_TO_UES, 0);
+    route_to_ues.add_static_param(targets.size());
+    SAS::report_event(route_to_ues);
+
     // Fork the request to the bindings, and remember the AoR used to query
     // the registration store and the binding identifier for each fork.
     _target_aor = aor;
@@ -1493,6 +1519,9 @@ void SCSCFSproutletTsx::on_timer_expiry(void* context)
       // The AS either timed out or returned a 5xx error, and default
       // handling is set to continue.
       LOG_DEBUG("Trigger default_handling=CONTINUE processing");
+      SAS::Event bypass_as(trail(), SASEvent::BYPASS_AS, 0);
+      SAS::report_event(bypass_as);
+
       _as_chain_link = _as_chain_link.next();
       pjsip_msg* req = original_request();
       if (_session_case->is_originating())
@@ -1506,6 +1535,9 @@ void SCSCFSproutletTsx::on_timer_expiry(void* context)
     }
     else
     {
+      SAS::Event as_failed(trail(), SASEvent::AS_FAILED, 0);
+      SAS::report_event(as_failed);
+
       // Build and send a timeout response upstream.
       pjsip_msg* req = original_request();
       pjsip_msg* rsp = create_response(req,
@@ -1592,3 +1624,30 @@ void SCSCFSproutletTsx::add_second_p_a_i_hdr(pjsip_msg* msg)
     }
   }
 }
+
+void SCSCFSproutletTsx::sas_log_start_of_sesion_case(pjsip_msg* req,
+                                                     const SessionCase* session_case,
+                                                     const std::string& served_user)
+{
+  int event_id;
+
+  if (session_case == &SessionCase::Originating)
+  {
+    event_id = SASEvent::SCSCF_STARTED_ORIG_PROC;
+  }
+  else if (session_case == &SessionCase::Terminating)
+  {
+    event_id = SASEvent::SCSCF_STARTED_TERM_PROC;
+  }
+  else
+  {
+    event_id = SASEvent::SCSCF_STARTED_ORIG_CDIV_PROC;
+  }
+
+  SAS::Event event(trail(), event_id, 0);
+  event.add_var_param(served_user);
+  event.add_var_param(req->line.req.method.name.slen,
+                      req->line.req.method.name.ptr);
+  SAS::report_event(event);
+}
+
