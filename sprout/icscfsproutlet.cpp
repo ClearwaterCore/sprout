@@ -185,6 +185,10 @@ void ICSCFSproutletRegTsx::on_rx_initial_request(pjsip_msg* req)
   pjsip_uri* to_uri = (pjsip_uri*)pjsip_uri_get_uri(to_hdr->uri);
   impu = PJUtils::public_id_from_uri(to_uri);
 
+  SAS::Event reg_event(trail(), SASEvent::ICSCF_RCVD_REGISTER, 0);
+  reg_event.add_var_param(impu);
+  SAS::report_event(reg_event);
+
   // Get the private identity from the Authentication header, or generate
   // a default if there is no Authentication header or no username in the
   // header.
@@ -455,6 +459,10 @@ void ICSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     LOG_DEBUG("Originating request");
     _originating = true;
     impu = PJUtils::public_id_from_uri(PJUtils::orig_served_user(req));
+
+    SAS::Event event(trail(), SASEvent::ICSCF_RCVD_ORIG_NON_REG, 0);
+    event.add_var_param(impu);
+    SAS::report_event(event);
   }
   else
   {
@@ -482,6 +490,10 @@ void ICSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     }
 
     impu = PJUtils::public_id_from_uri(PJUtils::term_served_user(req));
+
+    SAS::Event event(trail(), SASEvent::ICSCF_RCVD_TERM_NON_REG, 0);
+    event.add_var_param(impu);
+    SAS::report_event(event);
   }
 
   // Create an LIR router to handle the HSS interactions and S-CSCF
