@@ -182,6 +182,7 @@ static void pjsip_log_handler(int level,
   default: level = 5; break;
   }
 
+  TRC_RAMTRACE("%s", data);
   Log::write(level, "pjsip", 0, data);
 }
 
