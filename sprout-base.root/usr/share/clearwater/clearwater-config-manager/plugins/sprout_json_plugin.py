@@ -33,6 +33,7 @@
 from metaswitch.clearwater.config_manager.plugin_base import ConfigPluginBase, FileStatus
 from metaswitch.clearwater.etcd_shared.plugin_utils import run_command
 import logging
+import subprocess
 
 _log = logging.getLogger("sprout_json_plugin")
 
@@ -54,6 +55,11 @@ class SproutJsonPlugin(ConfigPluginBase):
                 if current == value:
                     return FileStatus.UP_TO_DATE
                 else:
+                    with open("/tmp/value.tmp", "w") as ofile:
+                        ofile.write(value)
+                    print " + {} is present but is out of sync:".format(self._file)
+                    print "     # diff -bw <etcd-conman-value> {}".format(self._file)
+                    subprocess.call("diff -bw /tmp/value.tmp {}|sed -e 's#^#     #'".format(self._file), shell=True);
                     return FileStatus.OUT_OF_SYNC
         except IOError:
             return FileStatus.MISSING
