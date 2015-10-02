@@ -137,7 +137,8 @@ enum OptionTypes
   OPT_STATELESS_PROXIES,
   OPT_NON_REGISTERING_PBXES,
   OPT_PBX_SERVICE_ROUTE,
-  OPT_NON_REGISTER_AUTHENTICATION
+  OPT_NON_REGISTER_AUTHENTICATION,
+  OPT_FORCE_THIRD_PARTY_REGISTER_BODY,
 };
 
 
@@ -210,6 +211,7 @@ const static struct pj_getopt_option long_opt[] =
   { "non-registering-pbxes",        required_argument, 0, OPT_NON_REGISTERING_PBXES},
   { "non-register-authentication",  required_argument, 0, OPT_NON_REGISTER_AUTHENTICATION},
   { "pbx-service-route",            required_argument, 0, OPT_PBX_SERVICE_ROUTE},
+  { "force-3pr-body",               no_argument,       0, OPT_FORCE_THIRD_PARTY_REGISTER_BODY},
   { NULL,                           0,                 0, 0}
 };
 
@@ -380,6 +382,9 @@ static void usage(void)
        "                            - 'never' means that sprout never challenges non-REGISTER requests.\n"
        "                            - 'if_proxy_authorization_present' means sprout will only challenge\n"
        "                              requests that already have a Proxy-Authorization header.\n"
+       "     --force-3pr-body       Always include the original REGISTER and 200 OK in the body of\n"
+       "                            third-party REGISTER messages to application servers, even if the\n"
+       "                            User-Data doesn't specify it\n"
        " -F, --log-file <directory>\n"
        "                            Log to file in specified directory\n"
        " -L, --log-level N          Set log level to N (default: 4)\n"
@@ -1013,6 +1018,14 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
       }
       break;
 
+    case OPT_FORCE_THIRD_PARTY_REGISTER_BODY:
+      {
+        TRC_INFO("Forcing inclusion of original REGISTER requests/responses on third-party REGISTERs");
+        options->force_third_party_register_body = true;
+      }
+      break;
+
+
     case 'h':
       usage();
       return -1;
@@ -1337,6 +1350,7 @@ int main(int argc, char* argv[])
   opt.session_terminated_timeout_ms = SCSCFSproutlet::DEFAULT_SESSION_TERMINATED_TIMEOUT;
   opt.stateless_proxies.clear();
   opt.non_register_auth_mode = NonRegisterAuthentication::NEVER;
+  opt.force_third_party_register_body = false;
 
   boost::filesystem::path p = argv[0];
   // Copy the filename to a string so that we can be sure of its lifespan -
@@ -1970,6 +1984,7 @@ int main(int argc, char* argv[])
                             analytics_logger,
                             scscf_acr_factory,
                             opt.reg_max_expires,
+                            opt.force_third_party_register_body,
                             &reg_stats_tbls,
                             &third_party_reg_stats_tbls);
 
