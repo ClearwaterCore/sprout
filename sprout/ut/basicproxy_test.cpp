@@ -122,7 +122,11 @@ public:
   };
 
   BasicProxyUT(pjsip_endpoint* endpt, int priority) :
-    BasicProxy(endpt, "UTProxy", priority, false, std::set<std::string>())
+    BasicProxy(endpt,
+               "UTProxy",
+               priority,
+               false,
+               std::set<std::string>({"stateless-proxy.awaydomain"}))
   {
   }
 
@@ -2702,7 +2706,7 @@ TEST_F(BasicProxyTest, DontRetryOnTimeout)
   free_txdata();
 
   // This server doesn't respond, so advance time to trigger the timeout.
-  cwtest_advance_time_ms(31000);
+  cwtest_advance_time_ms(33000);
   poll();
 
   // Check a 408 timeout response is forwarded back to the source.
@@ -3595,7 +3599,7 @@ TEST_F(BasicProxyTest, BlacklistOnTimeout)
   EXPECT_STREQ("TCP", tdata->tp_info.transport->type_name) << "Wrong transport type";
   EXPECT_EQ(5060, tdata->tp_info.transport->remote_name.port) << "Wrong transport port";
   server1 = str_pj(tdata->tp_info.transport->remote_name.host);
-  EXPECT_EQ(server1, "10.10.10.100");
+  EXPECT_EQ(server1, "10.10.10.101");
 
   // Send a 200 OK response.
   inject_msg(respond_to_current_txdata(200));
