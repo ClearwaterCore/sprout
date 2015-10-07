@@ -103,6 +103,13 @@ get_settings()
         signaling_dns_server=127.0.0.1
         chronos_hostname=127.0.0.1:7253
         . /etc/clearwater/config
+	
+	# Log the output of clearwater-show-config to syslog
+	(
+	    clearwater-show-config > /tmp/$$ 2>&1
+	    logger -t "clearwater-show-config" -f /tmp/$$ -p local6.info
+	    rm -f /tmp/$$
+	)
 
         # Set up a default cluster_settings file if it does not exist.  The local
         # IP address needs to be surrounded by square brackets if it is IPv6.
