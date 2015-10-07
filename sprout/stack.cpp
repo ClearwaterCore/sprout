@@ -385,6 +385,8 @@ class StackQuiesceHandler :
 {
 public:
 
+  virtual ~StackQuiesceHandler(){};
+
   //
   // The following methods are from QuiesceConnectionsInterface.
   //
