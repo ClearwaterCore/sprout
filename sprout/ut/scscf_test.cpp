@@ -3946,8 +3946,8 @@ TEST_F(SCSCFTest, RecordRoutingTestStartAndEnd)
   doFourAppServerFlow("Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-term>\r\n"
                       "Record-Route: <sip:6.2.3.4>\r\n"
                       "Record-Route: <sip:5.2.3.4>\r\n"
-                      "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-term>\r\n"
-                      "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-orig>\r\n"
+                      "Record-Route: <sip:homedomain:5058;lr;service=scscf>\r\n"
+                      "Record-Route: <sip:homedomain:5058;lr;service=scscf>\r\n"
                       "Record-Route: <sip:4.2.3.4>\r\n"
                       "Record-Route: <sip:1.2.3.4>\r\n"
                       "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-orig>", true);
@@ -3983,12 +3983,12 @@ TEST_F(SCSCFTest, RecordRoutingTestEachHop)
   // split originating and terminating handling like that yet.
   doFourAppServerFlow("Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-term>\r\n"
                       "Record-Route: <sip:6.2.3.4>\r\n"
-                      "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-term>\r\n"
+                      "Record-Route: <sip:homedomain:5058;lr;service=scscf>\r\n"
                       "Record-Route: <sip:5.2.3.4>\r\n"
-                      "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-term>\r\n"
-                      "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-orig>\r\n"
+                      "Record-Route: <sip:homedomain:5058;lr;service=scscf>\r\n"
+                      "Record-Route: <sip:homedomain:5058;lr;service=scscf>\r\n"
                       "Record-Route: <sip:4.2.3.4>\r\n"
-                      "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-orig>\r\n"
+                      "Record-Route: <sip:homedomain:5058;lr;service=scscf>\r\n"
                       "Record-Route: <sip:1.2.3.4>\r\n"
                       "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-orig>", true);
 
@@ -4015,9 +4015,9 @@ TEST_F(SCSCFTest, RecordRoutingTestCollapseEveryHop)
   stack_data.record_route_on_every_hop = true;
   // Expect 1 Record-Route
   doFourAppServerFlow("Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-term>\r\n"
-                      "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-term>\r\n"
-                      "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-orig>\r\n"
-                      "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-orig>\r\n"
+                      "Record-Route: <sip:homedomain:5058;lr;service=scscf>\r\n"
+                      "Record-Route: <sip:homedomain:5058;lr;service=scscf>\r\n"
+                      "Record-Route: <sip:homedomain:5058;lr;service=scscf>\r\n"
                       "Record-Route: <sip:homedomain:5058;lr;service=scscf;billing-role=charge-orig>", false);
   stack_data.record_route_on_every_hop = false;
 }
