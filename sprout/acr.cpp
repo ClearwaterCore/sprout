@@ -92,6 +92,10 @@ void ACR::set_default_ccf(const std::string& default_ccf)
 {
 }
 
+void ACR::override_session_id(const std::string& session_id)
+{
+}
+
 std::string ACR::node_name(Node node_functionality)
 {
   switch (node_functionality)
@@ -282,12 +286,15 @@ void RalfACR::rx_request(pjsip_msg* req, pj_time_val timestamp)
       _expires = -1;
     }
 
-    // Store the call ID.
-    pjsip_cid_hdr* cid_hdr = (pjsip_cid_hdr*)
-                                pjsip_msg_find_hdr(req, PJSIP_H_CALL_ID, NULL);
-    if (cid_hdr != NULL)
+    // Store the call ID but only if the session ID has not already been set.
+    if (_user_session_id.empty())
     {
-      _user_session_id = PJUtils::pj_str_to_string(&cid_hdr->id);
+      pjsip_cid_hdr* cid_hdr = (pjsip_cid_hdr*)
+                                  pjsip_msg_find_hdr(req, PJSIP_H_CALL_ID, NULL);
+      if (cid_hdr != NULL)
+      {
+        _user_session_id = PJUtils::pj_str_to_string(&cid_hdr->id);
+      }
     }
 
     // Store contents of From header.
@@ -643,6 +650,7 @@ void RalfACR::send_message(pj_time_val timestamp)
     {
       TRC_WARNING("Failed to send Ralf ACR message (%p), rc = %ld", this, rc);
     }
+
   }
   else
   {
@@ -1267,6 +1275,11 @@ void RalfACR::set_default_ccf(const std::string& default_ccf)
   {
     _ccfs.push_back(default_ccf);
   }
+}
+
+void RalfACR::override_session_id(const std::string& session_id)
+{
+  _user_session_id = session_id;
 }
 
 void RalfACR::encode_sdp_description(
