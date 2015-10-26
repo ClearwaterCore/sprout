@@ -1697,6 +1697,7 @@ TEST_F(SCSCFTest, TestEnumReqURIwithNPDataOverride)
   _hss_connection->set_impu_result("sip:+16505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
 
   _scscf_sproutlet->set_override_npdi(true);
+  _bgcf_sproutlet->set_override_npdi(true);
   Message msg;
   msg._to = "+15108580301;npdi";
   msg._route = "Route: <sip:homedomain;orig>";
@@ -1732,6 +1733,7 @@ TEST_F(SCSCFTest, TestEnumNPBGCFSIP)
   SCOPED_TRACE("");
   _hss_connection->set_impu_result("sip:+16505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
   _scscf_sproutlet->set_override_npdi(true);
+  _bgcf_sproutlet->set_override_npdi(true);
 
   Message msg;
   msg._to = "+15108580401";
@@ -1750,6 +1752,7 @@ TEST_F(SCSCFTest, TestEnumNPBGCFTel)
   SCOPED_TRACE("");
   _hss_connection->set_impu_result("sip:+16505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
   _scscf_sproutlet->set_override_npdi(true);
+  _bgcf_sproutlet->set_override_npdi(true);
 
   Message msg;
   msg._to = "+15108580401";
@@ -1761,25 +1764,6 @@ TEST_F(SCSCFTest, TestEnumNPBGCFTel)
   list<HeaderMatcher> hdrs;
   hdrs.push_back(HeaderMatcher("Route", "Route: <sip:10.0.0.1:5060;transport=TCP;lr>"));
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580401;rn.*+151085804;npdi@homedomain.*"), hdrs, false);
-}
-
-// Test where the BGCF does an ENUM lookup which returns an invalid rule. This
-// test uses two ENUM rules. The first one is invoked by the S-CSCF before
-// routing to the BGCF. The BGCF does the second lookup. At this point an
-// invalid rule is returned and we reply with a 404 ENUM failure.
-TEST_F(SCSCFTest, TestBGCFInvalidEnumRule)
-{
-  add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
-  SCOPED_TRACE("");
-  register_uri(_store, _hss_connection, "6505551239", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
-  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
-  Message msg;
-  msg._toscheme = "tel";
-  msg._to = "16505551239";
-  msg._route = "Route: <sip:homedomain;orig>";
-  msg._todomain = "";
-  list<HeaderMatcher> hdrs;
-  doSlowFailureFlow(msg, 404, "", "ENUM failure");
 }
 
 TEST_F(SCSCFTest, TestValidBGCFRoute)
