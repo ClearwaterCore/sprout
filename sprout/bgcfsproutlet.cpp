@@ -130,8 +130,9 @@ std::string BGCFSproutlet::enum_lookup(pjsip_uri* uri, SAS::TrailId trail)
       user = PJUtils::pj_str_to_string(&((pjsip_tel_uri*)uri)->number);
     }
 
-    if ((!user.empty()) && 
-        ((PJUtils::is_user_global(user)) || 
+    if ((!user.empty()) &&
+         (PJUtils::is_home_domain(uri)) &&
+        ((PJUtils::is_user_global(user)) ||
          (!_global_only_lookups)))
     {
       LOG_DEBUG("Performing ENUM lookup for user %s", user.c_str());
@@ -183,9 +184,9 @@ void BGCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
   std::string routing_value;
   bool routing_with_number = false;
 
-  if ((PJUtils::does_uri_represent_number(req_uri, 
-                _bgcf->should_require_user_phone())) && 
-      ((!PJUtils::get_npdi(req_uri)) || 
+  if ((PJUtils::does_uri_represent_number(req_uri,
+                _bgcf->should_require_user_phone())) &&
+      ((!PJUtils::get_npdi(req_uri)) ||
        (_bgcf->should_override_npdi())))
   {
     std::string new_uri = _bgcf->enum_lookup(req_uri, trail());
@@ -195,7 +196,7 @@ void BGCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     if (!new_uri.empty())
     {
       req_uri = (pjsip_uri*)PJUtils::uri_from_string(new_uri, get_pool(req));
- 
+
       if (req_uri != NULL)
       {
         LOG_DEBUG("Rewrite request URI to %s", new_uri.c_str());
@@ -203,13 +204,13 @@ void BGCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
       }
       else
       {
-        // The ENUM lookup has returned an invalid URI. Reject the 
-        // request. 
+        // The ENUM lookup has returned an invalid URI. Reject the
+        // request.
         LOG_DEBUG("Invalid ENUM response: %s", new_uri.c_str());
         SAS::Event event(trail(), SASEvent::ENUM_INVALID, 0);
         event.add_var_param(new_uri);
         SAS::report_event(event);
-  
+
         pjsip_msg* rsp = create_response(req,
                                          PJSIP_SC_NOT_FOUND,
                                          "ENUM failure");
@@ -235,7 +236,7 @@ void BGCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     // Extract the domain from the ReqURI if this is a SIP URI.
     if (!PJUtils::is_uri_phone_number(req_uri))
     {
-      routing_value = 
+      routing_value =
                     PJUtils::pj_str_to_string(&((pjsip_sip_uri*)req_uri)->host);
     }
 
