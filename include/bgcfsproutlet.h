@@ -91,6 +91,10 @@ public:
     return _override_npdi;
   }
 
+  // Methods used to change the values of internal configuration during unit
+  // test.
+  void set_override_npdi(bool v) { _override_npdi = v; }
+
 private:
 
   /// Lookup a route from the configured rules.

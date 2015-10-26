@@ -1697,6 +1697,7 @@ TEST_F(SCSCFTest, TestEnumReqURIwithNPDataOverride)
   _hss_connection->set_impu_result("sip:+16505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
 
   _scscf_sproutlet->set_override_npdi(true);
+  _bgcf_sproutlet->set_override_npdi(true);
   Message msg;
   msg._to = "+15108580301;npdi";
   msg._route = "Route: <sip:homedomain;orig>";
@@ -1732,6 +1733,7 @@ TEST_F(SCSCFTest, TestEnumNPBGCFSIP)
   SCOPED_TRACE("");
   _hss_connection->set_impu_result("sip:+16505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
   _scscf_sproutlet->set_override_npdi(true);
+  _bgcf_sproutlet->set_override_npdi(true);
 
   Message msg;
   msg._to = "+15108580401";
@@ -1750,6 +1752,7 @@ TEST_F(SCSCFTest, TestEnumNPBGCFTel)
   SCOPED_TRACE("");
   _hss_connection->set_impu_result("sip:+16505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
   _scscf_sproutlet->set_override_npdi(true);
+  _bgcf_sproutlet->set_override_npdi(true);
 
   Message msg;
   msg._to = "+15108580401";
