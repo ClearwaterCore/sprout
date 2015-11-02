@@ -80,12 +80,13 @@ public:
   /// Create a Sproutlet UAS transaction object, with optional notification of
   /// termination.
   typedef void (uas_tsx_terminated_callback)(void* user_data);
-  void create_uas_tsx(pjsip_tx_data *rdata,
-                      Sproutlet* sproutlet,
-                      const std::string& alias,
-                      SAS::TrailId trail,
-                      uas_tsx_terminated_callback* terminated_callback = NULL,
-                      void* user_data = NULL);
+  virtual void create_uas_tsx(
+      pjsip_tx_data *rdata,
+      Sproutlet* sproutlet,
+      const std::string& alias,
+      SAS::TrailId trail,
+      uas_tsx_terminated_callback* terminated_callback = NULL,
+      void* user_data = NULL);
 
 protected:
   /// Pre-declaration
