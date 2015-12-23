@@ -125,7 +125,30 @@ Sproutlet* SproutletProxy::target_sproutlet(pjsip_msg* req,
   {
     if (PJSIP_URI_SCHEME_IS_SIP(route->name_addr.uri))
     {
-      uri = (pjsip_sip_uri*)route->name_addr.uri;
+      bool attempt_route_to_sproutlet = true;
+
+      // TODO: Once the subscription manager is a Sproutlet, this should
+      // consider the ReqURI regardess of the method.  Until then, SUBSCRIBES
+      // targetted for the local S-CSCF mustn't use sproutlets as they'll miss
+      // the subscription module.
+      if (pjsip_method_cmp(&req->line.req.method, pjsip_get_subscribe_method()) == 0)
+      {
+        // If its a SUBSCRIBE, we only route it to a sproutlet if its not going to
+        // the S-CSCF port (as it might be targetted at an AS with no external port)
+        attempt_route_to_sproutlet = false;
+
+        if (((pjsip_sip_uri*)route->name_addr.uri)->port != stack_data.scscf_port)
+        {
+          // Its not going to the S-CSCF port, so sproutlet routing is on
+          attempt_route_to_sproutlet = true;
+          TRC_DEBUG("Not targetted at S-CSCF so attempt sproutlet route");
+        }
+      }
+
+      if (attempt_route_to_sproutlet)
+      {
+        uri = (pjsip_sip_uri*)route->name_addr.uri;
+      }
     }
   }
 
@@ -1004,7 +1027,7 @@ SproutletWrapper::SproutletWrapper(SproutletProxy* proxy,
     _sproutlet_tsx = new SproutletTsx(this);
   }
 
-  if ((_sproutlet != NULL) && 
+  if ((_sproutlet != NULL) &&
       (_sproutlet->_incoming_sip_transactions_tbl != NULL))
   {
     // Update SNMP SIP transactions statistics for the Sproutlet.
@@ -1014,7 +1037,7 @@ SproutletWrapper::SproutletWrapper(SproutletProxy* proxy,
       _sproutlet->_incoming_sip_transactions_tbl->increment_successes(_req_type);
     }
   }
-  
+
   // Construct a unique identifier for this Sproutlet.
   std::ostringstream id;
   id << _service_name << "-" << (const void*)_sproutlet_tsx;
@@ -1233,7 +1256,7 @@ int SproutletWrapper::send_request(pjsip_msg*& req)
     return -1;
   }
 
-  if ((_sproutlet != NULL) && 
+  if ((_sproutlet != NULL) &&
       (_sproutlet->_outgoing_sip_transactions_tbl != NULL))
   {
     // Update SNMP SIP transactions statistics for the Sproutlet.
@@ -1243,7 +1266,7 @@ int SproutletWrapper::send_request(pjsip_msg*& req)
       _sproutlet->_outgoing_sip_transactions_tbl->increment_successes(_req_type);
     }
   }
-  
+
   // We've found the tdata, move it to _send_requests under a new unique ID.
   int fork_id = _forks.size();
   _forks.resize(fork_id + 1);
@@ -1491,8 +1514,8 @@ void SproutletWrapper::rx_response(pjsip_tx_data* rsp, int fork_id)
                 _id.c_str(), pjsip_tx_data_get_info(rsp),
                 fork_id, pjsip_tsx_state_str(_forks[fork_id].state.tsx_state));
     --_pending_responses;
-  
-    if ((_sproutlet != NULL) && 
+
+    if ((_sproutlet != NULL) &&
       (_sproutlet->_outgoing_sip_transactions_tbl != NULL))
     {
       // Update SNMP SIP transactions statistics for the Sproutlet.
@@ -1674,7 +1697,7 @@ void SproutletWrapper::process_actions(bool complete_after_actions)
   // We've now finished (almost) the process_actions method, so we're free to
   // delete this SproutletWrapper once more (if it's appropriate to do so).
   _process_actions_entered--;
-  
+
   if ((_complete) &&
       (_pending_responses == 0) &&
       (_process_actions_entered == 0))
@@ -1812,7 +1835,7 @@ void SproutletWrapper::tx_response(pjsip_tx_data* rsp)
         (_sproutlet->_incoming_sip_transactions_tbl != NULL))
     {
       // Update SNMP SIP transactions statistics for the Sproutlet.
-      if ((_best_rsp != NULL) && 
+      if ((_best_rsp != NULL) &&
                (_best_rsp->msg->line.status.code >= 200 && _best_rsp->msg->line.status.code < 300))
       {
         _sproutlet->_incoming_sip_transactions_tbl->increment_successes(_req_type);
