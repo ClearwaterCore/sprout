@@ -182,7 +182,6 @@ static void pjsip_log_handler(int level,
   default: level = 5; break;
   }
 
-  TRC_RAMTRACE("%s", data);
   Log::write(level, "pjsip", 0, data);
 }
 
@@ -194,6 +193,7 @@ void init_pjsip_logging(int log_level,
   pj_log_set_level(log_level);
   pj_log_set_decor(PJ_LOG_HAS_SENDER);
   pj_log_set_log_func(&pjsip_log_handler);
+  pj_log_set_ram_trace_funcs(&Log::ramCacheTrcCall, &Log::ramTrace);
 }
 
 
@@ -624,7 +624,7 @@ pj_status_t init_stack(const std::string& system_name,
   {
     std::list<std::string> domains;
     Utils::split_string(additional_home_domains, ',', domains, 0, true);
-    
+
     for (std::list<std::string>::iterator ii = domains.begin();
          ii != domains.end();
          ii++)
