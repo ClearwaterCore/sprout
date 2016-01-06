@@ -58,7 +58,7 @@ static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
                               bool& previous_aor_pair_alloced,
                               std::string aor_id,
                               SubscriberDataManager* current_sdm,
-                              SubscriberDataManager* remote_sdm,
+                              std::vector<SubscriberDataManager*> remote_sdms,
                               SubscriberDataManager::AoRPair** previous_aor_pair,
                               SAS::TrailId trail)
 {
@@ -76,41 +76,67 @@ static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
     return false;
   }
 
-  // If we don't have any bindings, try the backup AoR and/or store.
+  // If we don't have any bindings, try the backup AoR and/or stores.
   //LCOV_EXCL_START
   if ((*aor_pair)->get_current()->bindings().empty())
   {
-    if ((*previous_aor_pair == NULL) &&
-        (remote_sdm != NULL) &&
-        (remote_sdm->has_servers()))
-    {
-      *previous_aor_pair = remote_sdm->get_aor_data(aor_id, trail);
-      previous_aor_pair_alloced = true;
-    }
+    bool found_binding = false;
 
     if ((*previous_aor_pair != NULL) &&
         ((*previous_aor_pair)->get_current() != NULL) &&
         (!(*previous_aor_pair)->get_current()->bindings().empty()))
     {
+      found_binding = true;
+    }
+    else
+    {
+      std::vector<SubscriberDataManager*>::iterator it = remote_sdms.begin();
+      while ((it != remote_sdms.end()) && (!found_binding))
+      {
+        if (previous_aor_pair_alloced)
+        {
+          delete *previous_aor_pair;
+          *previous_aor_pair = NULL;
+          previous_aor_pair_alloced = false;
+        }
+
+        *previous_aor_pair = (*it)->get_aor_data(aor_id, trail);
+        previous_aor_pair_alloced = (*previous_aor_pair != NULL);
+
+        if ((*previous_aor_pair != NULL) &&
+            ((*previous_aor_pair)->get_current() != NULL) &&
+            (!(*previous_aor_pair)->get_current()->bindings().empty()))
+        {
+          found_binding = true;
+        }
+        else
+        {
+          ++it;
+        }
+      }
+    }
+
+    if (found_binding)
+    {
       for (SubscriberDataManager::AoR::Bindings::const_iterator i =
-             (*previous_aor_pair)->get_current()->bindings().begin();
+           (*previous_aor_pair)->get_current()->bindings().begin();
            i != (*previous_aor_pair)->get_current()->bindings().end();
            ++i)
       {
         SubscriberDataManager::AoR::Binding* src = i->second;
         SubscriberDataManager::AoR::Binding* dst =
-           (*aor_pair)->get_current()->get_binding(i->first);
+          (*aor_pair)->get_current()->get_binding(i->first);
         *dst = *src;
       }
 
       for (SubscriberDataManager::AoR::Subscriptions::const_iterator i =
-             (*previous_aor_pair)->get_current()->subscriptions().begin();
+           (*previous_aor_pair)->get_current()->subscriptions().begin();
            i != (*previous_aor_pair)->get_current()->subscriptions().end();
            ++i)
       {
         SubscriberDataManager::AoR::Subscription* src = i->second;
         SubscriberDataManager::AoR::Subscription* dst =
-           (*aor_pair)->get_current()->get_subscription(i->first);
+          (*aor_pair)->get_current()->get_subscription(i->first);
         *dst = *src;
       }
     }
@@ -257,22 +283,24 @@ void RegSubTimeoutTask::handle_response()
   SubscriberDataManager::AoRPair* aor_pair = set_aor_data(_cfg->_sdm,
                                                           _aor_id,
                                                           NULL,
-                                                          _cfg->_remote_sdm,
+                                                          _cfg->_remote_sdms,
                                                           all_bindings_expired);
 
   if (aor_pair != NULL)
   {
-    // If we have a remote store, try to store this there too.  We don't worry
+    // If we have any remote stores, try to store this in them too.  We don't worry
     // about failures in this case.
     // LCOV_EXCL_START
-    if ((_cfg->_remote_sdm != NULL) && (_cfg->_remote_sdm->has_servers()))
+    for (std::vector<SubscriberDataManager*>::const_iterator sdm = _cfg->_remote_sdms.begin();
+         sdm != _cfg->_remote_sdms.end();
+         ++sdm)
     {
       bool ignored;
       SubscriberDataManager::AoRPair* remote_aor_pair =
-                                         set_aor_data(_cfg->_remote_sdm,
+                                         set_aor_data(*sdm,
                                                       _aor_id,
                                                       aor_pair,
-                                                      NULL,
+                                                      {},
                                                       ignored);
       delete remote_aor_pair;
     }
@@ -300,7 +328,7 @@ SubscriberDataManager::AoRPair* RegSubTimeoutTask::set_aor_data(
                           SubscriberDataManager* current_sdm,
                           std::string aor_id,
                           SubscriberDataManager::AoRPair* previous_aor_pair,
-                          SubscriberDataManager* remote_sdm,
+                          std::vector<SubscriberDataManager*> remote_sdms,
                           bool& all_bindings_expired)
 {
   SubscriberDataManager::AoRPair* aor_pair = NULL;
@@ -313,7 +341,7 @@ SubscriberDataManager::AoRPair* RegSubTimeoutTask::set_aor_data(
                            previous_aor_pair_alloced,
                            aor_id,
                            current_sdm,
-                           remote_sdm,
+                           remote_sdms,
                            &previous_aor_pair,
                            trail()))
     {
@@ -461,22 +489,24 @@ HTTPCode DeregistrationTask::handle_request()
                                                             it->first,
                                                             it->second,
                                                             NULL,
-                                                            _cfg->_remote_sdm);
+                                                            _cfg->_remote_sdms);
 
     // LCOV_EXCL_START
     if ((aor_pair != NULL) &&
         (aor_pair->get_current() != NULL))
     {
-      // If we have a remote store, try to store this there too.  We don't worry
+      // If we have any remote stores, try to store this in them too.  We don't worry
       // about failures in this case.
-      if (_cfg->_remote_sdm != NULL)
+      for (std::vector<SubscriberDataManager*>::const_iterator sdm = _cfg->_remote_sdms.begin();
+           sdm != _cfg->_remote_sdms.end();
+           ++sdm)
       {
         SubscriberDataManager::AoRPair* remote_aor_pair =
-                                             set_aor_data(_cfg->_remote_sdm,
+                                             set_aor_data(*sdm,
                                                           it->first,
                                                           it->second,
                                                           aor_pair,
-                                                          NULL);
+                                                          {});
         delete remote_aor_pair;
       }
     }
@@ -504,7 +534,7 @@ SubscriberDataManager::AoRPair* DeregistrationTask::set_aor_data(
                                         std::string aor_id,
                                         std::string private_id,
                                         SubscriberDataManager::AoRPair* previous_aor_pair,
-                                        SubscriberDataManager* remote_sdm)
+                                        std::vector<SubscriberDataManager*> remote_sdms)
 {
   SubscriberDataManager::AoRPair* aor_pair = NULL;
   bool previous_aor_pair_alloced = false;
@@ -517,7 +547,7 @@ SubscriberDataManager::AoRPair* DeregistrationTask::set_aor_data(
                            previous_aor_pair_alloced,
                            aor_id,
                            current_sdm,
-                           remote_sdm,
+                           remote_sdms,
                            &previous_aor_pair,
                            trail()))
     {

@@ -82,6 +82,7 @@ SPROUT_COMMON_SOURCES := logger.cpp \
                          uri_classifier.cpp \
                          namespace_hop.cpp \
                          session_expires_helper.cpp \
+                         astaire_resolver.cpp
 
 sprout_SOURCES := ${SPROUT_COMMON_SOURCES} \
                   snmp_counter_table.cpp \

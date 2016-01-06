@@ -57,6 +57,7 @@ extern "C" {
 #include <list>
 #include <queue>
 #include <string>
+#include <iterator>
 #include <boost/filesystem.hpp>
 
 #include "ipv6utils.h"
@@ -79,6 +80,7 @@ extern "C" {
 #include "authentication.h"
 #include "options.h"
 #include "dnsresolver.h"
+#include "astaire_resolver.h"
 #include "enumservice.h"
 #include "bgcfservice.h"
 #include "pjutils.h"
@@ -130,6 +132,7 @@ enum OptionTypes
   OPT_MAX_SESSION_EXPIRES,
   OPT_SIP_BLACKLIST_DURATION,
   OPT_HTTP_BLACKLIST_DURATION,
+  OPT_ASTAIRE_BLACKLIST_DURATION,
   OPT_SIP_TCP_CONNECT_TIMEOUT,
   OPT_SIP_TCP_SEND_TIMEOUT,
   OPT_SESSION_CONTINUED_TIMEOUT_MS,
@@ -160,8 +163,7 @@ const static struct pj_getopt_option long_opt[] =
   { "ibcf",                         required_argument, 0, 'I'},
   { "external-icscf",               required_argument, 0, 'j'},
   { "realm",                        required_argument, 0, 'R'},
-  { "memstore",                     required_argument, 0, 'M'},
-  { "remote-memstore",              required_argument, 0, 'm'},
+  { "registration-stores",          required_argument, 0, 'M'},
   { "sas",                          required_argument, 0, 'S'},
   { "hss",                          required_argument, 0, 'H'},
   { "record-routing-model",         required_argument, 0, 'C'},
@@ -206,6 +208,7 @@ const static struct pj_getopt_option long_opt[] =
   { "exception-max-ttl",            required_argument, 0, OPT_EXCEPTION_MAX_TTL},
   { "sip-blacklist-duration",       required_argument, 0, OPT_SIP_BLACKLIST_DURATION},
   { "http-blacklist-duration",      required_argument, 0, OPT_HTTP_BLACKLIST_DURATION},
+  { "astaire-blacklist-duration",   required_argument, 0, OPT_ASTAIRE_BLACKLIST_DURATION},
   { "sip-tcp-connect-timeout",      required_argument, 0, OPT_SIP_TCP_CONNECT_TIMEOUT},
   { "sip-tcp-send-timeout",         required_argument, 0, OPT_SIP_TCP_SEND_TIMEOUT},
   { "session-continued-timeout",    required_argument, 0, OPT_SESSION_CONTINUED_TIMEOUT_MS},
@@ -267,14 +270,11 @@ static void usage(void)
        "                            Route calls to specified external I-CSCF\n"
        " -R, --realm <realm>        Use specified realm for authentication\n"
        "                            (if not specified, local host name is used)\n"
-       " -M, --memstore <config_file>\n"
-       "                            Enables local memcached store for registration state and\n"
-       "                            specifies configuration file\n"
+       " -M, --registration-stores <domain>[,<domain>,<domain>...]\n"
+       "                            Enables memcached store for registration state and specifies\n"
+       "                            location of the local site, optionally followed by the location\n"
+       "                            of any remote sites for geo-redundant storage\n"
        "                            (otherwise uses local store)\n"
-       " -m, --remote-memstore <config file>\n"
-       "                            Enabled remote memcached store for geo-redundant storage\n"
-       "                            of registration state, and specifies configuration file\n"
-       "                            (otherwise uses no remote memcached store)\n"
        " -S, --sas <ipv4>,<system name>\n"
        "                            Use specified host as Service Assurance Server and specified\n"
        "                            system name to identify this system to SAS.  If this option isn't\n"
@@ -359,6 +359,8 @@ static void usage(void)
        "                            The amount of time to blacklist a SIP peer when it is unresponsive.\n"
        "     --http-blacklist-duration <secs>\n"
        "                            The amount of time to blacklist an HTTP peer when it is unresponsive.\n"
+       "     --astaire-blacklist-duration <secs>\n"
+       "                            The amount of time to blacklist an Astaire node when it is unresponsive.\n"
        "     --sip-tcp-connect-timeout <milliseconds>\n"
        "                            The amount of time to wait for a SIP TCP connection to establish.\n"
        "     --sip-tcp-send-timeout <milliseconds>\n"
@@ -651,13 +653,32 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
       break;
 
     case 'M':
-      options->store_servers = std::string(pj_optarg);
-      TRC_INFO("Using memcached store with configuration file %s", pj_optarg);
-      break;
+      {
+        std::string stores_str = std::string(pj_optarg);
+        std::stringstream ss(stores_str);
+        std::istream_iterator<std::string> begin(ss);
+        std::istream_iterator<std::string> end;
+        std::vector<std::string> stores_vector(begin, end);
+        std::copy(stores_vector.begin(),
+                  stores_vector.end(),
+                  std::ostream_iterator<std::string>(std::cout, ","));
 
-    case 'm':
-      options->remote_store_servers = std::string(pj_optarg);
-      TRC_INFO("Using remote memcached store with configuration file %s", pj_optarg);
+        // The first store is in the local site. Any remaining stores are in
+        // remote GR sites.
+        if (!stores_vector.empty())
+        {
+          options->registration_store = stores_vector.front();
+          stores_vector.erase(stores_vector.begin());
+          options->remote_registration_stores = stores_vector;
+
+          TRC_INFO("Using memcached registration stores %s", pj_optarg);
+        }
+        else
+        {
+          // I'm not sure we can hit this branch.
+          TRC_ERROR("Unable to parse registration-stores parameter");
+        }
+      }
       break;
 
     case 'S':
@@ -955,6 +976,12 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
       options->http_blacklist_duration = atoi(pj_optarg);
       TRC_INFO("HTTP blacklist duration set to %d",
                options->http_blacklist_duration);
+      break;
+
+    case OPT_ASTAIRE_BLACKLIST_DURATION:
+      options->astaire_blacklist_duration = atoi(pj_optarg);
+      TRC_INFO("Astaire blacklist duration set to %d",
+               options->astaire_blacklist_duration);
       break;
 
     case OPT_SIP_TCP_CONNECT_TIMEOUT:
@@ -1293,7 +1320,7 @@ LoadMonitor* load_monitor = NULL;
 HSSConnection* hss_connection = NULL;
 Store* local_data_store = NULL;
 SubscriberDataManager* local_sdm = NULL;
-SubscriberDataManager* remote_sdm = NULL;
+std::vector<SubscriberDataManager*> remote_sdms = {};
 RalfProcessor* ralf_processor = NULL;
 HttpResolver* http_resolver = NULL;
 ACRFactory* scscf_acr_factory = NULL;
@@ -1313,7 +1340,8 @@ int main(int argc, char* argv[])
   pthread_t quiesce_unquiesce_thread;
   DnsCachedResolver* dns_resolver = NULL;
   SIPResolver* sip_resolver = NULL;
-  Store* remote_data_store = NULL;
+  AstaireResolver* astaire_resolver = NULL;
+  std::vector<Store*> remote_data_stores = {};
   AvStore* av_store = NULL;
   HttpConnection* ralf_connection = NULL;
   ChronosConnection* chronos_connection = NULL;
@@ -1384,6 +1412,7 @@ int main(int argc, char* argv[])
   opt.exception_max_ttl = 600;
   opt.sip_blacklist_duration = SIPResolver::DEFAULT_BLACKLIST_DURATION;
   opt.http_blacklist_duration = HttpResolver::DEFAULT_BLACKLIST_DURATION;
+  opt.astaire_blacklist_duration = AstaireResolver::DEFAULT_BLACKLIST_DURATION;
   opt.sip_tcp_connect_timeout = 2000;
   opt.sip_tcp_send_timeout = 2000;
   opt.session_continued_timeout_ms = SCSCFSproutlet::DEFAULT_SESSION_CONTINUED_TIMEOUT;
@@ -1559,7 +1588,7 @@ int main(int argc, char* argv[])
     TRC_WARNING("XDM server configured on P-CSCF, ignoring");
   }
 
-  if ((opt.store_servers != "") &&
+  if ((opt.registration_store != "") &&
       (opt.auth_enabled) &&
       (opt.worker_threads == 1))
   {
@@ -1935,38 +1964,33 @@ int main(int argc, char* argv[])
                       (ACRFactory*)new RalfACRFactory(ralf_processor, SCSCF) :
                       new ACRFactory();
 
-    if (opt.store_servers != "")
+    if (opt.registration_store != "")
     {
       // Use memcached store.
       TRC_STATUS("Using memcached compatible store with ASCII protocol");
 
-      local_data_store = (Store*)new MemcachedStore(true,
-                                                    opt.store_servers,
-                                                    memcached_comm_monitor,
-                                                    vbucket_alarm);
+      astaire_resolver = new AstaireResolver(dns_resolver,
+                                             stack_data.addr_family,
+                                             opt.astaire_blacklist_duration);
 
-      if (!(((MemcachedStore*)local_data_store)->has_servers()))
-      {
-        TRC_ERROR("Cluster settings file '%s' does not contain a valid set of servers",
-                  opt.store_servers.c_str());
-        return 1;
-      };
+      local_data_store = (Store*)new TopologyNeutralMemcachedStore(opt.registration_store,
+                                                                   astaire_resolver,
+                                                                   memcached_comm_monitor);
 
-      if (opt.remote_store_servers != "")
+      if (!opt.remote_registration_stores.empty())
       {
         // Use remote memcached store too.
-        TRC_STATUS("Using remote memcached compatible store with ASCII protocol");
+        TRC_STATUS("Using remote memcached compatible stores with ASCII protocol");
 
-        remote_data_store = (Store*)new MemcachedStore(true,
-                                                       opt.remote_store_servers,
-                                                       memcached_remote_comm_monitor,
-                                                       remote_vbucket_alarm);
-
-        if (!(((MemcachedStore*)remote_data_store)->has_servers()))
+        for (std::vector<std::string>::iterator it = opt.remote_registration_stores.begin();
+             it != opt.remote_registration_stores.end();
+             ++it)
         {
-          TRC_WARNING("Remote cluster settings file '%s' does not contain a valid set of servers",
-                      opt.remote_store_servers.c_str());
-        };
+          Store* remote_data_store = (Store*)new TopologyNeutralMemcachedStore(*it,
+                                                                               astaire_resolver,
+                                                                               memcached_comm_monitor);
+          remote_data_stores.push_back(remote_data_store);
+        }
       }
     }
     else
@@ -2001,16 +2025,19 @@ int main(int argc, char* argv[])
                                           chronos_connection,
                                           true);
 
-    if (remote_data_store != NULL)
+    for (std::vector<Store*>::iterator it = remote_data_stores.begin();
+         it != remote_data_stores.end();
+         ++it)
     {
       create_sdm_plugins(serializer,
                          deserializers,
                          opt.memcached_write_format);
-      remote_sdm = new SubscriberDataManager(remote_data_store,
-                                             serializer,
-                                             deserializers,
-                                             chronos_connection,
-                                             false);
+      SubscriberDataManager* remote_sdm = new SubscriberDataManager(*it,
+                                                                    serializer,
+                                                                    deserializers,
+                                                                    chronos_connection,
+                                                                    false);
+      remote_sdms.push_back(remote_sdm);
     }
 
     // Start the HTTP stack early as plugins might need to register handlers
@@ -2052,7 +2079,7 @@ int main(int argc, char* argv[])
 
     // Launch the registrar.
     status = init_registrar(local_sdm,
-                            remote_sdm,
+                            remote_sdms,
                             hss_connection,
                             analytics_logger,
                             scscf_acr_factory,
@@ -2071,7 +2098,7 @@ int main(int argc, char* argv[])
 
     // Launch the subscription module.
     status = init_subscription(local_sdm,
-                               remote_sdm,
+                               remote_sdms,
                                hss_connection,
                                scscf_acr_factory,
                                analytics_logger,
@@ -2167,9 +2194,9 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  RegSubTimeoutTask::Config reg_sub_timeout_config(local_sdm, remote_sdm, hss_connection);
+  RegSubTimeoutTask::Config reg_sub_timeout_config(local_sdm, remote_sdms, hss_connection);
   AuthTimeoutTask::Config auth_timeout_config(av_store, hss_connection);
-  DeregistrationTask::Config deregistration_config(local_sdm, remote_sdm, hss_connection, sip_resolver);
+  DeregistrationTask::Config deregistration_config(local_sdm, remote_sdms, hss_connection, sip_resolver);
 
   // The RegSubTimeoutTask and AuthTimeoutTask both handle
   // chronos requests, so use the ChronosHandler.
@@ -2270,10 +2297,26 @@ int main(int argc, char* argv[])
   delete exception_handler;
   delete load_monitor;
   delete local_sdm;
-  delete remote_sdm;
+
+  for (std::vector<SubscriberDataManager*>::iterator it = remote_sdms.begin();
+       it != remote_sdms.end();
+       ++it)
+  {
+    delete *it;
+  }
+  remote_sdms.clear();
+
   delete av_store;
   delete local_data_store;
-  delete remote_data_store;
+
+  for (std::vector<Store*>::iterator it = remote_data_stores.begin();
+       it != remote_data_stores.end();
+       ++it)
+  {
+    delete *it;
+  }
+  remote_data_stores.clear();
+
   delete ralf_processor;
   delete ralf_connection;
   delete enum_service;
@@ -2281,6 +2324,7 @@ int main(int argc, char* argv[])
 
   delete sip_resolver;
   delete http_resolver;
+  delete astaire_resolver;
   delete dns_resolver;
 
   delete analytics_logger;

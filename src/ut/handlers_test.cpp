@@ -77,7 +77,8 @@ const std::string HSS_NOT_REG_STATE = "<?xml version=\"1.0\" encoding=\"UTF-8\"?
 class RegSubTimeoutTasksTest : public SipTest
 {
   MockSubscriberDataManager* store;
-  MockSubscriberDataManager* remote_store;
+  MockSubscriberDataManager* remote_store1;
+  MockSubscriberDataManager* remote_store2;
   MockHttpStack* stack;
   MockHSSConnection* mock_hss;
   MockHttpStack::Request* req;
@@ -92,7 +93,8 @@ class RegSubTimeoutTasksTest : public SipTest
   void SetUp()
   {
     store = new MockSubscriberDataManager();
-    remote_store = new MockSubscriberDataManager();
+    remote_store1 = new MockSubscriberDataManager();
+    remote_store2 = new MockSubscriberDataManager();
     mock_hss = new MockHSSConnection();
     stack = new MockHttpStack();
   }
@@ -102,7 +104,8 @@ class RegSubTimeoutTasksTest : public SipTest
     delete config;
     delete req;
     delete stack;
-    delete remote_store; remote_store = NULL;
+    delete remote_store1; remote_store1 = NULL;
+    delete remote_store2; remote_store2 = NULL;
     delete store; store = NULL;
     delete mock_hss;
   }
@@ -110,7 +113,7 @@ class RegSubTimeoutTasksTest : public SipTest
   void build_timeout_request(std::string body, htp_method method)
   {
     req = new MockHttpStack::Request(stack, "/", "timers", "", body, method);
-    config = new RegSubTimeoutTask::Config(store, remote_store, mock_hss);
+    config = new RegSubTimeoutTask::Config(store, {remote_store1, remote_store2}, mock_hss);
     handler = new RegSubTimeoutTask(*req, config, 0);
   }
 
@@ -170,13 +173,18 @@ TEST_F(RegSubTimeoutTasksTest, MainlineTest)
   // Set up subscriber_data_manager expectations
   std::string aor_id = "sip:6505550231@homedomain";
   SubscriberDataManager::AoRPair* aor = build_aor(aor_id);
+  SubscriberDataManager::AoRPair* remote_aor1 = build_aor(aor_id);
+  SubscriberDataManager::AoRPair* remote_aor2 = build_aor(aor_id);
 
   {
     InSequence s;
       EXPECT_CALL(*stack, send_reply(_, 200, _));
       EXPECT_CALL(*store, get_aor_data(aor_id, _)).WillOnce(Return(aor));
       EXPECT_CALL(*store, set_aor_data(aor_id, aor, _, _, _, _)).WillOnce(Return(Store::OK));
-      EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(false));
+      EXPECT_CALL(*remote_store1, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor1));
+      EXPECT_CALL(*remote_store1, set_aor_data(aor_id, remote_aor1, _, _, _, _)).WillOnce(Return(Store::OK));
+      EXPECT_CALL(*remote_store2, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor2));
+      EXPECT_CALL(*remote_store2, set_aor_data(aor_id, remote_aor2, _, _, _, _)).WillOnce(Return(Store::OK));
   }
 
   handler->run();
@@ -233,19 +241,24 @@ TEST_F(RegSubTimeoutTasksTest, RemoteAoRNoBindingsTest)
   std::string aor_id = "sip:6505550231@homedomain";
   SubscriberDataManager::AoRPair* aor = build_aor(aor_id);
 
-  // Set up an AoR with no bindings
-  SubscriberDataManager::AoR* remote_aor = new SubscriberDataManager::AoR(aor_id);
-  SubscriberDataManager::AoR* remote_aor2 = new SubscriberDataManager::AoR(*remote_aor);
-  SubscriberDataManager::AoRPair* remote_aor_pair = new SubscriberDataManager::AoRPair(remote_aor, remote_aor2);
+  // Set up AoRs with no bindings for both remote stores.
+  SubscriberDataManager::AoR* remote1_aor1 = new SubscriberDataManager::AoR(aor_id);
+  SubscriberDataManager::AoR* remote1_aor2 = new SubscriberDataManager::AoR(*remote1_aor1);
+  SubscriberDataManager::AoRPair* remote1_aor_pair = new SubscriberDataManager::AoRPair(remote1_aor1, remote1_aor2);
+  SubscriberDataManager::AoR* remote2_aor1 = new SubscriberDataManager::AoR(aor_id);
+  SubscriberDataManager::AoR* remote2_aor2 = new SubscriberDataManager::AoR(*remote2_aor1);
+  SubscriberDataManager::AoRPair* remote2_aor_pair = new SubscriberDataManager::AoRPair(remote2_aor1, remote2_aor2);
 
   {
     InSequence s;
       EXPECT_CALL(*stack, send_reply(_, 200, _));
       EXPECT_CALL(*store, get_aor_data(aor_id, _)).WillOnce(Return(aor));
       EXPECT_CALL(*store, set_aor_data(aor_id, aor, _, _, _, _)).WillOnce(Return(Store::OK));
-      EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(true));
-      EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor_pair));
-      EXPECT_CALL(*remote_store, set_aor_data(aor_id, remote_aor_pair, _, _, _, _))
+      EXPECT_CALL(*remote_store1, get_aor_data(aor_id, _)).WillOnce(Return(remote1_aor_pair));
+      EXPECT_CALL(*remote_store1, set_aor_data(aor_id, remote1_aor_pair, _, _, _, _))
+                   .WillOnce(Return(Store::OK));
+      EXPECT_CALL(*remote_store2, get_aor_data(aor_id, _)).WillOnce(Return(remote2_aor_pair));
+      EXPECT_CALL(*remote_store2, set_aor_data(aor_id, remote2_aor_pair, _, _, _, _))
                    .WillOnce(Return(Store::OK));
   }
 
@@ -265,23 +278,24 @@ TEST_F(RegSubTimeoutTasksTest, LocalAoRNoBindingsTest)
   SubscriberDataManager::AoR* aor2 = new SubscriberDataManager::AoR(*aor);
   SubscriberDataManager::AoRPair* aor_pair = new SubscriberDataManager::AoRPair(aor, aor2);
 
-  SubscriberDataManager::AoRPair* remote_aor = build_aor(aor_id);
+  SubscriberDataManager::AoRPair* remote1_aor1 = build_aor(aor_id);
 
-  // Set up second remote aor, to avoid problem of test process deleting
+  // Set up the remote AoR again, to avoid problem of test process deleting
   // the data of the first one. This is only a problem in the tests, as real
   // use would correctly set the data to the store before deleting the local copy
-  SubscriberDataManager::AoRPair* remote_aor_2 = build_aor(aor_id);
+  SubscriberDataManager::AoRPair* remote1_aor2 = build_aor(aor_id);
+  SubscriberDataManager::AoRPair* remote2_aor = build_aor(aor_id);
 
   {
     InSequence s;
       EXPECT_CALL(*stack, send_reply(_, 200, _));
       EXPECT_CALL(*store, get_aor_data(aor_id, _)).WillOnce(Return(aor_pair));
-      EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(true));
-      EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor));
+      EXPECT_CALL(*remote_store1, get_aor_data(aor_id, _)).WillOnce(Return(remote1_aor1));
       EXPECT_CALL(*store, set_aor_data(aor_id, aor_pair, _, _, _, _)).WillOnce(Return(Store::OK));
-      EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(true));
-      EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor_2));
-      EXPECT_CALL(*remote_store, set_aor_data(aor_id, remote_aor_2, _, _, _, _)).WillOnce(Return(Store::OK));
+      EXPECT_CALL(*remote_store1, get_aor_data(aor_id, _)).WillOnce(Return(remote1_aor2));
+      EXPECT_CALL(*remote_store1, set_aor_data(aor_id, remote1_aor2, _, _, _, _)).WillOnce(Return(Store::OK));
+      EXPECT_CALL(*remote_store2, get_aor_data(aor_id, _)).WillOnce(Return(remote2_aor));
+      EXPECT_CALL(*remote_store2, set_aor_data(aor_id, remote2_aor, _, _, _, _)).WillOnce(Return(Store::OK));
   }
 
   handler->run();
@@ -300,27 +314,34 @@ TEST_F(RegSubTimeoutTasksTest, NoBindingsTest)
   SubscriberDataManager::AoR* aor2 = new SubscriberDataManager::AoR(*aor1);
   SubscriberDataManager::AoRPair* aor_pair = new SubscriberDataManager::AoRPair(aor1, aor2);
 
-  SubscriberDataManager::AoR* remote_aor1 = new SubscriberDataManager::AoR(aor_id);
-  SubscriberDataManager::AoR* remote_aor2 = new SubscriberDataManager::AoR(*remote_aor1);
-  SubscriberDataManager::AoRPair* remote_aor_pair = new SubscriberDataManager::AoRPair(remote_aor1, remote_aor2);
+  SubscriberDataManager::AoR* remote1_aor1 = new SubscriberDataManager::AoR(aor_id);
+  SubscriberDataManager::AoR* remote1_aor2 = new SubscriberDataManager::AoR(*remote1_aor1);
+  SubscriberDataManager::AoRPair* remote1_aor_pair1 = new SubscriberDataManager::AoRPair(remote1_aor1, remote1_aor2);
+  SubscriberDataManager::AoR* remote2_aor1 = new SubscriberDataManager::AoR(aor_id);
+  SubscriberDataManager::AoR* remote2_aor2 = new SubscriberDataManager::AoR(*remote2_aor1);
+  SubscriberDataManager::AoRPair* remote2_aor_pair1 = new SubscriberDataManager::AoRPair(remote2_aor1, remote2_aor2);
 
-  // Set up second remote aor, to avoid problem of test process deleting
+  // Set up the remote AoRs again, to avoid problem of test process deleting
   // the data of the first one. This is only a problem in the tests, as real
   // use would correctly set the data to the store before deleting the local copy
-  SubscriberDataManager::AoR* remote_aor11 = new SubscriberDataManager::AoR(*remote_aor1);
-  SubscriberDataManager::AoR* remote_aor22 = new SubscriberDataManager::AoR(*remote_aor2);
-  SubscriberDataManager::AoRPair* remote_aor_pair2 = new SubscriberDataManager::AoRPair(remote_aor11, remote_aor22);
+  SubscriberDataManager::AoR* remote1_aor3 = new SubscriberDataManager::AoR(aor_id);
+  SubscriberDataManager::AoR* remote1_aor4 = new SubscriberDataManager::AoR(*remote1_aor3);
+  SubscriberDataManager::AoRPair* remote1_aor_pair2 = new SubscriberDataManager::AoRPair(remote1_aor3, remote1_aor4);
+  SubscriberDataManager::AoR* remote2_aor3 = new SubscriberDataManager::AoR(aor_id);
+  SubscriberDataManager::AoR* remote2_aor4 = new SubscriberDataManager::AoR(*remote2_aor3);
+  SubscriberDataManager::AoRPair* remote2_aor_pair2 = new SubscriberDataManager::AoRPair(remote2_aor3, remote2_aor4);
 
   {
     InSequence s;
       EXPECT_CALL(*stack, send_reply(_, 200, _));
       EXPECT_CALL(*store, get_aor_data(aor_id, _)).WillOnce(Return(aor_pair));
-      EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(true));
-      EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor_pair));
+      EXPECT_CALL(*remote_store1, get_aor_data(aor_id, _)).WillOnce(Return(remote1_aor_pair1));
+      EXPECT_CALL(*remote_store2, get_aor_data(aor_id, _)).WillOnce(Return(remote2_aor_pair1));
       EXPECT_CALL(*store, set_aor_data(aor_id, aor_pair, _, _, _, _)).WillOnce(DoAll(SetArgReferee<3>(true), Return(Store::OK)));
-      EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(true));
-      EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor_pair2));
-      EXPECT_CALL(*remote_store, set_aor_data(aor_id, remote_aor_pair2, _, _, _, _)).WillOnce(DoAll(SetArgReferee<3>(true), Return(Store::OK)));
+      EXPECT_CALL(*remote_store1, get_aor_data(aor_id, _)).WillOnce(Return(remote1_aor_pair2));
+      EXPECT_CALL(*remote_store1, set_aor_data(aor_id, remote1_aor_pair2, _, _, _, _)).WillOnce(DoAll(SetArgReferee<3>(true), Return(Store::OK)));
+      EXPECT_CALL(*remote_store2, get_aor_data(aor_id, _)).WillOnce(Return(remote2_aor_pair2));
+      EXPECT_CALL(*remote_store2, set_aor_data(aor_id, remote2_aor_pair2, _, _, _, _)).WillOnce(DoAll(SetArgReferee<3>(true), Return(Store::OK)));
       EXPECT_CALL(*mock_hss, update_registration_state(aor_id, "", HSSConnection::DEREG_TIMEOUT, 0));
   }
 
@@ -339,13 +360,18 @@ TEST_F(RegSubTimeoutTasksTest, NullAoRTest)
   std::string aor_id = "sip:6505550231@homedomain";
   SubscriberDataManager::AoR* aor = NULL;
   SubscriberDataManager::AoRPair* aor_pair = new SubscriberDataManager::AoRPair(aor, aor);
+  SubscriberDataManager::AoRPair* remote1_aor_pair = new SubscriberDataManager::AoRPair(aor, aor);
+  SubscriberDataManager::AoRPair* remote2_aor_pair = new SubscriberDataManager::AoRPair(aor, aor);
 
   {
     InSequence s;
       EXPECT_CALL(*stack, send_reply(_, 200, _));
       EXPECT_CALL(*store, get_aor_data(aor_id, _)).WillOnce(Return(aor_pair));
       EXPECT_CALL(*store, set_aor_data(aor_id, _, _, _, _, _)).Times(0);
-      EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(false));
+      EXPECT_CALL(*remote_store1, get_aor_data(aor_id, _)).WillOnce(Return(remote1_aor_pair));
+      EXPECT_CALL(*remote_store1, set_aor_data(aor_id, _, _, _, _, _)).Times(0);
+      EXPECT_CALL(*remote_store2, get_aor_data(aor_id, _)).WillOnce(Return(remote2_aor_pair));
+      EXPECT_CALL(*remote_store2, set_aor_data(aor_id, _, _, _, _, _)).Times(0);
   }
 
   handler->run();
@@ -376,7 +402,7 @@ class RegSubTimeoutTasksMockStoreTest : public SipTest
     store = new MockSubscriberDataManager();
     fake_hss = new FakeHSSConnection();
     req = new MockHttpStack::Request(&stack, "/", "timers");
-    chronos_config = new RegSubTimeoutTask::Config(store, NULL, fake_hss);
+    chronos_config = new RegSubTimeoutTask::Config(store, {}, fake_hss);
     handler = new RegSubTimeoutTask(*req, chronos_config, 0);
   }
 
@@ -453,7 +479,7 @@ class DeregistrationTaskTest : public SipTest
          "send-notifications=" + notify,
          body,
          method);
-    _cfg = new DeregistrationTask::Config(_subscriber_data_manager, NULL, _hss, NULL);
+    _cfg = new DeregistrationTask::Config(_subscriber_data_manager, {}, _hss, NULL);
     _task = new DeregistrationTask(*_req, _cfg, 0);
   }
 

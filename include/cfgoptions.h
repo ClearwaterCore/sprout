@@ -94,8 +94,8 @@ struct options
   std::string                          hss_server;
   std::string                          xdm_server;
   std::string                          chronos_service;
-  std::string                          store_servers;
-  std::string                          remote_store_servers;
+  std::string                          registration_store;
+  std::vector<std::string>             remote_registration_stores;
   std::string                          ralf_server;
   int                                  ralf_threads;
   std::vector<std::string>             dns_servers;
@@ -132,6 +132,7 @@ struct options
   int                                  exception_max_ttl;
   int                                  sip_blacklist_duration;
   int                                  http_blacklist_duration;
+  int                                  astaire_blacklist_duration;
   int                                  sip_tcp_connect_timeout;
   int                                  sip_tcp_send_timeout;
   int                                  session_continued_timeout_ms;

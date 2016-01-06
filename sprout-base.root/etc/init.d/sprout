@@ -181,8 +181,7 @@ get_daemon_args()
                      --domain=$home_domain
                      --localhost=$local_ip
                      --realm=$home_domain
-                     --memstore=/etc/clearwater/cluster_settings
-                     --remote-memstore=/etc/clearwater/remote_cluster_settings
+                     --registration-stores=$sprout_registration_store
                      --hss=$hs_hostname
                      --chronos=$chronos_hostname
                      $xdms_hostname_arg
