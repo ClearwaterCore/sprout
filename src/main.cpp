@@ -654,14 +654,9 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
 
     case 'M':
       {
-        std::string stores_str = std::string(pj_optarg);
-        std::stringstream ss(stores_str);
-        std::istream_iterator<std::string> begin(ss);
-        std::istream_iterator<std::string> end;
-        std::vector<std::string> stores_vector(begin, end);
-        std::copy(stores_vector.begin(),
-                  stores_vector.end(),
-                  std::ostream_iterator<std::string>(std::cout, ","));
+        std::string stores_str = std::string(optarg);
+        std::vector<std::string> stores_vector;
+        boost::split(stores_vector, stores_str, boost::is_any_of(","));
 
         // The first store is in the local site. Any remaining stores are in
         // remote GR sites.
@@ -671,12 +666,10 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
           stores_vector.erase(stores_vector.begin());
           options->remote_registration_stores = stores_vector;
 
-          TRC_INFO("Using memcached registration stores %s", pj_optarg);
-        }
-        else
-        {
-          // I'm not sure we can hit this branch.
-          TRC_ERROR("Unable to parse registration-stores parameter");
+          TRC_INFO("Using memcached registration stores");
+          TRC_INFO("  Primary store: %s", options->registration_store.c_str());
+          std::string remote_registration_stores_str = boost::algorithm::join(options->remote_registration_stores, ", ");
+          TRC_INFO("  Backup store(s): %s", remote_registration_stores_str.c_str());
         }
       }
       break;
@@ -1320,7 +1313,7 @@ LoadMonitor* load_monitor = NULL;
 HSSConnection* hss_connection = NULL;
 Store* local_data_store = NULL;
 SubscriberDataManager* local_sdm = NULL;
-std::vector<SubscriberDataManager*> remote_sdms = {};
+std::vector<SubscriberDataManager*> remote_sdms;
 RalfProcessor* ralf_processor = NULL;
 HttpResolver* http_resolver = NULL;
 ACRFactory* scscf_acr_factory = NULL;
@@ -1967,7 +1960,7 @@ int main(int argc, char* argv[])
     if (opt.registration_store != "")
     {
       // Use memcached store.
-      TRC_STATUS("Using memcached compatible store with ASCII protocol");
+      TRC_STATUS("Using memcached compatible store with binary protocol");
 
       astaire_resolver = new AstaireResolver(dns_resolver,
                                              stack_data.addr_family,
@@ -1980,7 +1973,7 @@ int main(int argc, char* argv[])
       if (!opt.remote_registration_stores.empty())
       {
         // Use remote memcached store too.
-        TRC_STATUS("Using remote memcached compatible stores with ASCII protocol");
+        TRC_STATUS("Using remote memcached compatible stores with binary protocol");
 
         for (std::vector<std::string>::iterator it = opt.remote_registration_stores.begin();
              it != opt.remote_registration_stores.end();

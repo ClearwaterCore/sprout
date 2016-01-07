@@ -123,7 +123,10 @@ void log_subscriptions(const std::string& aor_name,
   }
 }
 
-/// Write to the registration store.
+/// Write to the registration store. If we can't find the AoR pair in the
+/// primary SDM, we will either use the backup_aor or we will try and look up
+/// the AoR pair in the backup SDMs. Therefore either the backup_aor should be
+/// NULL, or backup_sdms should be empty.
 SubscriberDataManager::AoRPair* write_subscriptions_to_store(
                    SubscriberDataManager* primary_sdm,        ///<store to write to
                    std::string aor,                           ///<address of record to write to
@@ -183,47 +186,39 @@ SubscriberDataManager::AoRPair* write_subscriptions_to_store(
       bool found_subscription = false;
 
       if ((backup_aor != NULL) &&
-          (backup_aor->get_current() != NULL) &&
-          (!backup_aor->get_current()->subscriptions().empty()))
+          (backup_aor->current_contains_subscriptions()))
       {
         found_subscription = true;
       }
       else
       {
         std::vector<SubscriberDataManager*>::iterator it = backup_sdms.begin();
+        SubscriberDataManager::AoRPair* local_backup_aor = NULL;
 
         while ((it != backup_sdms.end()) && (!found_subscription))
         {
-          backup_aor = (*it)->get_aor_data(aor, trail);
-          backup_aor_alloced = (backup_aor != NULL);
+          local_backup_aor = (*it)->get_aor_data(aor, trail);
 
-          if ((backup_aor != NULL) &&
-              (backup_aor->get_current() != NULL) &&
-              (!backup_aor->get_current()->subscriptions().empty()))
+          if ((local_backup_aor != NULL) &&
+              (local_backup_aor->current_contains_subscriptions()))
           {
-            found_subscription = true; // LCOV_EXCL_LINE - this code is very similar to code in handlers.cpp and is unit tested there.
+            // LCOV_EXCL_START - this code is very similar to code in handlers.cpp and is unit tested there.
+            found_subscription = true;
+            backup_aor = local_backup_aor;
+
+            // Flag that we have allocated the memory for the backup pair so
+            // that we can tidy it up later.
+            backup_aor_alloced = true;
+            // LCOV_EXCL_STOP
           }
           else
           {
-            if (backup_aor_alloced)
-            {
-              delete backup_aor;
-              backup_aor = NULL;
-              backup_aor_alloced = false;
-            }
+            ++it;
 
-            backup_aor = (*it)->get_aor_data(aor, trail);
-            backup_aor_alloced = (backup_aor != NULL);
-
-            if ((backup_aor != NULL) &&
-                (backup_aor->get_current() != NULL) &&
-                (!backup_aor->get_current()->subscriptions().empty()))
+            if (local_backup_aor != NULL)
             {
-              found_subscription = true; // LCOV_EXCL_LINE - this code is very similar to code in handlers.cpp and is unit tested there.
-            }
-            else
-            {
-              ++it;
+              delete local_backup_aor;
+              local_backup_aor = NULL;
             }
           }
         }
@@ -389,7 +384,7 @@ SubscriberDataManager::AoRPair* write_subscriptions_to_store(
   // If we allocated the backup AoR, tidy up.
   if (backup_aor_alloced)
   {
-    delete backup_aor; backup_aor = NULL;
+    delete backup_aor; backup_aor = NULL; // LCOV_EXCL_LINE
   }
 
   return aor_pair;

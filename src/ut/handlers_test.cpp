@@ -163,7 +163,7 @@ class RegSubTimeoutTasksTest : public SipTest
   }
 };
 
-// Test main flow, without a remote store.
+// Test main flow
 TEST_F(RegSubTimeoutTasksTest, MainlineTest)
 {
   // Build request

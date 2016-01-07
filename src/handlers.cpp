@@ -54,12 +54,14 @@ extern "C" {
 #include "sproutsasevent.h"
 #include "uri_classifier.h"
 
+// If we can't find the AoR pair in the current SDM, we will either use the
+// backup_aor_pair or we will try and look up the AoR pair in the remote SDMs.
+// Therefore either the backup_aor_pair should be NULL, or remote_sdms should be empty.
 static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
-                              bool& previous_aor_pair_alloced,
                               std::string aor_id,
                               SubscriberDataManager* current_sdm,
                               std::vector<SubscriberDataManager*> remote_sdms,
-                              SubscriberDataManager::AoRPair** previous_aor_pair,
+                              SubscriberDataManager::AoRPair* backup_aor_pair,
                               SAS::TrailId trail)
 {
   // Find the current bindings for the AoR.
@@ -77,41 +79,44 @@ static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
   }
 
   // If we don't have any bindings, try the backup AoR and/or stores.
-  //LCOV_EXCL_START
   if ((*aor_pair)->get_current()->bindings().empty())
   {
     bool found_binding = false;
+    bool backup_aor_pair_alloced = false;
 
-    if ((*previous_aor_pair != NULL) &&
-        ((*previous_aor_pair)->get_current() != NULL) &&
-        (!(*previous_aor_pair)->get_current()->bindings().empty()))
+    if ((backup_aor_pair != NULL) &&
+        (backup_aor_pair->current_contains_bindings()))
     {
       found_binding = true;
     }
     else
     {
       std::vector<SubscriberDataManager*>::iterator it = remote_sdms.begin();
+      SubscriberDataManager::AoRPair* local_backup_aor_pair = NULL;
+
       while ((it != remote_sdms.end()) && (!found_binding))
       {
-        if (previous_aor_pair_alloced)
-        {
-          delete *previous_aor_pair;
-          *previous_aor_pair = NULL;
-          previous_aor_pair_alloced = false;
-        }
+        local_backup_aor_pair = (*it)->get_aor_data(aor_id, trail);
 
-        *previous_aor_pair = (*it)->get_aor_data(aor_id, trail);
-        previous_aor_pair_alloced = (*previous_aor_pair != NULL);
-
-        if ((*previous_aor_pair != NULL) &&
-            ((*previous_aor_pair)->get_current() != NULL) &&
-            (!(*previous_aor_pair)->get_current()->bindings().empty()))
+        if ((local_backup_aor_pair != NULL) &&
+            (local_backup_aor_pair->current_contains_bindings()))
         {
           found_binding = true;
+          backup_aor_pair = local_backup_aor_pair;
+
+          // Flag that we have allocated the memory for the backup pair so
+          // that we can tidy it up later.
+          backup_aor_pair_alloced = true;
         }
         else
         {
           ++it;
+
+          if (local_backup_aor_pair != NULL)
+          {
+            delete local_backup_aor_pair;
+            local_backup_aor_pair = NULL;
+          }
         }
       }
     }
@@ -119,8 +124,8 @@ static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
     if (found_binding)
     {
       for (SubscriberDataManager::AoR::Bindings::const_iterator i =
-           (*previous_aor_pair)->get_current()->bindings().begin();
-           i != (*previous_aor_pair)->get_current()->bindings().end();
+           backup_aor_pair->get_current()->bindings().begin();
+           i != backup_aor_pair->get_current()->bindings().end();
            ++i)
       {
         SubscriberDataManager::AoR::Binding* src = i->second;
@@ -130,8 +135,8 @@ static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
       }
 
       for (SubscriberDataManager::AoR::Subscriptions::const_iterator i =
-           (*previous_aor_pair)->get_current()->subscriptions().begin();
-           i != (*previous_aor_pair)->get_current()->subscriptions().end();
+           backup_aor_pair->get_current()->subscriptions().begin();
+           i != backup_aor_pair->get_current()->subscriptions().end();
            ++i)
       {
         SubscriberDataManager::AoR::Subscription* src = i->second;
@@ -140,8 +145,13 @@ static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
         *dst = *src;
       }
     }
+
+    if (backup_aor_pair_alloced)
+    {
+      delete backup_aor_pair;
+      backup_aor_pair = NULL;
+    }
   }
-  //LCOV_EXCL_STOP
 
   return true;
 }
@@ -332,17 +342,15 @@ SubscriberDataManager::AoRPair* RegSubTimeoutTask::set_aor_data(
                           bool& all_bindings_expired)
 {
   SubscriberDataManager::AoRPair* aor_pair = NULL;
-  bool previous_aor_pair_alloced = false;
   Store::Status set_rc;
 
   do
   {
     if (!sdm_access_common(&aor_pair,
-                           previous_aor_pair_alloced,
                            aor_id,
                            current_sdm,
                            remote_sdms,
-                           &previous_aor_pair,
+                           previous_aor_pair,
                            trail()))
     {
       break;
@@ -358,14 +366,6 @@ SubscriberDataManager::AoRPair* RegSubTimeoutTask::set_aor_data(
     }
   }
   while (set_rc == Store::DATA_CONTENTION);
-
-  // If we allocated the AoR, tidy up.
-  // LCOV_EXCL_START
-  if (previous_aor_pair_alloced)
-  {
-    delete previous_aor_pair;
-  }
-  // LCOV_EXCL_STOP
 
   return aor_pair;
 }
@@ -537,18 +537,16 @@ SubscriberDataManager::AoRPair* DeregistrationTask::set_aor_data(
                                         std::vector<SubscriberDataManager*> remote_sdms)
 {
   SubscriberDataManager::AoRPair* aor_pair = NULL;
-  bool previous_aor_pair_alloced = false;
   bool all_bindings_expired = false;
   Store::Status set_rc;
 
   do
   {
     if (!sdm_access_common(&aor_pair,
-                           previous_aor_pair_alloced,
                            aor_id,
                            current_sdm,
                            remote_sdms,
-                           &previous_aor_pair,
+                           previous_aor_pair,
                            trail()))
     {
       break;
@@ -605,12 +603,6 @@ SubscriberDataManager::AoRPair* DeregistrationTask::set_aor_data(
                                                              aor_id,
                                                              trail());
     }
-  }
-
-  // If we allocated the AoR, tidy up.
-  if (previous_aor_pair_alloced)
-  {
-    delete previous_aor_pair; //LCOV_EXCL_LINE
   }
 
   return aor_pair;

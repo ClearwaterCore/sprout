@@ -209,7 +209,10 @@ bool get_private_id(pjsip_rx_data* rdata, std::string& id)
   return success;
 }
 
-/// Write to the registration store.
+/// Write to the registration store. If we can't find the AoR pair in the
+/// primary SDM, we will either use the backup_aor or we will try and look up
+/// the AoR pair in the backup SDMs. Therefore either the backup_aor should be
+/// NULL, or backup_sdms should be empty.
 SubscriberDataManager::AoRPair* write_to_store(
                    SubscriberDataManager* primary_sdm,         ///<store to write to
                    std::string aor,                            ///<address of record to write to
@@ -265,36 +268,38 @@ SubscriberDataManager::AoRPair* write_to_store(
       bool found_binding = false;
 
       if ((backup_aor != NULL) &&
-          (backup_aor->get_current() != NULL) &&
-          (!backup_aor->get_current()->bindings().empty()))
+          (backup_aor->current_contains_bindings()))
       {
         found_binding = true;
       }
       else
       {
         std::vector<SubscriberDataManager*>::iterator it = backup_sdms.begin();
+        SubscriberDataManager::AoRPair* local_backup_aor = NULL;
 
         while ((it != backup_sdms.end()) && (!found_binding))
         {
-          if (backup_aor_alloced)
-          {
-            delete backup_aor;
-            backup_aor = NULL;
-            backup_aor_alloced = false;
-          }
+          local_backup_aor = (*it)->get_aor_data(aor, trail);
 
-          backup_aor = (*it)->get_aor_data(aor, trail);
-          backup_aor_alloced = (backup_aor != NULL);
-
-          if ((backup_aor != NULL) &&
-              (backup_aor->get_current() != NULL) &&
-              (!backup_aor->get_current()->bindings().empty()))
+          if ((local_backup_aor != NULL) &&
+              (local_backup_aor->current_contains_bindings()))
           {
             found_binding = true;
+            backup_aor = local_backup_aor;
+
+            // Flag that we have allocated the memory for the backup pair so
+            // that we can tidy it up later.
+            backup_aor_alloced = true;
           }
           else
           {
             ++it;
+
+            if (local_backup_aor != NULL)
+            {
+              delete local_backup_aor;
+              local_backup_aor = NULL;
+            }
           }
         }
       }
@@ -460,7 +465,7 @@ SubscriberDataManager::AoRPair* write_to_store(
   // If we allocated the backup AoR, tidy up.
   if (backup_aor_alloced)
   {
-    delete backup_aor;
+    delete backup_aor; // LCOV_EXCL_LINE
   }
 
   if (all_bindings_expired)
