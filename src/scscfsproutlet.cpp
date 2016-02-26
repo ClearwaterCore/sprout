@@ -382,8 +382,6 @@ void SCSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
 
   pjsip_status_code status_code = PJSIP_SC_OK;
 
-  _se_helper.process_request(req, get_pool(req), trail());
-
   // Work out if we should be auto-registering the user based on this
   // request and if we are, also work out the IMPI to register them with.
   const pjsip_route_hdr* top_route = route_hdr();
@@ -1622,6 +1620,7 @@ void SCSCFSproutletTsx::add_record_route(pjsip_msg* msg,
                                          NodeRole billing_role)
 {
   pj_pool_t* pool = get_pool(msg);
+  _se_helper.process_request(msg, pool, trail());
 
   pjsip_route_hdr* rr = NULL;
   if (!_record_routed)
