@@ -470,9 +470,12 @@ void SCSCFSproutletTsx::on_rx_in_dialog_request(pjsip_msg* req)
 {
   TRC_INFO("S-CSCF received in-dialog request");
 
-  // We must be record-routed as we received an in-dialog request
+  // We must be record-routed as we received an in-dialog request.
   _record_routed = true;
-  add_to_dialog(req, false, NULL);
+
+  // We use an arbitrary NodeRole here as the second parameter of
+  // false means it is ignored.
+  add_to_dialog(req, false, NODE_ROLE_ORIGINATING);
 
   // Create an ACR for this request and pass the request to it.
   _in_dialog_acr = _scscf->get_acr(trail(),
