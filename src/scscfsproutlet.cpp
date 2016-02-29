@@ -470,7 +470,9 @@ void SCSCFSproutletTsx::on_rx_in_dialog_request(pjsip_msg* req)
 {
   TRC_INFO("S-CSCF received in-dialog request");
 
-  _se_helper.process_request(req, get_pool(req), trail());
+  // We must be record-routed as we received an in-dialog request
+  _record_routed = true;
+  add_to_dialog(req, false, NULL);
 
   // Create an ACR for this request and pass the request to it.
   _in_dialog_acr = _scscf->get_acr(trail(),
@@ -857,7 +859,7 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
           if (stack_data.record_route_on_diversion)
           {
             TRC_DEBUG("Add service to dialog - originating Cdiv");
-            add_record_route(req, false, NODE_ROLE_ORIGINATING);
+            add_to_dialog(req, false, NODE_ROLE_ORIGINATING);
           }
         }
         else
@@ -877,11 +879,11 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
         TRC_DEBUG("Add service to dialog - AS hop");
         if (_session_case->is_terminating())
         {
-          add_record_route(req, false, NODE_ROLE_TERMINATING);
+          add_to_dialog(req, false, NODE_ROLE_TERMINATING);
         }
         else
         {
-          add_record_route(req, false, NODE_ROLE_ORIGINATING);
+          add_to_dialog(req, false, NODE_ROLE_ORIGINATING);
         }
       }
     }
@@ -907,7 +909,7 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
         if (stack_data.record_route_on_initiation_of_terminating)
         {
           TRC_DEBUG("Single Record-Route - initiation of terminating handling");
-          add_record_route(req, false, NODE_ROLE_TERMINATING);
+          add_to_dialog(req, false, NODE_ROLE_TERMINATING);
         }
       }
       else if (_session_case->is_originating())
@@ -915,7 +917,7 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
         if (stack_data.record_route_on_initiation_of_originating)
         {
           TRC_DEBUG("Single Record-Route - initiation of originating handling");
-          add_record_route(req, true, NODE_ROLE_ORIGINATING);
+          add_to_dialog(req, true, NODE_ROLE_ORIGINATING);
           acr->override_session_id(PJUtils::pj_str_to_string(&PJSIP_MSG_CID_HDR(req)->id));
         }
       }
@@ -1082,7 +1084,7 @@ void SCSCFSproutletTsx::apply_originating_services(pjsip_msg* req)
     if (stack_data.record_route_on_completion_of_originating)
     {
       TRC_DEBUG("Add service to dialog - end of originating handling");
-      add_record_route(req, false, NODE_ROLE_ORIGINATING);
+      add_to_dialog(req, false, NODE_ROLE_ORIGINATING);
     }
 
     // Attempt to translate the RequestURI using ENUM or an alternative
@@ -1153,7 +1155,7 @@ void SCSCFSproutletTsx::apply_terminating_services(pjsip_msg* req)
     if (stack_data.record_route_on_completion_of_terminating)
     {
       TRC_DEBUG("Add service to dialog - end of terminating handling");
-      add_record_route(req, true, NODE_ROLE_TERMINATING);
+      add_to_dialog(req, true, NODE_ROLE_TERMINATING);
 
       ACR* acr = _as_chain_link.acr();
       if (acr != NULL)
@@ -1612,12 +1614,12 @@ bool SCSCFSproutletTsx::lookup_ifcs(std::string public_id, Ifcs& ifcs)
 }
 
 
-/// Record-Route the S-CSCF sproutlet into a dialog.  The parameter passed will
-/// be attached to the Record-Route and can be used to recover the billing
-/// role that is in use on subsequent in-dialog messages.
-void SCSCFSproutletTsx::add_record_route(pjsip_msg* msg,
-                                         bool billing_rr,
-                                         NodeRole billing_role)
+/// Record-Route the S-CSCF sproutlet into a dialog.  The third parameter 
+/// passed will be attached to the Record-Route and can be used to recover 
+/// the billing role that is in use on subsequent in-dialog messages.
+void SCSCFSproutletTsx::add_to_dialog(pjsip_msg* msg,
+                                      bool billing_rr,
+                                      NodeRole billing_role)
 {
   pj_pool_t* pool = get_pool(msg);
   _se_helper.process_request(msg, pool, trail());
