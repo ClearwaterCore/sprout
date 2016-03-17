@@ -42,6 +42,7 @@ TARGET_SOURCES := logger.cpp \
                   scscfselector.cpp \
                   dnsresolver.cpp \
                   log.cpp \
+                  pdlog.cpp \
                   pjutils.cpp \
                   statistic.cpp \
                   zmq_lvc.cpp \
