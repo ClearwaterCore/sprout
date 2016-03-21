@@ -521,8 +521,8 @@ void process_register_request(pjsip_rx_data* rdata)
   // Allocate an ACR for this transaction and pass the request to it.  Node
   // role is always considered originating for REGISTER requests.
   ACR* acr = acr_factory->get_acr(get_trail(rdata),
-                                  CALLING_PARTY,
-                                  NODE_ROLE_ORIGINATING);
+                                  ACR::CALLING_PARTY,
+                                  ACR::NODE_ROLE_ORIGINATING);
   acr->rx_request(rdata->msg_info.msg, rdata->pkt_info.timestamp);
 
   // Canonicalize the public ID from the URI in the To header.
@@ -618,7 +618,9 @@ void process_register_request(pjsip_rx_data* rdata)
                                st_code,
                                NULL,
                                NULL,
-                               NULL);
+                               NULL,
+                               acr);
+    acr->send();
     delete acr;
 
     if (expiry == 0)
@@ -651,7 +653,9 @@ void process_register_request(pjsip_rx_data* rdata)
                                PJSIP_SC_BAD_REQUEST,
                                NULL,
                                NULL,
-                               NULL);
+                               NULL,
+                               acr);
+    acr->send();
     delete acr;
 
     reg_stats_tables->de_reg_tbl->increment_attempts();
@@ -673,7 +677,9 @@ void process_register_request(pjsip_rx_data* rdata)
                                PJSIP_SC_NOT_IMPLEMENTED,
                                NULL,
                                NULL,
-                               NULL);
+                               NULL,
+                               acr);
+    acr->send();
     delete acr;
 
     reg_stats_tables->de_reg_tbl->increment_attempts();
@@ -768,7 +774,9 @@ void process_register_request(pjsip_rx_data* rdata)
                                PJSIP_SC_INTERNAL_SERVER_ERROR,
                                NULL,
                                NULL,
-                               NULL);
+                               NULL,
+                               acr);
+    acr->send();
     delete acr;
     delete aor_pair;
 
@@ -793,6 +801,7 @@ void process_register_request(pjsip_rx_data* rdata)
   {
     // LCOV_EXCL_START - we only reject REGISTER if something goes wrong, and
     // we aren't covering any of those paths so we can't hit this either
+    acr->tx_response(tdata->msg);
     status = pjsip_endpt_send_response2(stack_data.endpt, rdata, tdata, NULL, NULL);
 
     SAS::Event event(trail, SASEvent::REGISTER_FAILED, 0);
@@ -801,6 +810,7 @@ void process_register_request(pjsip_rx_data* rdata)
     event.add_var_param(error_msg);
     SAS::report_event(event);
 
+    acr->send();
     delete acr;
     delete aor_pair;
 
@@ -837,7 +847,12 @@ void process_register_request(pjsip_rx_data* rdata)
 
     tdata->msg->line.status.code = PJSIP_SC_INTERNAL_SERVER_ERROR;
     pjsip_tx_data_invalidate_msg(tdata);
+
+    acr->tx_response(tdata->msg);
+
     status = pjsip_endpt_send_response2(stack_data.endpt, rdata, tdata, NULL, NULL);
+
+    acr->send();
     delete acr;
     delete aor_pair;
 
