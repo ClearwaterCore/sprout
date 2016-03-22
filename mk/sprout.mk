@@ -17,6 +17,9 @@ sprout: pjsip libmemcached
 sprout_test:
 	${MAKE} -C ${SPROUT_DIR} test
 
+sprout_runtest:
+	${MAKE} -C ${SPROUT_DIR} run_test
+
 sprout_clean:
 	${MAKE} -C ${SPROUT_DIR} clean
 	-${MAKE} -C ${SPROUT_TEST_DIR} clean
