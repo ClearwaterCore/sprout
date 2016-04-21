@@ -608,6 +608,25 @@ TEST_F(AuthenticationTest, DigestAuthSuccess)
   EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_AUTHENTICATION_STATS_TABLES.sip_digest_auth_tbl)->_attempts);
   EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_AUTHENTICATION_STATS_TABLES.sip_digest_auth_tbl)->_successes);
 
+  // Try sending in an identical REGISTER request (simulating a replay attack)
+  // This should fail (the AV record for the nonce should have been tombstoned).
+  AuthenticationMessage msg3("REGISTER");
+  msg3._algorithm = "MD5";
+  msg3._key = "12345678123456781234567812345678";
+  msg3._nonce = auth_params["nonce"];
+  msg3._opaque = auth_params["opaque"];
+  msg3._nc = "00000001";
+  msg3._cnonce = "8765432187654321";
+  msg3._qop = "auth";
+  msg3._integ_prot = "ip-assoc-pending";
+  inject_msg(msg3.get());
+
+  // Expect a 401 Not Authorized response.
+  ASSERT_EQ(1, txdata_count());
+  tdata = current_txdata();
+  RespMatcher(401).matches(tdata->msg);
+  free_txdata();
+
   _hss_connection->delete_result("/impi/6505550001%40homedomain/av?impu=sip%3A6505550001%40homedomain");
 }
 
@@ -1011,7 +1030,7 @@ TEST_F(AuthenticationTest, NoAlgorithmAKAAuthSuccess)
   // the purposes of the test as Clearwater never itself runs the MILENAGE
   // algorithms to generate or extract keys.
   _hss_connection->set_result("/impi/6505550001%40homedomain/av/aka?impu=sip%3A6505550001%40homedomain",
-                              "{\"aka\":{\"challenge\":\"87654321876543218765432187654321\","
+                              "{\"aka\":{\"challenge\":\"87654321876543218765432187654322\","
                               "\"response\":\"12345678123456781234567812345678\","
                               "\"cryptkey\":\"0123456789abcdef\","
                               "\"integritykey\":\"fedcba9876543210\"}}");
@@ -1031,7 +1050,7 @@ TEST_F(AuthenticationTest, NoAlgorithmAKAAuthSuccess)
   std::string auth = get_headers(tdata->msg, "WWW-Authenticate");
   std::map<std::string, std::string> auth_params;
   parse_www_authenticate(auth, auth_params);
-  EXPECT_EQ("87654321876543218765432187654321", auth_params["nonce"]);
+  EXPECT_EQ("87654321876543218765432187654322", auth_params["nonce"]);
   EXPECT_EQ("0123456789abcdef", auth_params["ck"]);
   EXPECT_EQ("fedcba9876543210", auth_params["ik"]);
   EXPECT_EQ("auth", auth_params["qop"]);
@@ -1277,7 +1296,7 @@ TEST_F(AuthenticationTest, AKAAuthResyncFail)
   // the purposes of the test as Clearwater never itself runs the MILENAGE
   // algorithms to generate or extract keys.
   _hss_connection->set_result("/impi/6505550001%40homedomain/av/aka?impu=sip%3A6505550001%40homedomain",
-                              "{\"aka\":{\"challenge\":\"87654321876543218765432187654321\","
+                              "{\"aka\":{\"challenge\":\"87654321876543218765432187654323\","
                                         "\"response\":\"12345678123456781234567812345678\","
                                         "\"cryptkey\":\"0123456789abcdef\","
                                         "\"integritykey\":\"fedcba9876543210\"}}");
@@ -1297,7 +1316,7 @@ TEST_F(AuthenticationTest, AKAAuthResyncFail)
   std::string auth = get_headers(tdata->msg, "WWW-Authenticate");
   std::map<std::string, std::string> auth_params;
   parse_www_authenticate(auth, auth_params);
-  EXPECT_EQ("87654321876543218765432187654321", auth_params["nonce"]);
+  EXPECT_EQ("87654321876543218765432187654323", auth_params["nonce"]);
   EXPECT_EQ("0123456789abcdef", auth_params["ck"]);
   EXPECT_EQ("fedcba9876543210", auth_params["ik"]);
   EXPECT_EQ("auth", auth_params["qop"]);
