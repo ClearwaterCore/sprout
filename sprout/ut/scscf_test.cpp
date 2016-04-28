@@ -1814,6 +1814,24 @@ TEST_F(SCSCFTest, TestEnumNPBGCFTel)
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580401;rn.*+151085804;npdi@homedomain.*"), hdrs, false);
 }
 
+// Test where the BGCF receives a SIP request URI represents a number.
+// The ENUM lookup returns a domain on which the BGCF routes, but this domain is not a valid SIP URI.
+TEST_F(SCSCFTest, TestEnumBGCFInvalidURI)
+{
+  SCOPED_TRACE("");
+  _hss_connection->set_impu_result("sip:+16505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
+  _scscf_sproutlet->set_override_npdi(true);
+
+  Message msg;
+  msg._to = "16505551235";
+  msg._toscheme = "tel";
+  msg._todomain = "";
+  msg._requri = "tel:16505551235";
+  msg._route = "Route: <sip:homedomain;orig>";
+  msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
+  doSlowFailureFlow(msg, 500);
+}
+
 /// Test a forked flow - setup phase.
 void SCSCFTest::setupForkedFlow(SP::Message& msg)
 {

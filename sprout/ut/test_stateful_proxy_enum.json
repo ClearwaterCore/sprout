@@ -32,6 +32,10 @@
             "prefix" : "16505551234",
             "regex"  : "!(^.*$)!sip:\\1@ut.cw-ngv.com!"
         },
+        {   "name" : "Clearwater Tel URI to bad BGCF rule",
+            "prefix" : "16505551235",
+            "regex"  : "!(^.*$)!sip:\\1@domainnotasipuri!"
+        },
         {   "name" : "Setup invalid ENUM rule",
             "prefix" : "16505551239",
             "regex"  : "!(^.*$)!sip:1\\1@ut.cw-ngv.com!"
