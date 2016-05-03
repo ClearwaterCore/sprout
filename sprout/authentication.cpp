@@ -249,6 +249,14 @@ pj_status_t user_lookup(pj_pool_t *pool,
     av = NULL;                                                 // LCOV_EXCL_LINE
   }
 
+  if ((av != NULL) &&
+       av->HasMember("tombstone"))
+  {
+    // av should be ignored as it has already been used
+    TRC_WARNING("Received an authentication request for %s with nonce %s, but matching AV has already been used - possible replay attack", impi.c_str(), nonce.c_str());
+    av = NULL;
+  }
+
   if (av != NULL)
   {
     pj_cstr(&cred_info->scheme, "digest");
