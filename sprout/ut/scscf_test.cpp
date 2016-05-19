@@ -7687,12 +7687,14 @@ TEST_F(SCSCFTest, TestSessionExpiresInDialog)
   msg._in_dialog = true;
 
   list<HeaderMatcher> hdrs;
-  hdrs.push_back(HeaderMatcher("Record-Route", "Record-Route:.*"));
+  hdrs.push_back(HeaderMatcher("Record-Route"));
   hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires:.*"));
 
   list<HeaderMatcher> rsp_hdrs;
-  rsp_hdrs.push_back(HeaderMatcher("Session-Expires"));
+  rsp_hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires:.*;refresher=uac"));
   rsp_hdrs.push_back(HeaderMatcher("Record-Route"));
+
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*homedomain.*"), hdrs, false, rsp_hdrs);
 }
 
 TEST_F(SCSCFTest, TestSessionExpiresWhenNoRecordRoute)
