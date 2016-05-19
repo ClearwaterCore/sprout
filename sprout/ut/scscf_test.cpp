@@ -7676,6 +7676,7 @@ TEST_F(SCSCFTest, TestSessionExpires)
 TEST_F(SCSCFTest, TestSessionExpiresInDialog)
 {
   SCOPED_TRACE("");
+  register_uri(_store, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
   _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
 
   // Send an UPDATE in-dialog request to which we should always add RR and SE.
@@ -7694,10 +7695,10 @@ TEST_F(SCSCFTest, TestSessionExpiresInDialog)
   rsp_hdrs.push_back(HeaderMatcher("Record-Route"));
 }
 
-TEST_F(SCSCFTest, TestSessionExpiresAStoAS)
+TEST_F(SCSCFTest, TestSessionExpiresWhenNoRecordRoute)
 {
   SCOPED_TRACE("");
-  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+  register_uri(_store, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
   _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED,
                                 R"(<IMSSubscription><ServiceProfile>
                                 <PublicIdentity><Identity>sip:6505551000@homedomain</Identity></PublicIdentity>
