@@ -332,7 +332,8 @@ SCSCFSproutletTsx::SCSCFSproutletTsx(SproutletTsxHelper* helper,
   _req_type(req_type),
   _seen_1xx(false),
   _impi(),
-  _auto_reg(false)
+  _auto_reg(false),
+  _se_helper(stack_data.default_session_expires)
 {
   TRC_DEBUG("S-CSCF Transaction (%p) created", this);
 }
@@ -379,19 +380,6 @@ void SCSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
   TRC_INFO("S-CSCF received initial request");
 
   pjsip_status_code status_code = PJSIP_SC_OK;
-
-  // Try to add a Session-Expires header
-  if (!PJUtils::add_update_session_expires(req,
-                                           get_pool(req),
-                                           trail()))
-  {
-    // Session expires header is invalid, so reject the request
-    // This has been logged in PJUtils
-    pjsip_msg* rsp = create_response(req, PJSIP_SC_TEMPORARILY_UNAVAILABLE);
-    send_response(rsp);
-    free_msg(req);
-    return;
-  }
 
   // Work out if we should be auto-registering the user based on this
   // request and if we are, also work out the IMPI to register them with.
@@ -481,18 +469,9 @@ void SCSCFSproutletTsx::on_rx_in_dialog_request(pjsip_msg* req)
 {
   TRC_INFO("S-CSCF received in-dialog request");
 
-  // Try to add a Session-Expires header
-  if (!PJUtils::add_update_session_expires(req,
-                                           get_pool(req),
-                                           trail()))
-  {
-    // Session expires header is invalid, so reject the request
-    // This has been logged in PJUtils
-    pjsip_msg* rsp = create_response(req, PJSIP_SC_TEMPORARILY_UNAVAILABLE);
-    send_response(rsp);
-    free_msg(req);
-    return;
-  }
+  // We must be record-routed to be in the dialog
+  _record_routed = true;
+  _se_helper.process_request(req, get_pool(req), trail());
 
   // Create an ACR for this request and pass the request to it.
   _in_dialog_acr = _scscf->get_acr(trail(),
@@ -521,6 +500,11 @@ void SCSCFSproutletTsx::on_tx_request(pjsip_msg* req)
 void SCSCFSproutletTsx::on_rx_response(pjsip_msg* rsp, int fork_id)
 {
   TRC_INFO("S-CSCF received response");
+
+  if (_record_routed)
+  {
+    _se_helper.process_response(rsp, get_pool(rsp), trail());
+  }
 
   // Pass the received response to the ACR.
   // @TODO - timestamp from response???
@@ -877,7 +861,7 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
           if (stack_data.record_route_on_diversion)
           {
             TRC_DEBUG("Add service to dialog - originating Cdiv");
-            add_record_route(req, false, NODE_ROLE_ORIGINATING);
+            add_to_dialog(req, false, NODE_ROLE_ORIGINATING);
           }
         }
         else
@@ -897,11 +881,11 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
         TRC_DEBUG("Add service to dialog - AS hop");
         if (_session_case->is_terminating())
         {
-          add_record_route(req, false, NODE_ROLE_TERMINATING);
+          add_to_dialog(req, false, NODE_ROLE_TERMINATING);
         }
         else
         {
-          add_record_route(req, false, NODE_ROLE_ORIGINATING);
+          add_to_dialog(req, false, NODE_ROLE_ORIGINATING);
         }
       }
     }
@@ -927,7 +911,7 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
         if (stack_data.record_route_on_initiation_of_terminating)
         {
           TRC_DEBUG("Single Record-Route - initiation of terminating handling");
-          add_record_route(req, false, NODE_ROLE_TERMINATING);
+          add_to_dialog(req, false, NODE_ROLE_TERMINATING);
         }
       }
       else if (_session_case->is_originating())
@@ -935,7 +919,7 @@ pjsip_status_code SCSCFSproutletTsx::determine_served_user(pjsip_msg* req)
         if (stack_data.record_route_on_initiation_of_originating)
         {
           TRC_DEBUG("Single Record-Route - initiation of originating handling");
-          add_record_route(req, true, NODE_ROLE_ORIGINATING);
+          add_to_dialog(req, true, NODE_ROLE_ORIGINATING);
           acr->override_session_id(PJUtils::pj_str_to_string(&PJSIP_MSG_CID_HDR(req)->id));
         }
       }
@@ -1102,7 +1086,7 @@ void SCSCFSproutletTsx::apply_originating_services(pjsip_msg* req)
     if (stack_data.record_route_on_completion_of_originating)
     {
       TRC_DEBUG("Add service to dialog - end of originating handling");
-      add_record_route(req, false, NODE_ROLE_ORIGINATING);
+      add_to_dialog(req, false, NODE_ROLE_ORIGINATING);
     }
 
     // Attempt to translate the RequestURI using ENUM or an alternative
@@ -1173,7 +1157,7 @@ void SCSCFSproutletTsx::apply_terminating_services(pjsip_msg* req)
     if (stack_data.record_route_on_completion_of_terminating)
     {
       TRC_DEBUG("Add service to dialog - end of terminating handling");
-      add_record_route(req, true, NODE_ROLE_TERMINATING);
+      add_to_dialog(req, true, NODE_ROLE_TERMINATING);
 
       ACR* acr = _as_chain_link.acr();
       if (acr != NULL)
@@ -1615,14 +1599,15 @@ bool SCSCFSproutletTsx::lookup_ifcs(std::string public_id, Ifcs& ifcs)
 }
 
 
-/// Record-Route the S-CSCF sproutlet into a dialog.  The parameter passed will
+/// Add the S-CSCF sproutlet into a dialog.  The parameter passed will
 /// be attached to the Record-Route and can be used to recover the billing
 /// role that is in use on subsequent in-dialog messages.
-void SCSCFSproutletTsx::add_record_route(pjsip_msg* msg,
-                                         bool billing_rr,
-                                         NodeRole billing_role)
+void SCSCFSproutletTsx::add_to_dialog(pjsip_msg* msg,
+                                      bool billing_rr,
+                                      NodeRole billing_role)
 {
   pj_pool_t* pool = get_pool(msg);
+  _se_helper.process_request(msg, pool, trail());
 
   pjsip_route_hdr* rr = NULL;
   if (!_record_routed)

@@ -497,7 +497,11 @@ protected:
   void doAsOriginated(SP::Message& msg, bool expect_orig);
   void doAsOriginated(const std::string& msg, bool expect_orig);
   void doFourAppServerFlow(std::string record_route_regex, bool app_servers_record_route=false);
-  void doSuccessfulFlow(SP::Message& msg, testing::Matcher<string> uri_matcher, list<HeaderMatcher> headers, bool include_ack_and_bye=true, bool session_expires=false);
+  void doSuccessfulFlow(SP::Message& msg,
+                        testing::Matcher<string> uri_matcher,
+                        list<HeaderMatcher> headers,
+                        bool include_ack_and_bye=true,
+                        list<HeaderMatcher> rsp_hdrs = list<HeaderMatcher>());
   void doFastFailureFlow(SP::Message& msg, int st_code);
   void doSlowFailureFlow(SP::Message& msg, int st_code, std::string body = "", std::string reason = "");
   void setupForkedFlow(SP::Message& msg);
@@ -1125,7 +1129,7 @@ void SCSCFTest::doSuccessfulFlow(Message& msg,
                                  testing::Matcher<string> uri_matcher,
                                  list<HeaderMatcher> headers,
                                  bool include_ack_and_bye,
-                                 bool session_expires)
+                                 list<HeaderMatcher> rsp_headers)
 {
   SCOPED_TRACE("");
   pjsip_msg* out;
@@ -1144,14 +1148,6 @@ void SCSCFTest::doSuccessfulFlow(Message& msg,
   ReqMatcher req("INVITE");
   ASSERT_NO_FATAL_FAILURE(req.matches(out));
 
-  if (session_expires)
-  {
-    // In general proxied messages should have Session-Expires headers added,
-    // except if we are simply forwarding without applying any services.
-    std::string session_expires = get_headers(out, "Session-Expires");
-    EXPECT_EQ("Session-Expires: 600", session_expires);
-  }
-
   // Do checks on what gets passed through:
   EXPECT_THAT(req.uri(), uri_matcher);
   for (list<HeaderMatcher>::iterator iter = headers.begin(); iter != headers.end(); ++iter)
@@ -1166,6 +1162,13 @@ void SCSCFTest::doSuccessfulFlow(Message& msg,
   // OK goes back
   out = current_txdata()->msg;
   RespMatcher(200).matches(out);
+  for (list<HeaderMatcher>::iterator iter = rsp_headers.begin();
+       iter != rsp_headers.end();
+       ++iter)
+  {
+    iter->match(out);
+  }
+
   msg.set_route(out);
   msg._cseq++;
   free_txdata();
@@ -1426,7 +1429,7 @@ TEST_F(SCSCFTest, TestStrictRouteThrough)
   msg._requri = "sip:6505551234@nonlocaldomain";
   list<HeaderMatcher> hdrs;
   hdrs.push_back(HeaderMatcher("Route", ".*lasthop@destination.com.*", ".*6505551234@nonlocaldomain.*"));
-  doSuccessfulFlow(msg, testing::MatchesRegex(".*nexthop@intermediate.com.*"), hdrs, false, false);
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*nexthop@intermediate.com.*"), hdrs, false);
 }
 
 TEST_F(SCSCFTest, TestNonLocal)
@@ -7142,42 +7145,6 @@ TEST_F(SCSCFTest, TestNoSecondPAIHdrTerm)
   doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs, false);
 }
 
-// Test that the Session-Expires header is correctly altered by the Min-SE
-// header
-TEST_F(SCSCFTest, TestMinSEOverride)
-{
-  SCOPED_TRACE("");
-  register_uri(_store, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
-  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
-  Message msg;
-  msg._extra = "Session-Expires: 600\nMin-SE: 800";
-  list<HeaderMatcher> hdrs;
-  hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires: 800"));
-  doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs, false);
-}
-
-// Test that a request where the Min-SE header is too large is rejected
-TEST_F(SCSCFTest, TestMinSETooLarge)
-{
-  SCOPED_TRACE("");
-  register_uri(_store, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
-  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
-  Message msg;
-  msg._extra = "Session-Expires: 600\nMin-SE: 1000";
-  doSlowFailureFlow(msg, 480);
-}
-
-// Test that a request where the Session-Expiry header is too large is rejected
-TEST_F(SCSCFTest, TestSessionExpiresTooLarge)
-{
-  SCOPED_TRACE("");
-  register_uri(_store, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
-  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
-  Message msg;
-  msg._extra = "Session-Expires: 1000";
-  doSlowFailureFlow(msg, 480);
-}
-
 /// Test handling of 430 Flow Failed response
 TEST_F(SCSCFTest, FlowFailedResponse)
 {
@@ -7683,3 +7650,155 @@ TEST_F(SCSCFTest, AutomaticRegistrationDerivedIMPI)
   hdrs.push_back(HeaderMatcher("Route", "Route: <sip:10.0.0.1:5060;transport=TCP;lr>"));
   doSuccessfulFlow(msg, testing::MatchesRegex("sip:newuser@domainvalid"), hdrs);
 }
+
+TEST_F(SCSCFTest, TestSessionExpires)
+{
+  SCOPED_TRACE("");
+  register_uri(_store, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
+
+  // Send an INVITE where the client supports session timers. This means that
+  // if the server does not support timers, there should still be a
+  // Session-Expires header on the response.
+  //
+  // Most of the session timer logic is tested in
+  // `session_expires_helper_test.cpp`. This is just to check that the S-CSCF
+  // invokes the logic correctly.
+  Message msg;
+  msg._extra = "Session-Expires: 600\r\nSupported: timer";
+  list<HeaderMatcher> hdrs;
+  hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires:.*"));
+  list<HeaderMatcher> rsp_hdrs;
+  rsp_hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires: .*"));
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs, false, rsp_hdrs);
+}
+
+TEST_F(SCSCFTest, TestSessionExpiresInDialog)
+{
+  SCOPED_TRACE("");
+  register_uri(_store, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
+
+  // Send an UPDATE in-dialog request to which we should always add RR and SE.
+  // Then check that if the UAS strips the SE, that Sprout tells the UAC to be
+  // the refresher. This ensures that our response processing is correct.
+  Message msg;
+  msg._extra = "Supported: timer";
+  msg._in_dialog = true;
+
+  list<HeaderMatcher> hdrs;
+  hdrs.push_back(HeaderMatcher("Record-Route"));
+  hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires:.*"));
+
+  list<HeaderMatcher> rsp_hdrs;
+  rsp_hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires:.*;refresher=uac"));
+  rsp_hdrs.push_back(HeaderMatcher("Record-Route"));
+
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*homedomain.*"), hdrs, false, rsp_hdrs);
+}
+
+TEST_F(SCSCFTest, TestSessionExpiresWhenNoRecordRoute)
+{
+  SCOPED_TRACE("");
+  register_uri(_store, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED,
+                                R"(<IMSSubscription><ServiceProfile>
+                                <PublicIdentity><Identity>sip:6505551000@homedomain</Identity></PublicIdentity>
+                                  <InitialFilterCriteria>
+                                    <Priority>2</Priority>
+                                    <TriggerPoint>
+                                    <ConditionTypeCNF>0</ConditionTypeCNF>
+                                    <SPT>
+                                      <ConditionNegated>0</ConditionNegated>
+                                      <Group>0</Group>
+                                      <Method>INVITE</Method>
+                                      <Extension></Extension>
+                                    </SPT>
+                                  </TriggerPoint>
+                                  <ApplicationServer>
+                                    <ServerName>sip:4.2.3.4:56788;transport=UDP</ServerName>
+                                    <DefaultHandling>0</DefaultHandling>
+                                  </ApplicationServer>
+                                  </InitialFilterCriteria>
+                                  <InitialFilterCriteria>
+                                    <Priority>1</Priority>
+                                    <TriggerPoint>
+                                    <ConditionTypeCNF>0</ConditionTypeCNF>
+                                    <SPT>
+                                      <ConditionNegated>0</ConditionNegated>
+                                      <Group>0</Group>
+                                      <Method>INVITE</Method>
+                                      <Extension></Extension>
+                                    </SPT>
+                                  </TriggerPoint>
+                                  <ApplicationServer>
+                                    <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>
+                                    <DefaultHandling>0</DefaultHandling>
+                                  </ApplicationServer>
+                                  </InitialFilterCriteria>
+                                </ServiceProfile></IMSSubscription>)");
+
+  TransportFlow tpAS1(TransportFlow::Protocol::UDP, stack_data.scscf_port, "1.2.3.4", 56789);
+  TransportFlow tpAS2(TransportFlow::Protocol::UDP, stack_data.scscf_port, "4.2.3.4", 56788);
+
+
+  // Send an INVITE
+  Message msg;
+  msg._via = "10.99.88.11:12345;transport=TCP";
+  msg._to = "6505551234@homedomain";
+  msg._todomain = "";
+  msg._route = "Route: <sip:homedomain;orig>";
+  msg._requri = "sip:6505551234@homedomain";
+  msg._method = "INVITE";
+
+  pjsip_msg* out;
+  inject_msg(msg.get_request());
+
+  // INVITE passed to AS1
+  SCOPED_TRACE("INVITE (1)");
+  ASSERT_EQ(2, txdata_count());
+  free_txdata();
+  out = current_txdata()->msg;
+  ReqMatcher r1("INVITE");
+  ASSERT_NO_FATAL_FAILURE(r1.matches(out));
+
+  ASSERT_TRUE(!get_headers(out, "Record-Route").empty());
+  ASSERT_TRUE(!get_headers(out, "Session-Expires").empty());
+
+
+  // AS proxies INVITE back.
+  const pj_str_t STR_ROUTE = pj_str("Route");
+  const pj_str_t STR_REC_ROUTE = pj_str("Record-Route");
+  const pj_str_t STR_SESS_EXP = pj_str("Session-Expires");
+  pjsip_hdr* hdr = (pjsip_hdr*)pjsip_msg_find_hdr_by_name(out, &STR_ROUTE, NULL);
+  pjsip_hdr* rr_hdr = (pjsip_hdr*)pjsip_msg_find_hdr_by_name(out, &STR_REC_ROUTE, NULL);
+  pjsip_hdr* se_hdr = (pjsip_hdr*)pjsip_msg_find_hdr_by_name(out, &STR_SESS_EXP, NULL);
+  pj_list_erase(rr_hdr);
+  pj_list_erase(se_hdr);
+
+  if (hdr)
+  {
+    pj_list_erase(hdr);
+  }
+
+  inject_msg(out, &tpAS1);
+  free_txdata();
+
+  // 100 Trying goes back to AS1
+  out = current_txdata()->msg;
+  RespMatcher(100).matches(out);
+  tpAS1.expect_target(current_txdata(), true);  // Requests always come back on same transport
+  msg.set_route(out);
+  free_txdata();
+
+  // INVITE passed on to AS2
+  SCOPED_TRACE("INVITE (2)");
+  out = current_txdata()->msg;
+  ASSERT_NO_FATAL_FAILURE(r1.matches(out));
+  tpAS2.expect_target(current_txdata(), false);
+
+  // Should not RR between AS's and therefore shouldn't SE
+  ASSERT_TRUE(get_headers(out, "Record-Route").empty());
+  ASSERT_TRUE(get_headers(out, "Session-Expires").empty());
+}
+
