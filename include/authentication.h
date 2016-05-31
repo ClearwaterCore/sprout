@@ -38,20 +38,37 @@
 #ifndef AUTHENTICATION_H__
 #define AUTHENTICATION_H__
 
-#include "avstore.h"
+#include "impistore.h"
 #include "hssconnection.h"
 #include "chronosconnection.h"
 #include "acr.h"
 #include "analyticslogger.h"
+#include "snmp_success_fail_count_table.h"
 
-extern pjsip_module mod_auth;
+extern pjsip_module mod_authentication;
+
+enum struct NonRegisterAuthentication
+{
+  // Never challenge a non-REGISTER.
+  NEVER,
+
+  // Only challenge a non-REGISTER if it has a Proxy-Authorization header.
+  IF_PROXY_AUTHORIZATION_PRESENT
+};
+
+typedef int(*get_expiry_for_binding_fn)(pjsip_contact_hdr* contact,
+                                        pjsip_expires_hdr* expires);
 
 pj_status_t init_authentication(const std::string& realm_name,
-                                AvStore* avstore,
+                                ImpiStore* impi_store,
                                 HSSConnection* hss_connection,
                                 ChronosConnection* chronos_connection,
                                 ACRFactory* rfacr_factory,
-                                AnalyticsLogger* analytics_logger);
+                                NonRegisterAuthentication non_register_auth_mode_param,
+                                AnalyticsLogger* analytics_logger,
+                                SNMP::AuthenticationStatsTables* auth_stats_tables,
+                                bool nonce_count_supported_arg,
+                                get_expiry_for_binding_fn get_expiry_for_binding_arg);
 
 void destroy_authentication();
 

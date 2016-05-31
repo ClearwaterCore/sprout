@@ -41,6 +41,7 @@ extern "C" {
 #include <pjsip.h>
 }
 
+const pj_str_t STR_HISTORY_INFO = pj_str((char*)"History-Info");
 const pj_str_t STR_DIVERSION = pj_str((char *)"Diversion");
 const pj_str_t STR_SUPPORTED = pj_str((char *)"Supported");
 const pj_str_t STR_REQUIRE = pj_str((char *)"Require");
@@ -60,7 +61,7 @@ const pj_str_t STR_IP_ASSOC_PENDING = pj_str((char *)"ip-assoc-pending");
 const pj_str_t STR_AUTH_DONE = pj_str((char *)"auth-done");
 const pj_str_t STR_PRIVACY = pj_str((char *)"Privacy");
 const pj_str_t STR_P_A_N_I = pj_str((char *)"P-Access-Network-Info");
-const pj_str_t STR_P_V_N_I = pj_str((char *)"P-Visited-Network-Id");
+const pj_str_t STR_P_V_N_I = pj_str((char *)"P-Visited-Network-ID");
 const pj_str_t STR_P_SERVED_USER = pj_str((char*)"P-Served-User");
 const pj_str_t STR_P_ASSERTED_IDENTITY = pj_str((char*)"P-Asserted-Identity");
 const pj_str_t STR_P_PREFERRED_IDENTITY = pj_str((char*)"P-Preferred-Identity");
@@ -68,6 +69,7 @@ const pj_str_t STR_P_ASSOCIATED_URI = pj_str((char*)"P-Associated-URI");
 const pj_str_t STR_REQUEST_DISPOSITION = pj_str((char*)"Request-Disposition");
 const pj_str_t STR_SERVICE_ROUTE = pj_str((char*)"Service-Route");
 const pj_str_t STR_ORIG = pj_str((char*)"orig");
+const pj_str_t STR_ORIG_CDIV = pj_str((char*)"orig-cdiv");
 const pj_str_t STR_NO_FORK = pj_str((char*)"no-fork");
 const pj_str_t STR_P_C_V = pj_str((char*)"P-Charging-Vector");
 const pj_str_t STR_P_C_F_A = pj_str((char*)"P-Charging-Function-Addresses");
@@ -81,7 +83,10 @@ const pj_str_t STR_CK = pj_str((char*)"ck");
 const pj_str_t STR_IK = pj_str((char*)"ik");
 const pj_str_t STR_P_PROFILE_KEY = pj_str((char*)"P-Profile-Key");
 const pj_str_t STR_APPLICATION = pj_str((char*)"application");
+const pj_str_t STR_JSON = pj_str((char*)"json");
 const pj_str_t STR_SDP = pj_str((char*)"sdp");
+const pj_str_t STR_TEXT = pj_str((char*)"text");
+const pj_str_t STR_XML = pj_str((char*)"xml");
 const pj_str_t STR_EVENT = pj_str((char*)"Event");
 const pj_str_t STR_EVENT_LOWER = pj_str((char*)"event");
 const pj_str_t STR_EVENTS = pj_str((char*)"events");
@@ -90,6 +95,7 @@ const pj_str_t STR_X = pj_str((char*)"X");
 const pj_str_t STR_REASON = pj_str((char*)"Reason");
 const pj_str_t STR_TRANSIT_IOI = pj_str((char*)"transit-ioi");
 const pj_str_t STR_SESSION_EXPIRES = pj_str((char*)"Session-Expires");
+const pj_str_t STR_MIN_SE = pj_str((char*)"Min-SE");
 const pj_str_t STR_CALL_ID = pj_str((char*)"Call-ID");
 const pj_str_t STR_CCF = pj_str((char*)"ccf");
 const pj_str_t STR_ECF = pj_str((char*)"ecf");
@@ -112,6 +118,20 @@ const pj_str_t STR_XML_PUB_GRUU = pj_str((char*)"gr:pub-gruu");
 const pj_str_t STR_ISUB = pj_str((char*)"isub");
 const pj_str_t STR_EXT = pj_str((char*)"ext");
 const pj_str_t STR_USER_PHONE = pj_str((char*)"phone");
+const pj_str_t STR_DIALOG_ID = pj_str((char*)"dialog_id");
+const pj_str_t STR_TARGET = pj_str((char*)"target");
+const pj_str_t STR_CONDITIONS = pj_str((char*)"conditions");
+const pj_str_t STR_NO_REPLY_TIMER = pj_str((char*)"no-reply-timer");
+const pj_str_t STR_NPDI = pj_str((char*)"npdi");
+const pj_str_t STR_RN = pj_str((char*)"rn");
+const pj_str_t STR_AUTO_REG = pj_str((char*)"auto-reg");
+const pj_str_t STR_TIMER = pj_str((char*)"timer");
+const pj_str_t STR_TO = pj_str((char*)"To");
+const pj_str_t STR_FROM = pj_str((char*)"From");
+const pj_str_t STR_ROUTE = pj_str((char*)"Route");
+const pj_str_t STR_CONTENT_TYPE = pj_str((char*)"Content-Type");
+const pj_str_t STR_CONTENT_LENGTH = pj_str((char*)"Content-Length");
+const pj_str_t STR_SERVICE = pj_str((char*)"service");
 
 /// Prefix of ODI tokens we generate.
 const pj_str_t STR_ODI_PREFIX = pj_str((char*)"odi_");
@@ -153,6 +173,7 @@ const pj_str_t STR_CREATED = pj_str((char*)"created");
 const pj_str_t STR_REFRESHED = pj_str((char*)"refreshed");
 const pj_str_t STR_EXPIRED = pj_str((char*)"expired");
 const pj_str_t STR_DEACTIVATED = pj_str((char*)"deactivated");
+const pj_str_t STR_SHORTENED = pj_str((char*)"shortened");
 const pj_str_t STR_UNREGISTERED = pj_str((char*)"unregistered");
 const pj_str_t STR_TIMEOUT = pj_str((char*)"timeout");
 
@@ -170,5 +191,9 @@ const pj_str_t STR_XMLNS_XSI_VAL = pj_str((char*)"http://www.w3.org/2001/XMLSche
 // XML schema location
 const pj_str_t STR_XSI_SLOC_NAME = pj_str((char*)"xsi:schemaLocation");
 const pj_str_t STR_XSI_SLOC_VAL = pj_str((char*)"http://www.w3.org/2001/03/xml.xsd");
+
+// SIP methods not defined in PJSIP core.
+const static pjsip_method METHOD_UPDATE = { PJSIP_OTHER_METHOD, pj_str((char*)"UPDATE") };
+const static pjsip_method METHOD_INFO = { PJSIP_OTHER_METHOD, pj_str((char*)"INFO") };
 
 #endif /* CONSTANTS_H_ */

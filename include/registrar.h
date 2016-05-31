@@ -42,24 +42,36 @@ extern "C" {
 #include <pjsip.h>
 }
 
-#include "regstore.h"
+#include "subscriber_data_manager.h"
 #include "hssconnection.h"
 #include "chronosconnection.h"
 #include "analyticslogger.h"
 #include "acr.h"
+#include "snmp_success_fail_count_table.h"
 
 extern pjsip_module mod_registrar;
 
 void third_party_register_failed(const std::string& public_id,
                                  SAS::TrailId trail);
 
-extern pj_status_t init_registrar(RegStore* registrar_store,
-                                  RegStore* remote_reg_store,
+extern pj_status_t init_registrar(SubscriberDataManager* sdm,
+                                  std::vector<SubscriberDataManager*> remote_sdms,
                                   HSSConnection* hss_connection,
                                   AnalyticsLogger* analytics_logger,
                                   ACRFactory* rfacr_factory,
-                                  int cfg_max_expires);
+                                  int cfg_max_expires,
+                                  bool force_third_party_register_body,
+                                  SNMP::RegistrationStatsTables* reg_stats_tbls,
+                                  SNMP::RegistrationStatsTables* third_party_reg_stats_tbls);
 
+
+/// Calculate the expiry time for a binding.
+///
+/// @param contact - The binding's contact header.
+/// @param expires - (optional) The expiry header from the request.
+///
+/// @return The expiry time in seconds.
+int expiry_for_binding(pjsip_contact_hdr* contact, pjsip_expires_hdr* expires);
 
 extern void destroy_registrar();
 

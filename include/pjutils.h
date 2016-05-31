@@ -54,15 +54,14 @@ extern "C" {
 #include <deque>
 #include "sas.h"
 #include "sipresolver.h"
+#include "enumservice.h"
+#include "uri_classifier.h"
+#include "acr.h"
 
 namespace PJUtils {
 
 pj_status_t init();
 void term();
-
-pj_bool_t is_home_domain(const pjsip_uri* uri);
-pj_bool_t is_home_domain(const std::string& domain);
-pj_bool_t is_uri_local(const pjsip_uri* uri);
 
 pj_bool_t is_e164(const pj_str_t* user);
 pj_bool_t is_e164(const pjsip_uri* uri);
@@ -73,6 +72,8 @@ pj_str_t uri_to_pj_str(pjsip_uri_context_e context,
 
 std::string uri_to_string(pjsip_uri_context_e context,
                           const pjsip_uri* uri);
+
+std::string strip_uri_scheme(const std::string& uri);
 
 pjsip_uri* uri_from_string(const std::string& uri_s,
                            pj_pool_t* pool,
@@ -86,7 +87,7 @@ std::string pj_status_to_string(const pj_status_t status);
 
 std::string hdr_to_string(void* hdr);
 
-std::string aor_from_uri(const pjsip_sip_uri* uri);
+std::string extract_username(pjsip_authorization_hdr* auth_hdr, pjsip_uri* impu_uri);
 
 std::string public_id_from_uri(const pjsip_uri* uri);
 
@@ -100,6 +101,8 @@ pjsip_uri* term_served_user(pjsip_msg* msg);
 
 typedef enum {NO, YES, TLS_YES, TLS_PENDING, IP_ASSOC_YES, IP_ASSOC_PENDING, AUTH_DONE} Integrity;
 void add_integrity_protected_indication(pjsip_tx_data* tdata, PJUtils::Integrity integrity);
+void add_proxy_auth_for_pbx(pjsip_tx_data* tdata);
+void add_pvni(pjsip_tx_data* tdata, pj_str_t* network_id);
 
 void add_asserted_identity(pjsip_msg* msg, pj_pool_t* pool, const std::string& aid, const pj_str_t& display_name);
 void add_asserted_identity(pjsip_tx_data* tdata, const std::string& aid);
@@ -121,6 +124,8 @@ inline pj_bool_t is_top_route_local(const pjsip_msg* msg, pjsip_route_hdr** hdr)
 }
 
 void add_record_route(pjsip_tx_data* tdata, const char* transport, int port, const char* user, const pj_str_t& host);
+
+void add_top_route_header(pjsip_msg* msg, pjsip_sip_uri* uri, pj_pool_t* pool);
 
 void add_route_header(pjsip_msg* msg, pjsip_sip_uri* uri, pj_pool_t* pool);
 
@@ -200,22 +205,26 @@ pj_status_t send_request_stateless(pjsip_tx_data* tdata,
 pj_status_t respond_stateless(pjsip_endpoint* endpt,
                               pjsip_rx_data* rdata,
                               int st_code,
-                              const pj_str_t* st_text,
-                              const pjsip_hdr* hdr_list,
-                              const pjsip_msg_body* body);
+                              const pj_str_t* st_text = NULL,
+                              const pjsip_hdr* hdr_list = NULL,
+                              const pjsip_msg_body* body = NULL,
+                              ACR* acr = NULL);
 
 pj_status_t respond_stateful(pjsip_endpoint* endpt,
                              pjsip_transaction* uas_tsx,
                              pjsip_rx_data* rdata,
                              int st_code,
-                             const pj_str_t* st_text,
-                             const pjsip_hdr* hdr_list,
-                             const pjsip_msg_body* body);
+                             const pj_str_t* st_text = NULL,
+                             const pjsip_hdr* hdr_list = NULL,
+                             const pjsip_msg_body* body = NULL,
+                             ACR* acr = NULL);
 
 pjsip_tx_data *clone_tdata(pjsip_tx_data* tdata);
 void clone_header(const pj_str_t* hdr_name, pjsip_msg* old_msg, pjsip_msg* new_msg, pj_pool_t* pool);
 
 void add_top_via(pjsip_tx_data* tdata);
+
+void remove_top_via(pjsip_tx_data* tdata);
 
 void add_reason(pjsip_tx_data* tdata, int reason_code);
 
@@ -231,8 +240,7 @@ void mark_sas_call_branch_ids(const SAS::TrailId trail, pjsip_cid_hdr* cid_hdr, 
 
 bool is_emergency_registration(pjsip_contact_hdr* contact_hdr);
 
-bool is_uri_phone_number(pjsip_uri* uri);
-
+bool check_route_headers(pjsip_msg* msg);
 bool check_route_headers(pjsip_rx_data* rdata);
 
 void put_unary_param(pjsip_param* params_list,
@@ -246,9 +254,7 @@ pjsip_status_code redirect_int(pjsip_msg* msg, pjsip_uri* target, pj_pool_t* poo
 pjsip_history_info_hdr* create_history_info_hdr(pjsip_uri* target, pj_pool_t* pool);
 void update_history_info_reason(pjsip_uri* history_info_uri, pj_pool_t* pool, int code);
 
-pj_str_t user_from_uri(pjsip_uri* uri);
-
-bool is_uri_gruu(pjsip_uri* uri);
+pj_str_t user_from_uri(const pjsip_uri* uri);
 
 void report_sas_to_from_markers(SAS::TrailId trail, pjsip_msg* msg);
 
@@ -261,11 +267,35 @@ void add_pcfa_header(pjsip_msg* msg,
 pjsip_uri* translate_sip_uri_to_tel_uri(const pjsip_sip_uri* sip_uri,
                                         pj_pool_t* pool);
 
-pj_bool_t is_user_global(const std::string& user);
-pj_bool_t is_user_global(const pj_str_t& user);
+std::string remove_visual_separators(const std::string& user);
+std::string remove_visual_separators(const pj_str_t& number);
 
-pj_bool_t is_user_numeric(const std::string& user);
-pj_bool_t is_user_numeric(const pj_str_t& user);
+bool get_npdi(pjsip_uri* uri);
+bool get_rn(pjsip_uri* uri, std::string& routing_value);
+
+void translate_request_uri(pjsip_msg* req,
+                           pj_pool_t* pool,
+                           EnumService* enum_service,
+                           bool should_override_npdi,
+                           SAS::TrailId trail);
+
+void update_request_uri_np_data(pjsip_msg* req,
+                                pj_pool_t* pool,
+                                EnumService* enum_service,
+                                bool should_override_npdi,
+                                SAS::TrailId trail);
+
+bool should_update_np_data(URIClass old_uri_class,
+                           URIClass new_uri_class,
+                           std::string& new_uri_str,
+                           bool should_override_npdi,
+                           SAS::TrailId trail);
+
+// Get a string representation of the top routing header (or the
+// request URI if there's no route headers). This can return
+// an empty string (if the header isn't a valid URI), so callers
+// should validate the result.
+std::string get_next_routing_header(pjsip_msg* msg);
 
 } // namespace PJUtils
 

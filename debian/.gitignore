@@ -5,9 +5,11 @@
 /files
 /bono-dbg/
 /bono/
-/clearwater-sip-stress-dbg/
+/clearwater-sipp/
+/clearwater-sipp-dbg/
 /clearwater-sip-stress/
 /clearwater-sip-stress-stats/
+/clearwater-sip-perf/
 /restund/
 /sprout-dbg/
 /sprout-libs-dbg/
@@ -27,3 +29,7 @@
 /gemini-as-dbg/
 /memento-as/
 /memento-as-dbg/
+/call-diversion-as/
+/call-diversion-as-dbg/
+/mangelwurzel-as/
+/mangelwurzel-as-dbg/

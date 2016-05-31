@@ -49,7 +49,8 @@
 
 #include "basicproxy.h"
 #include "sproutlet.h"
-
+#include "snmp_sip_request_types.h"
+#include "sproutlet_options.h"
 
 class SproutletWrapper;
 
@@ -58,15 +59,21 @@ class SproutletProxy : public BasicProxy
 public:
   /// Constructor.
   ///
-  /// @param  endpt         - The pjsip endpoint to associate with.
-  /// @param  priority      - The pjsip priority to load at.
-  /// @param  host_aliases  - The IP addresses/domains that refer to this proxy.
-  /// @param  sproutlets    - Sproutlets to load in this proxy.
+  /// @param  endpt             - The pjsip endpoint to associate with.
+  /// @param  priority          - The pjsip priority to load at.
+  /// @param  host_aliases      - The IP addresses/domains that refer to this proxy.
+  /// @param  sproutlets        - Sproutlets to load in this proxy.
+  /// @param  stateless_proxies - A set of next-hops that are considered to be
+  ///                             stateless proxies.
+  /// @param  scscf_name        - The name of the S-CSCF sproutlet (so we can
+  //                              prioritise this if possible)
   SproutletProxy(pjsip_endpoint* endpt,
                  int priority,
                  const std::string& root_uri,
                  const std::unordered_set<std::string>& host_aliases,
-                 const std::list<Sproutlet*>& sproutlets);
+                 const std::list<Sproutlet*>& sproutlets,
+                 const std::set<std::string>& stateless_proxies,
+                 const std::string scscf_name);
 
   /// Destructor.
   virtual ~SproutletProxy();
@@ -83,13 +90,18 @@ protected:
 
   /// Gets the next target Sproutlet for the message by analysing the top
   /// Route header.
-  Sproutlet* target_sproutlet(pjsip_msg* req, int port, std::string& alias);
+  Sproutlet* target_sproutlet(pjsip_msg* req,
+                              int port,
+                              std::string& alias,
+                              bool& force_external_routing,
+                              SAS::TrailId trail);
 
   /// Compare a SIP URI to a Sproutlet to see if they are a match (e.g.
   /// a message targeted at that URI would arrive at the given Sproutlet).
   bool does_uri_match_sproutlet(const pjsip_uri* uri,
                                 Sproutlet* sproutlet,
-                                std::string& alias);
+                                std::string& alias,
+                                SAS::TrailId trail);
 
   /// Create a URI that routes to a given Sproutlet.
   pjsip_sip_uri* create_sproutlet_uri(pj_pool_t* pool,
@@ -105,22 +117,14 @@ protected:
   /// Defintion of a timer set by an child sproutlet transaction.
   struct SproutletTimerCallbackData
   {
-    SproutletProxy* proxy;
     SproutletProxy::UASTsx* uas_tsx;
     SproutletWrapper* sproutlet_wrapper;
     void* context;
   };
 
-  bool schedule_timer(SproutletProxy::UASTsx* uas_tsx,
-                      SproutletWrapper* sproutlet_wrapper,
-                      void* context,
-                      TimerID& id,
-                      int duration);
-  void cancel_timer(TimerID id);
-  bool timer_running(TimerID id);
-  void on_timer_pop(SproutletProxy::UASTsx* uas_tsx,
-                    SproutletWrapper* sproutlet_wrapper,
-                    void* context);
+  bool schedule_timer(pj_timer_entry* tentry, int duration);
+  bool cancel_timer(pj_timer_entry* tentry);
+  bool timer_running(pj_timer_entry* tentry);
 
   class UASTsx : public BasicProxy::UASTsx
   {
@@ -141,8 +145,7 @@ protected:
     virtual void process_cancel_request(pjsip_rx_data* rdata);
 
     /// Handle a timer pop.
-    void process_timer_pop(SproutletWrapper* tsx,
-                           void* context);
+    static void on_timer_pop(pj_timer_heap_t* th, pj_timer_entry* tentry);
 
   protected:
     /// Handles a response to an associated UACTsx.
@@ -163,8 +166,9 @@ protected:
 
     void schedule_requests();
 
+    void process_timer_pop(pj_timer_entry* tentry);
     bool schedule_timer(SproutletWrapper* tsx, void* context, TimerID& id, int duration);
-    void cancel_timer(TimerID id);
+    bool cancel_timer(TimerID id);
     bool timer_running(TimerID id);
 
     void tx_response(SproutletWrapper* sproutlet,
@@ -176,7 +180,15 @@ protected:
 
     /// Gets the next target Sproutlet for the message by analysing the top
     /// Route header.
-    Sproutlet* target_sproutlet(pjsip_msg* msg, int port, std::string& alias);
+    Sproutlet* target_sproutlet(pjsip_msg* msg,
+                                int port,
+                                std::string& alias,
+                                SAS::TrailId trail);
+    Sproutlet* target_sproutlet(pjsip_msg* msg,
+                                int port,
+                                std::string& alias,
+                                bool& force_external_routing,
+                                SAS::TrailId trail);
 
     /// Checks to see if it is safe to destroy the UASTsx.
     void check_destroy();
@@ -215,13 +227,29 @@ protected:
     /// Parent proxy object
     SproutletProxy* _sproutlet_proxy;
 
+    /// This set holds all the timers created by sproutlet tsxs that are
+    /// children of this UASTsx. They are only freed when the UASTsx is freed
+    /// (they are not freed when a timer pops or is cancelled for example).
+    /// This prevents race conditions (such as a double free caused by one
+    /// thread popping a timer and another thread cancelling it).
+    std::set<pj_timer_entry*> _timers;
+
+    /// This set holds all the timers created by sproutlet tsx that are
+    /// children of this UASTsx that have not popped or been cancelled yet.
+    /// The UASTsx will persist while there are pending timers.
+    std::set<pj_timer_entry*> _pending_timers;
+
     friend class SproutletWrapper;
   };
 
   pjsip_sip_uri* _root_uri;
+  std::map<std::string, pjsip_sip_uri*> _root_uris;
+
   std::unordered_set<std::string> _host_aliases;
 
   std::list<Sproutlet*> _sproutlets;
+
+  std::string _scscf_name;
 
   static const pj_str_t STR_SERVICE;
 
@@ -254,6 +282,7 @@ public:
   const char* msg_info(pjsip_msg*);
   const pjsip_route_hdr* route_hdr() const;
   const std::string& dialog_id() const;
+  pjsip_msg* create_request();
   pjsip_msg* clone_request(pjsip_msg* req);
   pjsip_msg* create_response(pjsip_msg* req,
                              pjsip_status_code status_code,
@@ -278,7 +307,7 @@ private:
   void rx_cancel(pjsip_tx_data* cancel);
   void rx_error(int status_code);
   void rx_fork_error(pjsip_event_id_e event, int fork_id);
-  void on_timer_pop(void* context);
+  void on_timer_pop(TimerID id, void* context);
   void register_tdata(pjsip_tx_data* tdata);
   void deregister_tdata(pjsip_tx_data* tdata);
 
@@ -289,6 +318,7 @@ private:
   void tx_cancel(int fork_id);
   int compare_sip_sc(int sc1, int sc2);
   bool is_uri_local(const pjsip_uri*) const;
+  void log_inter_sproutlet(pjsip_tx_data* tdata, bool downstream);
 
   SproutletProxy* _proxy;
 
@@ -308,11 +338,12 @@ private:
   /// Immutable reference to the original request.  A mutable clone of this
   /// is passed to the Sproutlet.
   pjsip_tx_data* _req;
+  SNMP::SIPRequestTypes _req_type;
 
   typedef std::unordered_map<const pjsip_msg*, pjsip_tx_data*> Packets;
   Packets _packets;
 
-  typedef std::unordered_map<int, pjsip_tx_data*> Requests;
+  typedef std::map<int, pjsip_tx_data*> Requests;
   Requests _send_requests;
 
   typedef std::list<pjsip_tx_data*> Responses;
@@ -323,6 +354,14 @@ private:
   pjsip_tx_data* _best_rsp;
 
   bool _complete;
+
+  // All the actions are performed within SproutletWrapper::process_actions,
+  // including deleting the SproutletWrapper itself.  However, process_actions
+  // can be re-entered - it sends messages, which can fail and call back into
+  // the SproutletWrapper synchronously.  This counter counts how many times
+  // the method has currently been entered - if it is non-zero, the
+  // SproutletWrapper must not be destroyed.
+  int _process_actions_entered;
 
   /// Vector keeping track of the status of each fork.  The state field can
   /// only ever take a subset of the values defined by PJSIP - NULL, CALLING,
@@ -335,6 +374,11 @@ private:
     int cancel_reason;
   } ForkStatus;
   std::vector<ForkStatus> _forks;
+
+  /// Set keeping track of pending timers for this SproutletWrapper.  The
+  /// SproutletWrapper (and the SproutletTsx it wraps) won't be deleted
+  /// until all these timers have popped or been cancelled.
+  std::set<TimerID> _pending_timers;
 
   SAS::TrailId _trail_id;
 

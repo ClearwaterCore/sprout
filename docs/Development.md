@@ -2,7 +2,7 @@
 
 This document describes how to build and test Sprout and Bono.
 
-Sprout development is ongoing on Ubuntu 12.04, so the processes described
+Sprout/Bono development is ongoing on Ubuntu 14.04, so the processes described
 below are targetted for (and tested on) this platform.  The code has been
 written to be portable, though, and should compile on other platforms once the
 required dependencies are installed.
@@ -12,27 +12,19 @@ required dependencies are installed.
 Sprout and Bono depend on a number of tools and libraries.  Some of these are
 included as git submodules, but the rest must be installed separately.
 
-On Ubuntu 12.04,
+On Ubuntu 14.04,
 
-1. add the Clearwater repository to provide the ZeroMQ library
-
-    This step is necessary because Sprout and Bono rely on a newer version than Ubuntu provide.
-
-        echo "deb http://repo.cw-ngv.com/latest binary/" | sudo tee /etc/apt/sources.list.d/clearwater.list
-
-    For non-Ubuntu systems, you can build ZeroMQ from source. The source code is found [here](https://github.com/Metaswitch/zeromq3).  Note that you must install it to `/usr` (i.e. with `./configure --prefix=/usr`).
-
-2.  update the package list
+1.  update the package list
 
         sudo apt-get update
 
-3.  install the required packages
+2.  install the required packages
 
-        sudo apt-get install ntp build-essential autoconf scons pkg-config libtool libcloog-ppl0 gdb pstack git git-svn dpkg-dev devscripts dh-make python-setuptools python-virtualenv python-dev libcurl4-openssl-dev libmysqlclient-dev libgmp10 libgmp-dev libc-ares-dev ncurses-dev libxml2-dev libxslt1-dev libboost-all-dev libzmq3-dev valgrind libxml2-utils rubygems libevent-dev libevent-pthreads-2.0-5 cmake
+        sudo apt-get install ntp build-essential autoconf scons pkg-config libtool libcloog-ppl1 gdb pstack git git-svn dpkg-dev devscripts dh-make python-setuptools python-virtualenv python-dev libcurl4-openssl-dev libmysqlclient-dev libgmp10 libgmp-dev libc-ares-dev ncurses-dev libxml2-dev libxslt1-dev libboost-all-dev libzmq3-dev valgrind libxml2-utils ruby libevent-dev libevent-pthreads-2.0-5 cmake flex bison libboost-filesystem-dev libsnmp-dev
 
 ## Getting the Code
 
-The sprout code is all in the `sprout` repository, and its submodules, which
+The sprout/bono code is all in the `sprout` repository, and its submodules, which
 are in the `modules` subdirectory.
 
 To get all the code, clone the sprout repository with the `--recursive` flag to
@@ -50,8 +42,8 @@ This accesses the repository over SSH on Github, and will not work unless you ha
 Note that the first build can take a long time - up to an hour on a slow
 machine. It takes 20-30 minutes on an EC2 m1.medium instance.
 
-To build sprout and all its dependencies, change to the top-level `sprout`
-directory and issue `make all`.  Both the sprout and bono functions are
+To build sprout, bono, and all their dependencies, change to the top-level `sprout`
+directory and issue `make`.  Both the sprout and bono functions are
 provided by the same "sprout" binary - command-line parameters control which
 behavior the binary performs.
 
@@ -62,7 +54,7 @@ On completion,
 
 Subsequent builds should be quicker, but still check all of the
 dependencies.  For fast builds when you've only changed sprout code, change to
-the `sprout` subdirectory below the top-level `sprout` directory and then run
+the `src` subdirectory below the top-level `sprout` directory and then run
 `make all`.
 
 ## Building Debian Packages
@@ -84,7 +76,7 @@ environment variable to the user and server name.
 
 ## Running Unit Tests
 
-To run the sprout unit test suite, change to the `sprout` subdirectory below
+To run the sprout unit test suite, change to the `src` subdirectory below
 the top-level `sprout` directory and issue `make test`.
 
 Sprout unit tests use the [Google Test](https://code.google.com/p/googletest/)
@@ -125,10 +117,20 @@ The sprout makefile offers the following additional options and targets.
 *   `make debug` runs the tests under gdb.
 *   `make vg_raw` just runs the memory leak checks.
 
-## Running Sprout Locally
+## Running Sprout and Bono Locally
 
-To run sprout on the machine it was built on, change to the top-level `sprout` directory and then run the following command. Note that you will need to enable either S-CSCF, I-CSCF or P-CSCF, and provide a [Homestead](https://github.com/Metaswitch/homestead) server/cluster and a [Chronos](https://github.com/Metaswitch/chronos) host.
+To run sprout or bono on the machine it was built on, change to the top-level `sprout` directory and then run the following command, passing in the appropriate parameters
 
-    LD_LIBRARY_PATH=usr/lib:$LD_LIBRARY_PATH build/bin/sprout -t -s 5054 -H <homestead.server> -K localhost:7253
-    
+    MIBS="" LD_LIBRARY_PATH=usr/lib:$LD_LIBRARY_PATH build/bin/sprout <parameters>
+
+As an example, to run Sprout as a basic S-CSCF on port 5054 run the following command:
+
+    MIBS="" LD_LIBRARY_PATH=usr/lib:$LD_LIBRARY_PATH build/bin/sprout -t --domain=<Home Domain> --hss=<Homestead cluster>
+
+To run bono as a basic P-CSCF on port 5060 run the following command:
+
+    MIBS="" LD_LIBRARY_PATH=usr/lib:$LD_LIBRARY_PATH build/bin/sprout -t --pcscf=5058,5060 --routing-proxy=<I-CSCF address, or S-CSCF if there's no I-CSCF>,0,50,600
+
 For all command-line options, use the `-h` option.
+
+Sprout attempts to connect to the local SNMP agent (snmpd) to provide statistics. If running it interactively, you will see warnings ("Warning (Net-SNMP): Warning: Failed to connect to the agentx master agent ([NIL])") unless you install the `snmpd` package, and configure it as an AgentX master in /etc/snmp/snmpd.conf (http://www.net-snmp.org/docs/README.agentx.html).

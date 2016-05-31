@@ -42,20 +42,23 @@ extern "C" {
 #include <pjsip.h>
 }
 
-#include "regstore.h"
+#include "subscriber_data_manager.h"
 #include "hssconnection.h"
 #include "analyticslogger.h"
 #include "acr.h"
 
 extern pjsip_module mod_subscription;
 
-extern pj_status_t init_subscription(RegStore* registrar_store,
-                                     RegStore* remote_reg_store,
-                                     HSSConnection* hss_connection,
-                                     ACRFactory* rfacr_factory,
-                                     AnalyticsLogger* analytics_logger,
-                                     int cfg_max_expires);
+pj_status_t init_subscription(SubscriberDataManager* sdm,
+                              std::vector<SubscriberDataManager*> remote_sdms,
+                              HSSConnection* hss_connection,
+                              ACRFactory* rfacr_factory,
+                              AnalyticsLogger* analytics_logger,
+                              int cfg_max_expires);
 
-extern void destroy_subscription();
+pj_bool_t request_acceptable_to_subscription_module(pjsip_msg* msg,
+                                                    SAS::TrailId trail);
+
+void destroy_subscription();
 
 #endif

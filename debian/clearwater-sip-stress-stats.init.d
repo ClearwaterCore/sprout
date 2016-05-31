@@ -54,7 +54,7 @@
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 DESC="Clearwater SIP stress statistics"
-NAME=clearwater-sipp-stress-stats
+NAME=clearwater-sip-stress-stats
 PIDFILE=/var/run/$NAME.pid
 LOGFILE=/var/log/$NAME.log
 DAEMON=/usr/bin/ruby
@@ -129,7 +129,7 @@ do_reload() {
         # restarting (for example, when it is sent a SIGHUP),
         # then implement that here.
         #
-        start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDILE --exec $DAEMON
+        start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE --exec $DAEMON
         return 0
 }
 

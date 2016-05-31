@@ -47,6 +47,7 @@
 #include "servercaps.h"
 #include "acr.h"
 
+#include "rapidjson/document.h"
 
 /// Class implementing common routing functions of an I-CSCF.
 class ICSCFRouter
@@ -55,10 +56,11 @@ public:
   ICSCFRouter(HSSConnection* hss,
               SCSCFSelector* scscf_selector,
               SAS::TrailId trail,
-              ACR* acr);
+              ACR* acr,
+              int port);
   virtual ~ICSCFRouter();
 
-  int get_scscf(pj_pool_t* pool, pjsip_sip_uri*& scscf_uri);
+  int get_scscf(pj_pool_t* pool, pjsip_sip_uri*& scscf_uri, bool do_billing=false);
 
 protected:
   /// Do the HSS query.  This must be implemented by the request-type specific
@@ -66,10 +68,10 @@ protected:
   virtual int hss_query() = 0;
 
   /// Parses the HSS response.
-  int parse_hss_response(Json::Value& rsp, bool queried_caps);
+  int parse_hss_response(rapidjson::Document*& rsp, bool queried_caps);
 
   /// Parses a set of capabilities in the HSS response.
-  bool parse_capabilities(Json::Value& caps, std::vector<int>& parsed_caps);
+  bool parse_capabilities(rapidjson::Value& caps, std::vector<int>& parsed_caps);
 
   /// Homestead connection class for performing HSS queries.
   HSSConnection* _hss;
@@ -82,6 +84,9 @@ protected:
 
   /// The ACR for the request if ACR reported is enabled, NULL otherwise.
   ACR* _acr;
+
+  // Port that I-CSCF is listening on
+  int _port;
 
   /// Flag which indicates whether or not we have asked the HSS for
   /// capabilities and got a successful response (even if there were no
@@ -105,6 +110,7 @@ public:
                 SCSCFSelector* scscf_selector,
                 SAS::TrailId trail,
                 ACR* acr,
+                int port,
                 const std::string& impi,
                 const std::string& impu,
                 const std::string& visited_network,
@@ -138,6 +144,7 @@ public:
                  SCSCFSelector* scscf_selector,
                  SAS::TrailId trail,
                  ACR* acr,
+                 int port,
                  const std::string& impu,
                  bool originating);
   ~ICSCFLIRouter();

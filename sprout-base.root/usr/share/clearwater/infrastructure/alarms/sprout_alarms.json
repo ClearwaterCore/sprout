@@ -1,0 +1,257 @@
+{
+    "alarms": [
+        {
+            "index": 1000,
+            "cause": "SOFTWARE_ERROR",
+            "name": "SPROUT_PROCESS_FAIL",
+            "levels": [
+                {
+                    "severity": "CLEARED",
+                    "details": "The Sprout process has been restored to normal operation.",
+                    "description": "Sprout: Process failure cleared.",
+                    "cause": "The Sprout process has been restored to normal operation. The previously issued alarm has been cleared.",
+                    "effect": "Normal Sprout I-CSCF, S-CSCF, and BGCF operation has been restored.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "CRITICAL",
+                    "details": "Monit has detected that the Sprout process has failed. Monit will automatically attempt to restart it. If this alarm does not clear, the Sprout process may have been stopped or an unrecoverable failure may have occurred.",
+                    "description": "Sprout: Process failure.",
+                    "cause": "The system has detected that the Sprout process has failed. Monit will automatically attempt to restart it. If this alarm does not clear, the Sprout process may have been stopped or an unrecoverable failure may have occurred.",
+                    "effect": "In progress I-CSCF, S-CSCF, and BGCF SIP transactions are interrupted and may require retransmission by the SIP clients. If a single Sprout process failed then there is no significant effect to traffic capacity. If multiple Sprout processes fail then calls will fail and traffic capacity will be reduced.",
+                    "action": "The process will automatically be restarted and the craftsperson must monitor for the alarm to clear and confirm that the I-CSCF, S-CSCF, and BGCF are operating normally. If the failed Sprout node fails to return to service then contact your support representative."
+                }
+            ]
+        },
+        {
+            "index": 1001,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_HOMESTEAD_COMM_ERROR",
+            "levels": [
+                {
+                    "severity": "CLEARED",
+                    "details": "Sprout communication to at least one Homestead has been restored.",
+                    "description": "Sprout: Homestead communication error cleared.",
+                    "cause": "Sprout communication to at least one Homestead has been restored. The previously issued alarm has been cleared.",
+                    "effect": "Normal HSS communications have been restored.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "CRITICAL",
+                    "details": "Sprout is unable to contact any Homesteads. It will periodically attempt to reconnect. If this alarm does not clear, ensure that at least one Homestead is operational and that network connectivity exists between it and Sprout.",
+                    "description": "Sprout: Homestead communication error.",
+                    "cause": "Sprout is unable to contact any Homesteads.",
+                    "effect": "If multiple Sprout processes have raised this alarm, then this is potentially a total service affecting failure since the I-CSCF and S-CSCF cannot communicate with the HSS, and all new initial SIP requests will fail and existing SIP transactions may not complete normally. Registrations will eventually timeout and subscribers cannot re-register.",
+                    "action": "Ensure that one or more Homestead nodes are operational and that network connectivity exists between them and Sprout. If this alarm does not clear, then contact your support representative."
+                }
+            ]
+        },
+        {
+            "index": 1002,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_MEMCACHED_COMM_ERROR",
+            "levels": [
+                {
+                    "severity": "CLEARED",
+                    "details": "Sprout communication to Memcached has been restored.",
+                    "description": "Sprout: Memcached communication error cleared.",
+                    "cause": "Sprout communication to Memcached has been restored. The previously issued alarm has been cleared.",
+                    "effect": "Normal S-CSCF operation has been restored.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "CRITICAL",
+                    "details": "Sprout is unable to contact any Memcached processes. It will periodically attempt to reconnect. If this alarm does not clear, ensure that at least one Memcached is operational and that network connectivity exists between it and Sprout.",
+                    "description": "Sprout: Memcached communication error.",
+                    "cause": "Sprout is unable to contact any Memcached processes.",
+                    "effect": "If multiple Sprout processes have raised this alarm, then this is potentially a total service affecting failure because the S-CSCF cannot access the Memcached database for authentication vectors and registration data, meaning that all new SIP transactions will fail and existing SIP transactions may not complete normally.",
+                    "action": "Ensure that all Memcached processes are operational and that network connectivity exists between them and Sprout. If the alarm does not clear then contact your support representative."
+                }
+            ]
+        },
+        {
+            "index": 1003,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_REMOTE_MEMCACHED_COMM_ERROR",
+            "levels": [
+                {
+                    "severity": "CLEARED",
+                    "details": "Sprout communication to the remote Memcached site has been restored.",
+                    "description": "Sprout: Remote Memcached communication error cleared.",
+                    "cause": "Sprout communication to the remote Memcached site has been restored. The previously issued alarm has been cleared.",
+                    "effect": "Normal S-CSCF remote site synchronization has been restored.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "CRITICAL",
+                    "details": "Sprout is unable to contact any remote Memcached processes. It will periodically attempt to reconnect. If this alarm does not clear, ensure that at least one remote Memcached is operational and that network connectivity exists between it and Sprout.",
+                    "description": "Sprout: Remote Memcached communication error.",
+                    "cause": "Sprout is unable to contact any remote Memcached processes.",
+                    "effect": "The deployment is no longer geographically redundant because the S-CSCF cannot synchronize registration data to the remote site. If subscribers switch to the other geographic site they may have to re-register before becoming operational.",
+                    "action": "Ensure that all remote Memcached processes are operational and that network connectivity exists between them and Sprout. If the alarm does not clear then contact your support representative."
+                }
+            ]
+        },
+        {
+            "index": 1004,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_CHRONOS_COMM_ERROR",
+            "levels": [
+                {
+                    "severity": "CLEARED",
+                    "details": "Sprout communication to the local Chronos has been restored.",
+                    "description": "Sprout: Chronos communication error cleared.",
+                    "cause": "Sprout communication to the local Chronos has been restored. The previously issued alarm has been cleared.",
+                    "effect": "Normal S-CSCF timer operations have been restored.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "MAJOR",
+                    "details": "Sprout is unable to contact the local Chronos process. It will periodically attempt to reconnect. If this alarm does not clear, investigate the health of the Chronos cluster and ensure that the local Chronos is operational.",
+                    "description": "Sprout: Chronos communication error.",
+                    "cause": "Sprout is unable to contact the local Chronos process.",
+                    "effect": "Chronos failures will not cause any new requests to be rejected, but will mean that the appropriate notification messages (NOTIFYs, Server-Assignment-Requests to the HSS) will not be generated when registrations or subscriptions expire. Users will be able to re-register/re-subscribe later. From the HSS's point of view it will still regard the subscriber as registered (requests will be sent to the same S-CSCF, and unregistered services like voicemail will not be applied).",
+                    "action": "Ensure that the local Chronos is operational. If this alarm does not clear, then contact your support representative."
+                }
+            ]
+        },
+        {
+            "index": 1005,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_RALF_COMM_ERROR",
+            "levels": [
+                {
+                    "severity": "CLEARED",
+                    "details": "Sprout communication to at least one Ralf has been restored.",
+                    "description": "Sprout: Ralf communication error cleared.",
+                    "cause": "Sprout communication to at least one Ralf has been restored. The previously issued alarm has been cleared.",
+                    "effect": "Normal call detail event recording by the I-CSCF and the S-CSCF has been restored.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "MAJOR",
+                    "details": "Sprout is unable to contact any Ralfs. It will periodically attempt to reconnect. If this alarm does not clear, ensure that at least one Ralf is operational and that network connectivity exists between it and Sprout.",
+                    "description": "Sprout: Ralf communication error.",
+                    "cause": "Sprout is unable to contact any Ralfs.",
+                    "effect": "Call detail event recording by the I-CSCF and S-CSCF for offline billing is no longer operational. Active calls are preserved and new calls are allowed but the service provider is no longer able to bill for the calls.",
+                    "action": "Monitor for this alarm to clear. If this alarm does not clear, ensure that at least one Ralf is operational and that network connectivity exists between it and Sprout. If Ralf does not return to service then contact your support representative."
+                }
+            ]
+        },
+        {
+            "index": 1006,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_ENUM_COMM_ERROR",
+            "levels": [
+                {
+                    "severity": "CLEARED",
+                    "details": "Sprout communication to the ENUM server has been restored.",
+                    "description": "Sprout: ENUM communication error cleared.",
+                    "cause": "Sprout communication to at least one ENUM server has been restored. The previously issued alarm has been cleared.",
+                    "effect": "Normal ENUM services have been restored.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "MAJOR",
+                    "details": "Sprout is unable to contact any ENUM servers. It will periodically attempt to reconnect. If this alarm does not clear, ensure that the ENUM servers are operational and that network connectivity exists between them and Sprout.",
+                    "description": "Sprout: ENUM communication error.",
+                    "cause": "Sprout is unable to contact any ENUM servers.",
+                    "effect": "If the ENUM servers are not contactable then off-net calls will fail or be misrouted. Additionally, the I-CSCF cannot make ENUM queries for tel URIs after a LIR request to the HSS has failed.",
+                    "action": "Monitor for this alarm to clear. If this alarm does not clear, ensure that an ENUM server is operational and that network connectivity exists between it and Sprout. Check the configuration file for correct configuration of the ENUM servers. If the ENUM servers do not return to service then you may need to contact your ENUM server vendor."
+                }
+            ]
+        },
+        {
+            "index": 1007,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_VBUCKET_ERROR",
+            "levels": [
+                {
+                    "severity": "CLEARED",
+                    "details": "Sprout communication to Memcached has been restored for all subscribers.",
+                    "description": "Sprout: Memcached vBucket communication error cleared.",
+                    "cause": "Sprout communication to Memcached has been restored for all subscribers. The previously issued alarm has been cleared.",
+                    "effect": "Normal S-CSCF call processing operation has been restored for the affected subscribers.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "MAJOR",
+                    "details": "Sprout is unable to contact any Memcached processes for a subset of subscribers, and so some subscriber data will be unavailable. Ensure that all Memcached processes are operational and that network connectivity exists between them and Sprout.",
+                    "description": "Sprout: Memcached vBucket communication error.",
+                    "cause": "Sprout is unable to contact any Memcached processes for a subset of subscribers.",
+                    "effect": "A subset of the subscribers can no longer register or originate and receive calls because the S-CSCF cannot access the vBucket or the replica vBucket for those subscribers.",
+                    "action": "Ensure that all Memcached processes are operational and that network connectivity exists between them and Sprout. If the alarm does not clear then contact your support representative."
+                }
+            ]
+        },
+        {
+            "index": 1008,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_REMOTE_VBUCKET_ERROR",
+            "levels": [
+                {
+                    "severity": "CLEARED",
+                    "details": "Sprout communication to the remote Memcached site has been restored for all subscribers.",
+                    "description": "Sprout: Memcached remote vBucket communication error cleared.",
+                    "cause": "Sprout communication to the Memcached site has been restored for all subscribers. The previously issued alarm has been cleared.",
+                    "effect": "Normal S-CSCF geographic redundancy operation has been restored for the affected subscribers.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "MAJOR",
+                    "details": "Sprout is unable to contact any remote Memcached processes for a subset of subscribers, so some subscriber data will be unavailable. Ensure that all remote Memcached processes are operational and that network connectivity exists between them and Sprout.",
+                    "description": "Sprout: Memcached remote vBucket communication error.",
+                    "cause": "Sprout is unable to contact any remote Memcached processes for a subset of subscribers.",
+                    "effect": "The deployment is no longer geographically redundant for a subset of subscribers because the S-CSCF cannot synchronize registration data and authentication vectors to the remote site.",
+                    "action": "Ensure that all remote Memcached processes are operational and that network connectivity exists between them and Sprout. If the alarm does not clear then contact your support representative."
+                }
+            ]
+        },
+        {
+            "index": 1009,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_SESS_TERMINATED_AS_COMM_ERROR",
+            "levels" : [
+                {
+                    "severity": "cleared",
+                    "details": "Sprout communication to all active session terminated Application Servers has been restored.",
+                    "description": "Sprout: Communication error to session terminated Application Servers cleared.",
+                    "cause": "Sprout communication to all active Application Servers that use session terminated iFC default handling has been restored. The previously issued alarm has been cleared. ",
+                    "effect": "Normal Application Server communications have been restored.",
+                    "action": "No action."
+                },
+                {
+                    "severity": "major",
+                    "details": "Sprout cannot successfully communicate with one or more Application Servers that use session terminated default handling. Check that all ASs are operational, they have network connectivity to Sprout, and iFCs are properly configured.",
+                    "description": "Sprout: Communication error to session terminated Application Server.",
+                    "cause": "Sprout is unable to successfully communicate with at least one active Application Server that uses session terminated iFC default handling. ",
+                    "effect": "Probable major loss of service. The precise impact will vary depending on the role of Application Servers in the deployment. ",
+                    "action": "Use ENT logs to identify which Application Servers cannot be successfully communicated with and investigate the cause. It might be due to failure of an AS, misconfiguration of Initial Filter Criteria, or network / DNS problems. Once the issue has been resolved this alarm will clear after approximately 5-10 minutes."
+                }
+            ]
+        },
+        {
+            "index": 1010,
+            "cause": "UNDERLYING_RESOURCE_UNAVAILABLE",
+            "name": "SPROUT_SESS_CONTINUED_AS_COMM_ERROR",
+            "levels": [
+                {
+                    "severity": "cleared",
+                    "details": "Sprout communication to all active session continued Application Servers has been restored",
+                    "description": "Sprout: Communication error to session continued Application Servers cleared.",
+                    "cause": "Sprout communication to all active Application Servers that use session continued iFC default handling has been restored. The previously issued alarm has been cleared.",
+                    "effect": "Normal Application Server communications have been restored",
+                    "action": "No action"
+                },
+                {
+                    "severity": "minor",
+                    "details": "Sprout cannot successfully communicate with one or more Application Servers that use session continued default handling. Check that all ASs are operational, they have network connectivity to Sprout, and iFCs are properly configured.",
+                    "description": "Sprout: Communication error to session continued Application Server.",
+                    "cause": "Sprout is unable to successfully communicate with at least one active Application Server that uses session continued iFC default handling.",
+                    "effect": "Probable minor degradation of service, or loss of a supplemental service. The precise impact will vary depending on the role of Application Servers in the deployment.",
+                    "action": "Use ENT logs to identify which Application Servers cannot be successfully communicated with and investigate the cause. It might be due to failure of an AS, misconfiguration of Initial Filter Criteria, or network / DNS problems. Once the issue has been resolved this alarm will clear after approximately 5-10 minutes."
+                }
+            ]
+        }
+    ]
+}

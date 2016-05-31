@@ -34,27 +34,33 @@
 # under which the OpenSSL Project distributes the OpenSSL toolkit software,
 # as those licenses appear in the file LICENSE-OPENSSL.
 
-. /etc/clearwater/config
-
 # Set up the monit configuration for bono with the right IP addresses and ports
 cat > /etc/monit/conf.d/bono.monit <<EOF
-# Poll every 10 seconds
-set daemon 10
+# Check the Bono process.
 
-# Check the server's public interfaces.  We put this first so that we process
-# failed polls (and maybe kill the server) before we process the restart.
-check program poll_bono with path "/usr/share/clearwater/bin/poll_bono.sh"
-  if status != 0 for 2 cycles then exec "/etc/init.d/bono abort"
+# Monitor the service's PID file and memory use.
+check process bono_process with pidfile /var/run/bono/bono.pid
+  group bono
 
-# Monitor the server's PID file and check its memory usage.
-check process bono pidfile /var/run/bono.pid
   start program = "/etc/init.d/bono start"
   stop program = "/etc/init.d/bono stop"
-  if memory is greater than 80% for 3 cycles
-     then exec "/etc/init.d/bono abort-restart"
+  restart program = "/etc/init.d/bono restart"
+
+  # Check the service's resource usage, and abort the process if it's too high. This will
+  # generate a core file and trigger diagnostics collection. 
+  if memory > 80% for 6 cycles then exec "/etc/init.d/bono abort"
+
+# Check the SIP interface. This depends on the Bono process (and so won't run
+# unless the Bono process is running)
+check program poll_bono with path "/usr/share/clearwater/bin/poll_bono.sh"
+  group bono
+  depends on bono_process
+
+  # Aborting generates a core file and triggers diagnostic collection.
+  if status != 0 for 2 cycles then exec "/etc/init.d/bono abort"
 EOF
 chmod 0644 /etc/monit/conf.d/bono.monit
 
 # Force monit to reload its configuration
-service monit reload
+reload clearwater-monit || true
 

@@ -55,8 +55,8 @@
 class DNSResolver
 {
 public:
-  DNSResolver(const struct IP46Address& server);
-  ~DNSResolver();
+  DNSResolver(const std::vector<struct IP46Address>& servers);
+  virtual ~DNSResolver();
   // Helper function wrapping the destructor for use as thread-local callbacks.
   static void destroy(DNSResolver* resolver);
   // Perform a NAPTR query for the specified domain, returning the results in
@@ -99,6 +99,8 @@ private:
   // The reply data structure.  Only valid between ares_callback and
   // perform_naptr_query returning, and only if _status is ARES_SUCCESS.
   struct ares_naptr_reply* _naptr_reply;
+  // Pointer to a linked list of servers
+  struct ares_addr_node _ares_addrs[3];
 
 };
 
@@ -110,8 +112,9 @@ class DNSResolverFactory
 {
 public:
   inline DNSResolverFactory() {};
+  virtual ~DNSResolverFactory() {}
   // Create a new resolver.
-  virtual DNSResolver* new_resolver(const struct IP46Address& server) const;
+  virtual DNSResolver* new_resolver(const std::vector<struct IP46Address>& servers) const;
 
 };
 

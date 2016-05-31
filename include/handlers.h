@@ -41,9 +41,9 @@
 #include "httpstack_utils.h"
 #include "chronosconnection.h"
 #include "hssconnection.h"
-#include "regstore.h"
+#include "subscriber_data_manager.h"
 #include "sipresolver.h"
-#include "avstore.h"
+#include "impistore.h"
 
 /// Common factory for all handlers that deal with chronos timer pops. This is
 /// a subclass of SpawningHandler that requests HTTP flows to be
@@ -63,22 +63,26 @@ public:
   }
 };
 
-class RegistrationTimeoutTask : public HttpStackUtils::Task
+class AoRTimeoutTask : public HttpStackUtils::Task
 {
 public:
   struct Config
   {
-    Config(RegStore* store, RegStore* remote_store, HSSConnection* hss) :
-      _store(store), _remote_store(remote_store), _hss(hss)
-      {}
-    RegStore* _store;
-    RegStore* _remote_store;
+    Config(SubscriberDataManager* sdm,
+           std::vector<SubscriberDataManager*> remote_sdms,
+           HSSConnection* hss) :
+      _sdm(sdm),
+      _remote_sdms(remote_sdms),
+      _hss(hss)
+    {}
+    SubscriberDataManager* _sdm;
+    std::vector<SubscriberDataManager*> _remote_sdms;
     HSSConnection* _hss;
   };
 
-  RegistrationTimeoutTask(HttpStack::Request& req,
-                          const Config* cfg,
-                          SAS::TrailId trail) :
+  AoRTimeoutTask(HttpStack::Request& req,
+                       const Config* cfg,
+                       SAS::TrailId trail) :
     HttpStackUtils::Task(req, trail), _cfg(cfg)
   {};
 
@@ -87,17 +91,16 @@ public:
 protected:
   void handle_response();
   HTTPCode parse_response(std::string body);
-  RegStore::AoR* set_aor_data(RegStore* current_store,
-                              std::string aor_id,
-                              RegStore::AoR* previous_aor_data,
-                              RegStore* remote_store,
-                              bool update_chronos,
-                              bool& all_bindings_expired);
+  SubscriberDataManager::AoRPair* set_aor_data(
+                        SubscriberDataManager* current_sdm,
+                        std::string aor_id,
+                        SubscriberDataManager::AoRPair* previous_aor_data,
+                        std::vector<SubscriberDataManager*> remote_sdms,
+                        bool& all_bindings_expired);
 
 protected:
   const Config* _cfg;
   std::string _aor_id;
-  std::string _binding_id;
 };
 
 class DeregistrationTask : public HttpStackUtils::Task
@@ -105,13 +108,22 @@ class DeregistrationTask : public HttpStackUtils::Task
 public:
   struct Config
   {
-    Config(RegStore* store, RegStore* remote_store, HSSConnection* hss, SIPResolver* sipresolver) :
-      _store(store), _remote_store(remote_store), _hss(hss), _sipresolver(sipresolver)
-      {}
-    RegStore* _store;
-    RegStore* _remote_store;
+    Config(SubscriberDataManager* sdm,
+           std::vector<SubscriberDataManager*> remote_sdms,
+           HSSConnection* hss,
+           SIPResolver* sipresolver,
+           ImpiStore* impi_store) :
+      _sdm(sdm),
+      _remote_sdms(remote_sdms),
+      _hss(hss),
+      _sipresolver(sipresolver),
+      _impi_store(impi_store)
+    {}
+    SubscriberDataManager* _sdm;
+    std::vector<SubscriberDataManager*> _remote_sdms;
     HSSConnection* _hss;
     SIPResolver* _sipresolver;
+    ImpiStore* _impi_store;
   };
 
 
@@ -124,12 +136,13 @@ public:
   void run();
   HTTPCode handle_request();
   HTTPCode parse_request(std::string body);
-  RegStore::AoR* set_aor_data(RegStore* current_store,
-                              std::string aor_id,
-                              std::string private_id,
-                              RegStore::AoR* previous_aor_data,
-                              RegStore* remote_store,
-                              bool is_primary);
+  SubscriberDataManager::AoRPair* deregister_bindings(
+                    SubscriberDataManager* current_sdm,
+                    std::string aor_id,
+                    std::string private_id,
+                    SubscriberDataManager::AoRPair* previous_aor_data,
+                    std::vector<SubscriberDataManager*> remote_sdms,
+                    std::set<std::string>& impis_to_delete);
 
 protected:
   const Config* _cfg;
@@ -142,9 +155,9 @@ class AuthTimeoutTask : public HttpStackUtils::Task
 public:
   struct Config
   {
-  Config(AvStore* store, HSSConnection* hss) :
-    _avstore(store), _hss(hss) {}
-    AvStore* _avstore;
+  Config(ImpiStore* store, HSSConnection* hss) :
+    _impi_store(store), _hss(hss) {}
+    ImpiStore* _impi_store;
     HSSConnection* _hss;
   };
   AuthTimeoutTask(HttpStack::Request& req,

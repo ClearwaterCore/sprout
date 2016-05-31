@@ -37,9 +37,9 @@
 # This script uses a SIP message to poll a process and check whether it is
 # healthy.
 
-# In case bono has only just restarted, give it a few seconds to come up
-sleep 5
+. /etc/clearwater/config
+[ -z $signaling_namespace ] || namespace_prefix="ip netns exec $signaling_namespace"
 
 # Just call into the poll-sip script, specifying our port.
-/usr/share/clearwater/bin/poll-sip 5058
+$namespace_prefix /usr/share/clearwater/bin/poll-sip 5058
 exit $?
