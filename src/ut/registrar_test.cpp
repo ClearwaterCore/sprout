@@ -84,12 +84,6 @@ public:
                                      &SNMP::FAKE_REGISTRATION_STATS_TABLES,
                                      &SNMP::FAKE_THIRD_PARTY_REGISTRATION_STATS_TABLES);
     ASSERT_EQ(PJ_SUCCESS, ret);
-
-    _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED, "");
-    _hss_connection->set_impu_result("tel:6505550231", "reg", HSSConnection::STATE_REGISTERED, "");
-    _hss_connection->set_rc("/impu/sip%3A6505550231%40homedomain/reg-data", HTTP_OK);
-    _chronos_connection->set_result("", HTTP_OK);
-    _chronos_connection->set_result("post_identity", HTTP_OK);
   }
 
   static void TearDownTestCase()
@@ -104,6 +98,22 @@ public:
     delete _local_data_store; _local_data_store = NULL;
     delete _chronos_connection; _chronos_connection = NULL;
     SipTest::TearDownTestCase();
+  }
+
+  void SetUp()
+  {
+    _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED, "");
+    _hss_connection->set_impu_result("tel:6505550231", "reg", HSSConnection::STATE_REGISTERED, "");
+    _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED, "");
+    _hss_connection->set_rc("/impu/sip%3A6505550231%40homedomain/reg-data", HTTP_OK);
+    _chronos_connection->set_result("", HTTP_OK);
+    _chronos_connection->set_result("post_identity", HTTP_OK);
+  }
+
+  void TearDown()
+  {
+    _hss_connection->flush_all();
+    _chronos_connection->flush_all();
   }
 
   RegistrarTest() : SipTest(&mod_registrar)
@@ -129,9 +139,6 @@ public:
     ((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_THIRD_PARTY_REGISTRATION_STATS_TABLES.init_reg_tbl)->reset_count(); 
     ((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_THIRD_PARTY_REGISTRATION_STATS_TABLES.re_reg_tbl)->reset_count(); 
     ((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_THIRD_PARTY_REGISTRATION_STATS_TABLES.de_reg_tbl)->reset_count(); 
-    // Stop and restart the layer just in case
-    //pjsip_tsx_layer_instance()->stop();
-    //pjsip_tsx_layer_instance()->start();
   }
 
   void check_notify(pjsip_msg* out,
@@ -1002,6 +1009,27 @@ TEST_F(RegistrarTest, AppServersWithNoBody)
 /// Verify that third-party REGISTERs have appropriate headers passed through
 TEST_F(RegistrarTest, AppServersPassthrough)
 {
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED,
+                              "<IMSSubscription><ServiceProfile>\n"
+                              "  <PublicIdentity><Identity>sip:6505550231@homedomain</Identity></PublicIdentity>\n"
+                              "  <InitialFilterCriteria>\n"
+                              "    <Priority>1</Priority>\n"
+                              "    <TriggerPoint>\n"
+                              "      <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                              "      <SPT>\n"
+                              "        <ConditionNegated>0</ConditionNegated>\n"
+                              "        <Group>0</Group>\n"
+                              "        <Method>REGISTER</Method>\n"
+                              "        <Extension></Extension>\n"
+                              "      </SPT>\n"
+                              "    </TriggerPoint>\n"
+                              "    <ApplicationServer>\n"
+                              "      <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                              "      <DefaultHandling>0</DefaultHandling>\n"
+                              "    </ApplicationServer>\n"
+                              "  </InitialFilterCriteria>\n"
+                              "</ServiceProfile></IMSSubscription>");
+
   TransportFlow tpAS(TransportFlow::Protocol::UDP, stack_data.scscf_port, "1.2.3.4", 56789);
 
   SCOPED_TRACE("REGISTER (1)");
@@ -1964,7 +1992,6 @@ TEST_F(RegistrarTest, EmergencyDeregistration)
   free_txdata();
 }
 
-
 // Test multiple emergency and standard registrations.
 TEST_F(RegistrarTest, MultipleEmergencyRegistrations)
 {
@@ -2096,7 +2123,6 @@ TEST_F(RegistrarTest, MultipleEmergencyRegistrations)
   delete aor_data; aor_data = NULL;
 }
 
-
 /// Simple correct example with rinstance parameter in Contact URI
 TEST_F(RegistrarTest, RinstanceParameter)
 {
@@ -2125,6 +2151,7 @@ TEST_F(RegistrarTest, RinstanceParameter)
 // are sent
 TEST_F(RegistrarTest, RegistrationWithSubscription)
 {
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED, "", "?private_id=Alice");
   std::string aor = "sip:6505550231@homedomain";
   std::string aor_brackets = "<" + aor + ">";
   // We have a private ID in this test, so set up the expect response
@@ -2208,6 +2235,7 @@ TEST_F(RegistrarTest, RegistrationWithSubscription)
 // exists.
 TEST_F(RegistrarTest, NoNotifyToUnregisteredUser)
 {
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED, "", "?private_id=Alice");
   std::string aor = "sip:6505550231@homedomain";
   std::string aor_brackets = "<" + aor + ">";
   // We have a private ID in this test, so set up the expect response
@@ -2264,6 +2292,7 @@ TEST_F(RegistrarTest, NoNotifyToUnregisteredUser)
 
 TEST_F(RegistrarTest, MultipleRegistrationsWithSubscription)
 {
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED, "", "?private_id=Alice");
   std::string aor = "sip:6505550231@homedomain";
   std::string aor_brackets = "<" + aor + ">";
   // We have a private ID in this test, so set up the expect response

@@ -430,7 +430,10 @@ SubscriberDataManager::AoRPair* write_to_store(
   if (all_bindings_expired)
   {
     TRC_DEBUG("All bindings have expired - triggering deregistration at the HSS");
-    hss->update_registration_state(aor, "", HSSConnection::DEREG_USER, trail);
+    hss->update_registration_state(aor,
+                                   "",
+                                   HSSConnection::DEREG_USER,
+                                   trail);
   }
 
   out_is_initial_registration = is_initial_registration;

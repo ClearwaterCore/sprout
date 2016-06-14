@@ -330,7 +330,7 @@ static void usage(void)
        "                            Target latency above which throttling applies for the Cassandra store\n"
        "                            that's part of the Memento application server (default: 1000000)\n"
        "     --max-tokens N         Maximum number of tokens allowed in the token bucket (used by\n"
-       "                            the throttling code (default: 20))\n"
+       "                            the throttling code (default: 1000))\n"
        "     --init-token-rate N    Initial token refill rate of tokens in the token bucket (used by\n"
        "                            the throttling code (default: 100.0))\n"
        "     --min-token-rate N     Minimum token refill rate of tokens in the token bucket (used by\n"
@@ -1420,7 +1420,7 @@ int main(int argc, char* argv[])
   opt.call_list_ttl = 604800;
   opt.target_latency_us = 100000;
   opt.cass_target_latency_us = 1000000;
-  opt.max_tokens = 20;
+  opt.max_tokens = 1000;
   opt.init_token_rate = 100.0;
   opt.min_token_rate = 10.0;
   opt.log_to_file = PJ_FALSE;
@@ -1527,6 +1527,7 @@ int main(int argc, char* argv[])
     analytics_logger = new AnalyticsLogger(analytics_logger_logger);
   }
 
+  std::vector<std::string> sproutlet_uris;
   SPROUTLET_MACRO(SPROUTLET_VERIFY_OPTIONS)
 
   if ((!opt.pcscf_enabled) && (!opt.enabled_scscf) && (!opt.enabled_icscf))
@@ -1805,6 +1806,7 @@ int main(int argc, char* argv[])
                       opt.home_domain,
                       opt.additional_home_domains,
                       opt.uri_scscf,
+                      opt.sprout_hostname,
                       opt.alias_hosts,
                       sip_resolver,
                       opt.pjsip_threads,
@@ -1814,7 +1816,8 @@ int main(int argc, char* argv[])
                       opt.sip_tcp_connect_timeout,
                       opt.sip_tcp_send_timeout,
                       quiescing_mgr,
-                      opt.billing_cdf);
+                      opt.billing_cdf,
+                      sproutlet_uris);
 
   if (status != PJ_SUCCESS)
   {
@@ -1877,7 +1880,8 @@ int main(int argc, char* argv[])
                                        homestead_sar_latency_table,
                                        homestead_uar_latency_table,
                                        homestead_lir_latency_table,
-                                       hss_comm_monitor);
+                                       hss_comm_monitor,
+                                       opt.uri_scscf);
   }
 
   if ((opt.enabled_scscf) || (opt.enabled_icscf))
