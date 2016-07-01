@@ -149,6 +149,7 @@ enum OptionTypes
   OPT_IMPI_STORE_MODE,
   OPT_NONCE_COUNT_SUPPORTED,
   OPT_SAS_USE_SIGNALING_IF,
+  OPT_SCSCF_NODE_URI,
 };
 
 
@@ -228,6 +229,7 @@ const static struct pj_getopt_option long_opt[] =
   { "impi-store-mode",              required_argument, 0, OPT_IMPI_STORE_MODE},
   { "nonce-count-supported",        no_argument,       0, OPT_NONCE_COUNT_SUPPORTED},
   { "sas-use-signaling-interface",  no_argument,       0, OPT_SAS_USE_SIGNALING_IF},
+  { "scscf-node-uri",               required_argument, 0, OPT_SCSCF_NODE_URI},
   { NULL,                           0,                 0, 0}
 };
 
@@ -413,6 +415,9 @@ static void usage(void)
        "     --sas-use-signaling-interface\n"
        "                            Whether SAS traffic is to be dispatched over the signaling network\n"
        "                            interface rather than the default management interface\n"
+       "     --scsf-node-uri <URI>\n"
+       "                            The URI of this S-CSCF used by other servers, including AS, to contact\n"
+       "                            this specific node. Defaults to \"sip:<localhost>:<port_scscf>\"."
        "     --pidfile=<filename>   Write pidfile\n"
        " -N, --plugin-option <plugin>,<name>,<value>\n"
        "                            Provide an option value to a plugin.\n"
@@ -1108,6 +1113,10 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
       }
       break;
 
+    case OPT_SCSCF_NODE_URI:
+      options->scscf_node_uri = std::string(pj_optarg);
+      break;
+
     case OPT_SPROUT_HOSTNAME:
       options->sprout_hostname = std::string(pj_optarg);
       break;
@@ -1450,6 +1459,7 @@ int main(int argc, char* argv[])
   opt.impi_store_mode = ImpiStore::Mode::READ_IMPI_WRITE_IMPI;
   opt.nonce_count_supported = false;
   opt.sas_signaling_if = false;
+  opt.scscf_node_uri = "";
 
   // Initialise ENT logging before making "Started" log
   PDLogStatic::init(argv[0]);
