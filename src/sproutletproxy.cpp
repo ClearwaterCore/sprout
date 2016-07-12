@@ -206,14 +206,14 @@ Sproutlet* SproutletProxy::target_sproutlet(pjsip_msg* req,
       (sproutlet->service_name() == "scscf") &&
       (request_acceptable_to_subscription_module(req, 0)))
   {
-    // This is a subscribe being routed back to the S-CSCF sproutlet but to 
-    // get this handled correctly we need route it externally to make sure it 
+    // This is a subscribe being routed back to the S-CSCF sproutlet but to
+    // get this handled correctly we need route it externally to make sure it
     // hits the subscription module.
     TRC_DEBUG("Don't route S-CSCF subscribe message via sproutlet");
     force_external_routing = true;
     sproutlet = NULL;
   }
-  
+
   return sproutlet;
 }
 
