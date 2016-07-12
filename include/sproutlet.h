@@ -566,7 +566,7 @@ public:
 
   SNMP::SuccessFailCountByRequestTypeTable* _incoming_sip_transactions_tbl = NULL;
   SNMP::SuccessFailCountByRequestTypeTable* _outgoing_sip_transactions_tbl = NULL;
-  
+
   /// Called when the system determines the service should be invoked for a
   /// received request.  The Sproutlet can either return NULL indicating it
   /// does not want to process the request, or create a suitable object
@@ -583,6 +583,9 @@ public:
 
   /// Returns the name of this service.
   const std::string service_name() const { return _service_name; }
+
+  /// Returns the uri of this service (as a string)
+  const std::string uri_as_str() const { return _uri; }
 
   /// Returns the API version required by this Sproutlet.
   int api_version() const { return API_VERSION; }
@@ -601,9 +604,11 @@ protected:
   /// Constructor.
   Sproutlet(const std::string& service_name,
             int port,
+            const std::string& uri,
             const std::string& service_host="") :
     _service_name(service_name),
     _port(port),
+    _uri(uri),
     _service_host(service_host)
   {
   }
@@ -614,6 +619,9 @@ private:
 
   /// The default port for this service (0 if no default).
   const int _port;
+
+  /// The URI of this service.
+  const std::string _uri;
 
   /// The host name of this service.
   const std::string _service_host;

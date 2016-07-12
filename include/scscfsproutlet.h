@@ -82,6 +82,7 @@ public:
                  const std::string& icscf_uri,
                  const std::string& bgcf_uri,
                  int port,
+                 const std::string& uri,
                  SubscriberDataManager* sdm,
                  SubscriberDataManager* remote_sdm,
                  HSSConnection* hss,
