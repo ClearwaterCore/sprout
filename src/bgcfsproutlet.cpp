@@ -48,11 +48,12 @@
 /// BGCFSproutlet constructor.
 BGCFSproutlet::BGCFSproutlet(const std::string& bgcf_name,
                              int port,
+                             const std::string& uri,
                              BgcfService* bgcf_service,
                              EnumService* enum_service,
                              ACRFactory* acr_factory,
                              bool override_npdi) :
-  Sproutlet(bgcf_name, port),
+  Sproutlet(bgcf_name, port, uri),
   _bgcf_service(bgcf_service),
   _enum_service(enum_service),
   _acr_factory(acr_factory),
