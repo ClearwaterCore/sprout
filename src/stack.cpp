@@ -255,6 +255,9 @@ pj_status_t create_udp_transport(int port, pj_str_t& host)
   status = fill_transport_details(port, &addr, host, &published_name);
   if (status != PJ_SUCCESS)
   {
+    CL_SPROUT_SIP_UDP_INTERFACE_START_FAIL.log(port, PJUtils::pj_status_to_string(status).c_str());
+    TRC_ERROR("Failed to fill in UDP transport for port %d (%s)", port, PJUtils::pj_status_to_string(status).c_str());
+
     return status;
   }
 
@@ -301,6 +304,12 @@ pj_status_t create_tcp_listener_transport(int port, pj_str_t& host, pjsip_tpfact
   status = fill_transport_details(port, &addr, host, &published_name);
   if (status != PJ_SUCCESS)
   {
+    CL_SPROUT_SIP_TCP_START_FAIL.log(port,
+                                     PJUtils::pj_status_to_string(status).c_str());
+    TRC_ERROR("Failed to fill in TCP transport for port %d  (%s)",
+              port,
+              PJUtils::pj_status_to_string(status).c_str());
+
     return status;
   }
 
