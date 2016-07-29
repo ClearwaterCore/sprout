@@ -1823,8 +1823,6 @@ int main(int argc, char* argv[])
                                  true,
                                  opt.upstream_proxy,
                                  opt.upstream_proxy_port,
-                                 opt.upstream_proxy_connections,
-                                 opt.upstream_proxy_recycle,
                                  opt.ibcf,
                                  opt.trusted_hosts,
                                  opt.pbxes,
