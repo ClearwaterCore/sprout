@@ -166,17 +166,17 @@ Priority: extra
 Depends: mangelwurzel-as (= ${binary:Version})
 Description: Debugging symbols for mangelwurzel, the B2BUA and SCC-AS emulator
 
-Package: bono
+Package: bono-node
 Architecture: any
 Depends: clearwater-infrastructure, clearwater-tcp-scalability, clearwater-log-cleanup, sprout-libs, libboost-regex1.54.0, libboost-system1.54.0, libboost-thread1.54.0, libzmq3, libevent-pthreads-2.0-5, clearwater-socket-factory, libboost-filesystem1.54.0, libsnmp30 (>= 5.7.2~dfsg-clearwater4), clearwater-monit
-Suggests: restund, bono-dbg, clearwater-logging
+Suggests: restund, bono-node-dbg, clearwater-logging
 Description: bono, the SIP edge proxy
 
-Package: bono-dbg
+Package: bono-node-dbg
 Architecture: any
 Section: debug
 Priority: extra
-Depends: bono (= ${binary:Version})
+Depends: bono-node (= ${binary:Version})
 Recommends: gdb
 Description: Debugging symbols for bono, the SIP edge proxy
 
@@ -202,7 +202,7 @@ Description: Debugging symbols for the Clearwater build of SIPp, used for runnin
 Package: clearwater-sip-stress
 Architecture: any
 Depends: clearwater-infrastructure, clearwater-tcp-scalability, clearwater-sipp
-Conflicts: sprout, sprout-node, bono, restund
+Conflicts: sprout, sprout-node, bono-node, restund
 Suggests: clearwater-logging, clearwater-snmpd, clearwater-sip-stress-stats
 Description: Runs SIP stress against Clearwater
 
@@ -214,7 +214,7 @@ Description: Exposes SIP stress statistics over the clearwater statistics interf
 Package: clearwater-sip-perf
 Architecture: any
 Depends: clearwater-infrastructure, clearwater-tcp-scalability, clearwater-sipp
-Conflicts: sprout, sprout-node, bono, restund
+Conflicts: sprout, sprout-node, bono-node, restund
 Suggests: clearwater-logging, clearwater-snmpd
 Description: Runs SIP performance tests against Clearwater
 
