@@ -43,6 +43,7 @@
 #include "log.h"
 #include "sproutsasevent.h"
 #include "bgcfsproutlet.h"
+#include "constants.h"
 #include <fstream>
 
 /// BGCFSproutlet constructor.
@@ -156,13 +157,6 @@ void BGCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     bgcf_routes = _bgcf->get_route_from_number(routing_value, trail());
     routing_with_number = true;
   }
-  else if (uri_class == OFFNET_SIP_URI)
-  {
-    routing_value = PJUtils::pj_str_to_string(&((pjsip_sip_uri*)req_uri)->host);
-
-    // Find the downstream routes based on the domain.
-    bgcf_routes = _bgcf->get_route_from_domain(routing_value, trail());
-  }
   else if ((uri_class == LOCAL_PHONE_NUMBER) ||
            (uri_class == GLOBAL_PHONE_NUMBER))
   {
@@ -171,9 +165,20 @@ void BGCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     routing_value = "";
     bgcf_routes = _bgcf->get_route_from_domain(routing_value, trail());
   }
+  else
+  {
+    routing_value = PJUtils::pj_str_to_string(&((pjsip_sip_uri*)req_uri)->host);
+
+    // Find the downstream routes based on the domain.
+    bgcf_routes = _bgcf->get_route_from_domain(routing_value, trail());
+  }
 
   if (!bgcf_routes.empty())
   {
+    // The BGCF should be in control of what routes get added - delete existing
+    // ones first.
+    PJUtils::remove_hdr(req, &STR_ROUTE);
+
     for (std::vector<std::string>::iterator ii = bgcf_routes.begin();
          ii != bgcf_routes.end();
          ++ii)
