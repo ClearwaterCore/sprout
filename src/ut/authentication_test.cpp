@@ -359,7 +359,7 @@ string AuthenticationMessage::calculate_digest_response(
   md5_byte_t resp[16];
 
   std::string ha1;
-  if (algorithm == "AKAv1-MD5" || force_aka)
+  if (algorithm == "AKAv2-MD5" || force_aka)
   {
     // Key is a plain text password, so convert to HA1
     md5_init(&md5);
@@ -1338,13 +1338,13 @@ TEST_F(AuthenticationTest, AKAAuthSuccess)
   EXPECT_EQ("0123456789abcdef", auth_params["ck"]);
   EXPECT_EQ("fedcba9876543210", auth_params["ik"]);
   EXPECT_EQ("auth", auth_params["qop"]);
-  EXPECT_EQ("AKAv1-MD5", auth_params["algorithm"]);
+  EXPECT_EQ("AKAv2-MD5", auth_params["algorithm"]);
   free_txdata();
 
   // Send a new REGISTER request with an authentication header including the
   // response.
   AuthenticationMessage msg2("REGISTER");
-  msg2._algorithm = "AKAv1-MD5";
+  msg2._algorithm = "AKAv2-MD5";
   msg2._key = "12345678123456781234567812345678";
   msg2._nonce = auth_params["nonce"];
   msg2._opaque = auth_params["opaque"];
@@ -1396,7 +1396,7 @@ TEST_F(AuthenticationTest, NoAlgorithmAKAAuthSuccess)
   EXPECT_EQ("0123456789abcdef", auth_params["ck"]);
   EXPECT_EQ("fedcba9876543210", auth_params["ik"]);
   EXPECT_EQ("auth", auth_params["qop"]);
-  EXPECT_EQ("AKAv1-MD5", auth_params["algorithm"]);
+  EXPECT_EQ("AKAv2-MD5", auth_params["algorithm"]);
   free_txdata();
 
   // Send a new REGISTER request with an authentication header including the
@@ -1455,13 +1455,13 @@ TEST_F(AuthenticationTest, AKAAuthSuccessWithNonceCount)
   EXPECT_EQ("0123456789abcdef", auth_params["ck"]);
   EXPECT_EQ("fedcba9876543210", auth_params["ik"]);
   EXPECT_EQ("auth", auth_params["qop"]);
-  EXPECT_EQ("AKAv1-MD5", auth_params["algorithm"]);
+  EXPECT_EQ("AKAv2-MD5", auth_params["algorithm"]);
   free_txdata();
 
   // Send a new REGISTER request with an authentication header including the
   // response.
   AuthenticationMessage msg2("REGISTER");
-  msg2._algorithm = "AKAv1-MD5";
+  msg2._algorithm = "AKAv2-MD5";
   msg2._key = "12345678123456781234567812345678";
   msg2._nonce = auth_params["nonce"];
   msg2._opaque = auth_params["opaque"];
@@ -1482,7 +1482,7 @@ TEST_F(AuthenticationTest, AKAAuthSuccessWithNonceCount)
   // Send a new REGISTER request but increase the nonce count. This should also
   // pass authentication.
   AuthenticationMessage msg3("REGISTER");
-  msg3._algorithm = "AKAv1-MD5";
+  msg3._algorithm = "AKAv2-MD5";
   msg3._key = "12345678123456781234567812345678";
   msg3._nonce = auth_params["nonce"];
   msg3._opaque = auth_params["opaque"];
@@ -1532,13 +1532,13 @@ TEST_F(AuthenticationTest, AKAAuthFailBadResponse)
   EXPECT_EQ("0123456789abcdef", auth_params["ck"]);
   EXPECT_EQ("fedcba9876543210", auth_params["ik"]);
   EXPECT_EQ("auth", auth_params["qop"]);
-  EXPECT_EQ("AKAv1-MD5", auth_params["algorithm"]);
+  EXPECT_EQ("AKAv2-MD5", auth_params["algorithm"]);
   free_txdata();
 
   // Send a new REGISTER request with an authentication header with an incorrect
   // response.
   AuthenticationMessage msg2("REGISTER");
-  msg2._algorithm = "AKAv1-MD5";
+  msg2._algorithm = "AKAv2-MD5";
   msg2._key = "12345678123456781234567812345678";
   msg2._nonce = auth_params["nonce"];
   msg2._opaque = auth_params["opaque"];
@@ -1578,7 +1578,7 @@ TEST_F(AuthenticationTest, AKAAuthFailStale)
   // store.
   AuthenticationMessage msg1("REGISTER");
   msg1._auth_hdr = true;
-  msg1._algorithm = "AKAv1-MD5";
+  msg1._algorithm = "AKAv2-MD5";
   msg1._key = "12345678123456781234567812345678";
   msg1._nonce = "abcdefabcdefabcdefabcdefabcdef";
   msg1._opaque = "123123";
@@ -1636,7 +1636,7 @@ TEST_F(AuthenticationTest, AKAAuthResyncSuccess)
   EXPECT_EQ("0123456789abcdef", auth_params["ck"]);
   EXPECT_EQ("fedcba9876543210", auth_params["ik"]);
   EXPECT_EQ("auth", auth_params["qop"]);
-  EXPECT_EQ("AKAv1-MD5", auth_params["algorithm"]);
+  EXPECT_EQ("AKAv2-MD5", auth_params["algorithm"]);
   free_txdata();
 
   // Set up a second HSS response for the resync query from the authentication
@@ -1651,7 +1651,7 @@ TEST_F(AuthenticationTest, AKAAuthResyncSuccess)
   // response, but with an auts parameter indicating the sequence number in
   // the nonce was out of sync.
   AuthenticationMessage msg2("REGISTER");
-  msg2._algorithm = "AKAv1-MD5";
+  msg2._algorithm = "AKAv2-MD5";
   msg2._nonce = auth_params["nonce"];
   msg2._opaque = auth_params["opaque"];
   msg2._nc = "00000001";
@@ -1683,13 +1683,13 @@ TEST_F(AuthenticationTest, AKAAuthResyncSuccess)
   EXPECT_EQ("fedcba9876543210", auth_params["ck"]);
   EXPECT_EQ("0123456789abcdef", auth_params["ik"]);
   EXPECT_EQ("auth", auth_params["qop"]);
-  EXPECT_EQ("AKAv1-MD5", auth_params["algorithm"]);
+  EXPECT_EQ("AKAv2-MD5", auth_params["algorithm"]);
   free_txdata();
 
   // Send a new REGISTER request with an authentication header with a correct
   // response to the second challenge.
   AuthenticationMessage msg3("REGISTER");
-  msg3._algorithm = "AKAv1-MD5";
+  msg3._algorithm = "AKAv2-MD5";
   msg3._key = "87654321876543218765432187654321";
   msg3._nonce = auth_params["nonce"];
   msg3._opaque = auth_params["opaque"];
@@ -1745,14 +1745,14 @@ TEST_F(AuthenticationTest, AKAAuthResyncFail)
   EXPECT_EQ("0123456789abcdef", auth_params["ck"]);
   EXPECT_EQ("fedcba9876543210", auth_params["ik"]);
   EXPECT_EQ("auth", auth_params["qop"]);
-  EXPECT_EQ("AKAv1-MD5", auth_params["algorithm"]);
+  EXPECT_EQ("AKAv2-MD5", auth_params["algorithm"]);
   free_txdata();
 
   // Send a new REGISTER request with an authentication header with a correct
   // response, but with an auts parameter indicating the sequence number in
   // the nonce was out of sync.
   AuthenticationMessage msg2("REGISTER");
-  msg2._algorithm = "AKAv1-MD5";
+  msg2._algorithm = "AKAv2-MD5";
   msg2._nonce = auth_params["nonce"];
   msg2._opaque = auth_params["opaque"];
   msg2._nc = "00000001";

@@ -418,7 +418,7 @@ void create_challenge(pjsip_digest_credential* credentials,
 
       // Use default realm for AKA as not specified in the AV.
       pj_strdup(tdata->pool, &hdr->challenge.digest.realm, &aka_realm);
-      hdr->challenge.digest.algorithm = STR_AKAV1_MD5;
+      hdr->challenge.digest.algorithm = STR_AKAV2_MD5;
 
       if ((aka.HasMember("challenge")) &&
           (aka["challenge"].IsString()))
@@ -835,7 +835,7 @@ pj_bool_t authenticate_rx_request(pjsip_rx_data* rdata)
       {
         auth_stats_table = auth_stats_tables->sip_digest_auth_tbl;
       }
-      else if (!pj_strcmp2(&credentials->algorithm, "AKAv1-MD5"))
+      else if (!pj_strcmp(&credentials->algorithm, &STR_AKAV2_MD5))
       {
         auth_stats_table = auth_stats_tables->ims_aka_auth_tbl;
       }
@@ -1011,7 +1011,7 @@ pj_bool_t authenticate_rx_request(pjsip_rx_data* rdata)
         // If doing AKA authentication, check for an AUTS parameter.  We only
         // check this if the request authenticated as actioning it otherwise
         // is a potential denial of service attack.
-        if (!pj_strcmp(&credentials->algorithm, &STR_AKAV1_MD5))
+        if (!pj_strcmp(&credentials->algorithm, &STR_AKAV2_MD5))
         {
           TRC_DEBUG("AKA authentication so check for client resync request");
           pjsip_param* p = pjsip_param_find(&credentials->other_param,
