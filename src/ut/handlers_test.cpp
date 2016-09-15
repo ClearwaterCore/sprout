@@ -628,6 +628,73 @@ TEST_F(DeregistrationTaskTest, SubscriberDataManagerFailureTest)
   _task->run();
 }
 
+// Test that an valid SIP URI gets sent on third party registers.
+TEST_F(DeregistrationTaskTest, ValidIMPUTest)
+{
+  TransportFlow tpAS(TransportFlow::Protocol::UDP, stack_data.scscf_port, "1.2.3.4", 56789);
+
+  std::string user = "sip:6505550231@homedomain";
+
+  _hss->set_impu_result("sip:6505550231@homedomain", "dereg-admin", HSSConnection::STATE_REGISTERED,
+                              "<IMSSubscription><ServiceProfile>\n"
+                              "  <PublicIdentity><Identity>sip:6505550231@homedomain</Identity></PublicIdentity>\n"
+                              "  <InitialFilterCriteria>\n"
+                              "    <Priority>1</Priority>\n"
+                              "    <TriggerPoint>\n"
+                              "      <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                              "      <SPT>\n"
+                              "        <ConditionNegated>0</ConditionNegated>\n"
+                              "        <Group>0</Group>\n"
+                              "        <Method>REGISTER</Method>\n"
+                              "        <Extension></Extension>\n"
+                              "      </SPT>\n"
+                              "    </TriggerPoint>\n"
+                              "    <ApplicationServer>\n"
+                              "      <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                              "      <DefaultHandling>1</DefaultHandling>\n"
+                              "    </ApplicationServer>\n"
+                              "  </InitialFilterCriteria>\n"
+                              "</ServiceProfile></IMSSubscription>");
+
+  CapturingTestLogger log;
+
+  // Build the request
+  std::string body = "{\"registrations\": [{\"primary-impu\": \"notavalidsipuri\"}]}";
+  build_dereg_request(body, "false");
+
+  // Set up the subscriber_data_manager expectations
+  std::string aor_id = "sip:6505550231@homedomain";
+  SubscriberDataManager::AoR* aor = new SubscriberDataManager::AoR(aor_id);
+  SubscriberDataManager::AoR* aor2 = new SubscriberDataManager::AoR(*aor);
+  SubscriberDataManager::AoRPair* aor_pair = new SubscriberDataManager::AoRPair(aor, aor2);
+  std::vector<std::string> aor_ids = {aor_id};
+  std::vector<SubscriberDataManager::AoRPair*> aors = {aor_pair};
+
+  expect_sdm_updates(aor_ids, aors);
+
+  // Run the task
+  EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
+  _task->run();
+
+  SCOPED_TRACE("deREGISTER");
+  // Check that we send a REGISTER to the AS on network-initiated deregistration
+  ASSERT_TRUE(current_txdata() != NULL);
+  pjsip_msg* out = current_txdata()->msg;
+  ReqMatcher r1("REGISTER");
+  ASSERT_NO_FATAL_FAILURE(r1.matches(out));
+  EXPECT_EQ(NULL, out->body);
+
+  tpAS.expect_target(current_txdata(), false);
+  inject_msg(respond_to_current_txdata(200));
+
+  EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_THIRD_PARTY_REGISTRATION_STATS_TABLES.de_reg_tbl)->_attempts);
+  EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_THIRD_PARTY_REGISTRATION_STATS_TABLES.de_reg_tbl)->_successes);
+
+  free_txdata();
+
+  _hss->flush_all();
+}
+
 // Test that an invalid SIP URI doesn't get sent on third party registers.
 TEST_F(DeregistrationTaskTest, InvalidIMPUTest)
 {
