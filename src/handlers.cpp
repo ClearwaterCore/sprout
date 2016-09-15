@@ -332,8 +332,6 @@ void AoRTimeoutTask::handle_response()
   report_sip_all_register_marker(trail(), _aor_id);
 }
 
-
-
 SubscriberDataManager::AoRPair* AoRTimeoutTask::set_aor_data(
                           SubscriberDataManager* current_sdm,
                           std::string aor_id,
