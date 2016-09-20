@@ -61,8 +61,6 @@ extern "C" {
 #include "impistore.h"
 #include "snmp_success_fail_count_table.h"
 #include "base64.h"
-#include <openssl/hmac.h>
-
 
 
 //
@@ -288,15 +286,23 @@ pj_status_t user_lookup(pj_pool_t *pool,
     if (auth_challenge->type == ImpiStore::AuthChallenge::Type::AKA)
     {
       ImpiStore::AKAAuthChallenge* aka_challenge = (ImpiStore::AKAAuthChallenge*)auth_challenge;
-//      pjsip_param* auts_param = pjsip_param_find(&credentials->other_param,
-//                                                 &STR_AUTS);
+      pjsip_param* auts_param = pjsip_param_find(&credentials->other_param,
+                                                 &STR_AUTS);
 
       // AKA authentication.  The response in the challenge must be used as a
       // plain-text password for the MD5 Digest computation.  Convert the text
       // into binary as this is what PJSIP is expecting. If we find the 'auts'
       // parameter, then leave the response as the empty string in accordance
       // with RFC 3310.
-      std::string xres = aka_challenge->response;
+      std::string xres = "";
+      if (auts_param == NULL)
+      {
+        for (size_t ii = 0; ii < aka_challenge->response.length(); ii += 2)
+        {
+          xres.push_back((char)(pj_hex_digit_to_val(aka_challenge->response[ii]) * 16 +
+                                pj_hex_digit_to_val(aka_challenge->response[ii+1])));
+        }
+      }
 
       cred_info->data_type = PJSIP_CRED_DATA_PLAIN_PASSWD;
       pj_strdup2(pool, &cred_info->data, xres.c_str());
@@ -458,21 +464,7 @@ void create_challenge(pjsip_digest_credential* credentials,
       if ((aka.HasMember("response")) &&
           (aka["response"].IsString()))
       {
-        std::string joined = std::string(aka["response"].GetString()) + aka["integritykey"].GetString() +  aka["cryptkey"].GetString();
-        //std::string joined = "1918";
-        unsigned char bytearray[255] = {0};
-        size_t i;
-        const char* joined2 = joined.c_str();
-        for (i = 0; i < (joined.size() / 2); i++) {
-          sscanf(joined2 + 2*i, "%02hhx", &bytearray[i]);
-          //sscanf("19", "%02x", &bytearray[0]);
-        }
-        std::string formality = "http-digest-akav2-password";
-        //unsigned char* digest = HMAC(EVP_md5(), (unsigned char*)joined.data(), joined.size(), (unsigned char*)(formality.data()), formality.size(), NULL, NULL);
-        unsigned char* digest = HMAC(EVP_md5(), (unsigned char*)bytearray, (i+1), (unsigned char*)(formality.data()), formality.size(), NULL, NULL);
-        //response = std::string(aka["response"].GetString());
-        response = base64_encode(std::string(reinterpret_cast<char*>(digest)));
-        //printf("Calculated response: %s from j %s, i %lu\n", response.c_str(), joined.c_str(), i);
+        response = aka["response"].GetString();
       }
 
       // Now build the AuthChallenge so that we can store it in the ImpiStore.
