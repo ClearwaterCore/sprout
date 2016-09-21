@@ -1165,12 +1165,13 @@ void SCSCFSproutletTsx::apply_originating_services(pjsip_msg* req)
     }
     else if (uri_class == OFFNET_SIP_URI)
     {
-      // Destination is off-net, so route to the BGCF.
-      TRC_DEBUG("Routing to BGCF");
-      SAS::Event event(trail(), SASEvent::OFFNET_ROUTING_TO_BGCF, 0);
+      // Destination is off-net, so use default SIP routing (using route headers if present.
+      // otherwise via R-URI).
+      TRC_DEBUG("Routing using SIP default rules");
+      SAS::Event event(trail(), SASEvent::OFFNET_ROUTING, 0);
       event.add_var_param(new_uri_str);
       SAS::report_event(event);
-      route_to_bgcf(req);
+      send_request(req);
     }
     else
     {

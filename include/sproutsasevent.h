@@ -76,8 +76,11 @@ namespace SASEvent
   const int SCSCF_NO_BINDINGS = SPROUT_BASE + 0x000028;
   const int SCSCF_NOT_REGISTERED = SPROUT_BASE + 0x000029;
 
+  const int OFFNET_ROUTING = SPROUT_BASE + 0x00002D;
   const int PHONE_ROUTING_TO_BGCF = SPROUT_BASE + 0x00002E;
-  const int OFFNET_ROUTING_TO_BGCF = SPROUT_BASE + 0x00002F;
+  // The following event has been retired - BGCF no longer routes offnet URIs
+  // - and may be reallocated.
+  // const int OFFNET_ROUTING_TO_BGCF = SPROUT_BASE + 0x00002F;
 
   const int SIPRESOLVE_START = SPROUT_BASE + 0x000030;
   const int SIPRESOLVE_PORT_A_LOOKUP = SPROUT_BASE + 0x000031;

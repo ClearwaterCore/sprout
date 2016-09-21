@@ -520,9 +520,13 @@ void ICSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     // If the Req URI is a SIP URI with the user=phone parameter set, is not a
     // GRUU and the user part starts with '+' (i.e. is a global phone number),
     // we should replace it with a tel URI, as per TS24.229 5.3.2.1.
+    //
+    // Note that we aren't interested in knowing whether the URI currently contains
+    // NP information so ignore this for the purposes of determining whether the
+    // URI is a global phone number.
     if (PJSIP_URI_SCHEME_IS_SIP(uri))
     {
-      URIClass uri_class = URIClassifier::classify_uri(uri);
+      URIClass uri_class = URIClassifier::classify_uri(uri, true, true);
       pjsip_sip_uri* sip_uri = (pjsip_sip_uri*)uri;
 
       if (uri_class == GLOBAL_PHONE_NUMBER)
@@ -565,7 +569,11 @@ void ICSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
   {
     TRC_DEBUG("Couldn't find an S-CSCF, attempt to translate the URI");
     pjsip_uri* uri = PJUtils::term_served_user(req);
-    URIClass uri_class = URIClassifier::classify_uri(uri, false);
+
+    // Determine whether the URI is a global phone number for the purposes of
+    // Tel URI translation.  As above, we don't want to misidentify a number
+    // as non-global if it happens to contain NP information.
+    URIClass uri_class = URIClassifier::classify_uri(uri, false, true);
 
     // For terminating processing, if the HSS indicates that the user does not
     // exist, and if the request URI is a tel URI, try an ENUM translation. If
@@ -612,6 +620,8 @@ void ICSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
             (uri_class == FINAL_NP_DATA))
         {
           // We got number portability information from ENUM - drop out and route to the BGCF.
+          // Note that this includes the case where the ENUM lookup failed, but
+          // the original URI contained NP data anyway.
           route_to_bgcf(req);
           return;
         }
@@ -648,6 +658,7 @@ void ICSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
   }
 
   URIClass uri_class = URIClassifier::classify_uri(req->line.req.uri);
+  std::string new_uri_str = PJUtils::uri_to_string(PJSIP_URI_IN_REQ_URI, req->line.req.uri);
   if (status_code == PJSIP_SC_OK)
   {
     TRC_DEBUG("Found SCSCF for non-REGISTER");
@@ -664,11 +675,22 @@ void ICSCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     PJUtils::add_route_header(req, scscf_sip_uri, get_pool(req));
     send_request(req);
   }
-  else if ((uri_class == OFFNET_SIP_URI) ||
-           (uri_class == GLOBAL_PHONE_NUMBER))
+  else if (uri_class == GLOBAL_PHONE_NUMBER)
   {
-    // Target is a TEL URI or not in our home domain.  Pass to the BGCF.
+    // Target is a TEL URI.  Pass to the BGCF.
+    SAS::Event event(trail(), SASEvent::PHONE_ROUTING_TO_BGCF, 1);
+    event.add_var_param(new_uri_str);
+    SAS::report_event(event);
     route_to_bgcf(req);
+  }
+  else if (uri_class == OFFNET_SIP_URI)
+  {
+    // Target is not in our home domain.  Use default SIP routing.
+    TRC_DEBUG("Routing using SIP default rules");
+    SAS::Event event(trail(), SASEvent::OFFNET_ROUTING, 1);
+    event.add_var_param(new_uri_str);
+    SAS::report_event(event);
+    send_request(req);
   }
   else
   {

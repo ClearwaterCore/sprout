@@ -54,7 +54,7 @@ bool URIClassifier::is_user_numeric(pj_str_t user)
         (uri[i] == ')') ||
         (uri[i] == '[') ||
         (uri[i] == ']') ||
-        ((uri[i] >= '0') && 
+        ((uri[i] >= '0') &&
          (uri[i] <= '9')))
     {
       continue;
@@ -102,8 +102,9 @@ static bool is_local_name(pj_str_t host)
 // - uri - the URI to classify
 // - prefer_sip - for ambiguous URIs like sip:+1234@example.com (which could be a global phone
 // number or just a SIP URI), prefer to interpret it as SIP
+// - ignore_np - ignore number portability information for the purposes of this check
 //
-URIClass URIClassifier::classify_uri(const pjsip_uri* uri, bool prefer_sip)
+URIClass URIClassifier::classify_uri(const pjsip_uri* uri, bool prefer_sip, bool ignore_np)
 {
   URIClass ret = URIClass::UNKNOWN;
 
@@ -111,17 +112,20 @@ URIClass URIClassifier::classify_uri(const pjsip_uri* uri, bool prefer_sip)
   bool has_rn = false;
   bool has_npdi = false;
 
-  if (PJSIP_URI_SCHEME_IS_TEL(uri))
+  if (!ignore_np)
   {
-    // If the URI is a tel URI, pull out the information from the other_params
-    has_rn = (pjsip_param_find(&((pjsip_tel_uri*)uri)->other_param, &STR_RN) != NULL);
-    has_npdi = (pjsip_param_find(&((pjsip_tel_uri*)uri)->other_param, &STR_NPDI) != NULL);
-  }
-  else if (PJSIP_URI_SCHEME_IS_SIP(uri))
-  {
-    // If the URI is a tel URI, pull out the information from the userinfo_params
-    has_rn = (pjsip_param_find(&((pjsip_sip_uri*)uri)->userinfo_param, &STR_RN) != NULL);
-    has_npdi = (pjsip_param_find(&((pjsip_sip_uri*)uri)->userinfo_param, &STR_NPDI) != NULL);
+    if (PJSIP_URI_SCHEME_IS_TEL(uri))
+    {
+      // If the URI is a tel URI, pull out the information from the other_params
+      has_rn = (pjsip_param_find(&((pjsip_tel_uri*)uri)->other_param, &STR_RN) != NULL);
+      has_npdi = (pjsip_param_find(&((pjsip_tel_uri*)uri)->other_param, &STR_NPDI) != NULL);
+    }
+    else if (PJSIP_URI_SCHEME_IS_SIP(uri))
+    {
+      // If the URI is a tel URI, pull out the information from the userinfo_params
+      has_rn = (pjsip_param_find(&((pjsip_sip_uri*)uri)->userinfo_param, &STR_RN) != NULL);
+      has_npdi = (pjsip_param_find(&((pjsip_sip_uri*)uri)->userinfo_param, &STR_NPDI) != NULL);
+    }
   }
 
   if (has_rn)
