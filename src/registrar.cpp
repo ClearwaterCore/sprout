@@ -213,7 +213,7 @@ bool get_private_id(pjsip_rx_data* rdata, std::string& id)
 SubscriberDataManager::AoRPair* get_bindings(
                    SubscriberDataManager* primary_sdm,         ///<store to read from
                    std::string aor,                            ///<address of record to read from
-                   std::vector<SubscriberDataManager*> backup_sdms,
+                   SubscriberDataManager* backup_sdm,
                    SAS::TrailId trail)
 {
   SubscriberDataManager::AoRPair* aor_pair;
@@ -235,41 +235,20 @@ SubscriberDataManager::AoRPair* get_bindings(
     // If we don't have any bindings, try the backup AoR and/or store.
     if (aor_pair->get_current()->bindings().empty())
     {
-      std::vector<SubscriberDataManager*>::iterator it = backup_sdms.begin();
-      SubscriberDataManager::AoRPair* local_backup_aor = NULL;
-
-      bool found_binding = false;
-
-      while ((it != backup_sdms.end()) && (!found_binding))
+      if ((backup_sdm != NULL) &&
+          (backup_sdm->has_servers()))
       {
-        if ((*it)->has_servers())
-        {
-          local_backup_aor = (*it)->get_aor_data(aor, trail);
-
-          if ((local_backup_aor != NULL) &&
-              (local_backup_aor->current_contains_bindings()))
-          {
-            found_binding = true;
-            backup_aor = local_backup_aor;
-          }
-        }
-
-        if (!found_binding)
-        {
-          ++it;
-
-          if (local_backup_aor != NULL)
-          {
-            delete local_backup_aor;
-            local_backup_aor = NULL;
-          }
-        }
+        backup_aor = backup_sdm->get_aor_data(aor, trail);
       }
 
-      if (found_binding)
+      if ((backup_aor != NULL) &&
+          (backup_aor->get_current() != NULL) &&
+          (!backup_aor->get_current()->bindings().empty()))
       {
+
         aor_pair->get_current()->copy_aor(backup_aor->get_current());
       }
+
       delete backup_aor;
     }
   }
@@ -726,7 +705,7 @@ void process_fetch_bindings(pjsip_rx_data* rdata, int now, SAS::TrailId trail)
     aor = uris.front();
 
     // Get bindings from the local store, falling back to remote if not present
-    aor_pair = get_bindings(sdm, aor, remote_sdms, trail);
+    aor_pair = get_bindings(sdm, aor, remote_sdm, trail);
 
     if ((aor_pair != NULL) && (aor_pair->get_current() != NULL))
     {

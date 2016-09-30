@@ -211,7 +211,9 @@ public:
     // returned (if any)
     SubscriberDataManager::AoRPair* aor_pair = SubscriberDataManager::get_aor_data(aor_id, trail);
 
-    if ((aor_pair != NULL) && aor_pair->current_contains_bindings())
+    if ((aor_pair != NULL) &&
+          (aor_pair->get_current() != NULL) &&
+          (!aor_pair->get_current()->bindings().empty()))
     {
       aor_pair->get_current()->test_clear_bindings();
     }
@@ -235,17 +237,14 @@ public:
 
     _chronos_connection = new FakeChronosConnection();
     _local_data_store = new LocalStore();
-    _remote_data_store_no_bindings = new LocalStore();
     _remote_data_store = new LocalStore();
     _sdm = new SDMNoBindings((Store*)_local_data_store, _chronos_connection, true);
-    _remote_sdm_no_bindings = new SDMNoBindings((Store*)_remote_data_store_no_bindings, _chronos_connection, false);
     _remote_sdm = new SubscriberDataManager((Store*)_remote_data_store, _chronos_connection, false);
-    _remote_sdms = {_remote_sdm_no_bindings, _remote_sdm};
     _analytics = new AnalyticsLogger(&PrintingTestLogger::DEFAULT);
     _hss_connection = new FakeHSSConnection();
     _acr_factory = new ACRFactory();
     pj_status_t ret = init_registrar(_sdm,
-                                     _remote_sdms,
+                                     _remote_sdm,
                                      _hss_connection,
                                      _analytics,
                                      _acr_factory,
@@ -256,40 +255,25 @@ public:
     ASSERT_EQ(PJ_SUCCESS, ret);
   }
 
-  RegistrarTestRemoteSDM() : RegistrarTest()
-  {
-    _remote_data_store_no_bindings->flush_all();
-                                 // start from a clean slate on each test
-  }
-
   static void TearDownTestCase()
   {
     destroy_registrar();
     delete _acr_factory; _acr_factory = NULL;
     delete _hss_connection; _hss_connection = NULL;
     delete _analytics;
-    delete _remote_sdm_no_bindings; _remote_sdm_no_bindings = NULL;
     delete _remote_sdm; _remote_sdm = NULL;
     delete _sdm; _sdm = NULL;
     delete _remote_data_store; _remote_data_store = NULL;
-    delete _remote_data_store_no_bindings; _remote_data_store_no_bindings = NULL;
     delete _local_data_store; _local_data_store = NULL;
     delete _chronos_connection; _chronos_connection = NULL;
     SipTest::TearDownTestCase();
   }
-
-protected:
-  static LocalStore* _remote_data_store_no_bindings;
-  static SubscriberDataManager* _remote_sdm_no_bindings;
 };
 
 LocalStore* RegistrarTest::_local_data_store;
 LocalStore* RegistrarTest::_remote_data_store;
-LocalStore* RegistrarTestRemoteSDM::_remote_data_store_no_bindings;
 SubscriberDataManager* RegistrarTest::_sdm;
 SubscriberDataManager* RegistrarTest::_remote_sdm;
-SubscriberDataManager* RegistrarTestRemoteSDM::_remote_sdm_no_bindings;
-std::vector<SubscriberDataManager*> RegistrarTest::_remote_sdms;
 AnalyticsLogger* RegistrarTest::_analytics;
 IfcHandler* RegistrarTest::_ifc_handler;
 ACRFactory* RegistrarTest::_acr_factory;
