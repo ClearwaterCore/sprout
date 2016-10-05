@@ -2853,9 +2853,12 @@ TEST_F(ICSCFSproutletTest, RouteTermInviteNumericSIPURI)
 
   // Inject an INVITE request to a sip URI representing a telephone number with a
   // P-Served-User header.
+  //
+  // Add NP data to the SIP URI - it should be ignored for the purposes of SIP -> Tel URI
+  // conversion
   Message msg1;
   msg1._method = "INVITE";
-  msg1._requri = "sip:+16505551234@homedomain";
+  msg1._requri = "sip:+16505551234;rn=567@homedomain";
   msg1._to = "+16505551234";
   msg1._via = tp->to_string(false);
   msg1._extra = "Contact: sip:6505551000@" +
@@ -3177,7 +3180,7 @@ TEST_F(ICSCFSproutletTest, RouteOutOfDialogAck)
                                         "1.2.3.4",
                                         49152);
 
- 
+
   // Inject an ACK request to a local URI
   Message msg1;
   msg1._method = "ACK";
@@ -3186,10 +3189,10 @@ TEST_F(ICSCFSproutletTest, RouteOutOfDialogAck)
 
   // Expect it to just be dropped
   ASSERT_EQ(0, txdata_count());
-  free_txdata(); 
+  free_txdata();
 
   // Allow the transaction to time out so we don't leak PJSIP memory.
   cwtest_advance_time_ms(33000L);
   poll();
-  delete tp;   
+  delete tp;
 }
