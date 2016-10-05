@@ -92,7 +92,7 @@ static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
         ((*previous_aor_pair)->get_current() != NULL) &&
         (!(*previous_aor_pair)->get_current()->bindings().empty()))
     {
-      (*aor_pair)->get_current()->copy_aor((*previous_aor_pair)->get_current());
+      (*aor_pair)->get_current()->copy_subscriptions_and_bindings(backup_aor_pair->get_current());
     }
   }
   //LCOV_EXCL_STOP
