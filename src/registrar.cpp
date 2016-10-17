@@ -209,7 +209,10 @@ bool get_private_id(pjsip_rx_data* rdata, std::string& id)
   return success;
 }
 
-/// Write to the registration store.
+/// Write to the registration store. If we can't find the AoR pair in the
+/// primary SDM, we will either use the backup_aor or we will try and look up
+/// the AoR pair in the backup SDMs. Therefore either the backup_aor should be
+/// NULL, or backup_sdms should be empty.
 SubscriberDataManager::AoRPair* write_to_store(
                    SubscriberDataManager* primary_sdm,         ///<store to write to
                    std::string aor,                            ///<address of record to write to
@@ -257,8 +260,7 @@ SubscriberDataManager::AoRPair* write_to_store(
       break;
     }
 
-    // If we don't have any bindings, try the backup AoR and/or store.
-    // LCOV_EXCL_START - remote store tests temp excluded
+    // If we don't have any bindings, try the backup AoR and/or stores.
     if (aor_pair->get_current()->bindings().empty())
     {
       if ((backup_aor == NULL)   &&
@@ -273,26 +275,9 @@ SubscriberDataManager::AoRPair* write_to_store(
           (backup_aor->get_current() != NULL) &&
           (!backup_aor->get_current()->bindings().empty()))
       {
-        for (SubscriberDataManager::AoR::Bindings::const_iterator i = backup_aor->get_current()->bindings().begin();
-             i != backup_aor->get_current()->bindings().end();
-             ++i)
-        {
-          SubscriberDataManager::AoR::Binding* src = i->second;
-          SubscriberDataManager::AoR::Binding* dst = aor_pair->get_current()->get_binding(i->first);
-          *dst = *src;
-        }
-
-        for (SubscriberDataManager::AoR::Subscriptions::const_iterator i = backup_aor->get_current()->subscriptions().begin();
-             i != backup_aor->get_current()->subscriptions().end();
-             ++i)
-        {
-          SubscriberDataManager::AoR::Subscription* src = i->second;
-          SubscriberDataManager::AoR::Subscription* dst = aor_pair->get_current()->get_subscription(i->first);
-          *dst = *src;
-        }
+        aor_pair->get_current()->copy_subscriptions_and_bindings(backup_aor->get_current());
       }
     }
-    // LCOV_EXCL_STOP
 
     is_initial_registration = is_initial_registration && aor_pair->get_current()->bindings().empty();
 
@@ -300,9 +285,11 @@ SubscriberDataManager::AoRPair* write_to_store(
     // the contact header in the SIP message, pjsip parses them to separate
     // contact header structures.
     pjsip_contact_hdr* contact = (pjsip_contact_hdr*)pjsip_msg_find_hdr(msg, PJSIP_H_CONTACT, NULL);
+    int changed_bindings = 0;
 
     while (contact != NULL)
     {
+      changed_bindings++;
       expiry = expiry_for_binding(contact, expires);
 
       if (contact->star)
@@ -410,10 +397,23 @@ SubscriberDataManager::AoRPair* write_to_store(
       contact = (pjsip_contact_hdr*)pjsip_msg_find_hdr(msg, PJSIP_H_CONTACT, contact->next);
     }
 
-    set_rc = primary_sdm->set_aor_data(aor,
-                                       aor_pair,
-                                       trail,
-                                       all_bindings_expired);
+    if (changed_bindings > 0)
+    {
+      set_rc = primary_sdm->set_aor_data(aor,
+                                         aor_pair,
+                                         trail,
+                                         all_bindings_expired);
+    }
+    else
+    {
+      // No bindings changed (because we had no contact headers).  However, we
+      // may need to deregister the subscriber (because we will have registered
+      // the sub in the calling routine), so set all_bindings_expired based on
+      // whether we found any bindings to report.
+      set_rc = Store::OK;
+      all_bindings_expired = aor_pair->get_current()->bindings().empty();
+    }
+
     if (set_rc != Store::OK)
     {
       delete aor_pair; aor_pair = NULL;
@@ -458,14 +458,16 @@ void process_register_request(pjsip_rx_data* rdata)
   // registration and its expiry is 0 then reject with a 501.
   // If there are valid registration updates to make then attempt to write to
   // store, which also stops emergency registrations from being deregistered.
-  bool reject_with_501 = true;
-  bool any_emergency_registrations = false;
+  int num_contacts = 0;
+  int num_emergency_bindings = 0;
+  int num_emergency_deregisters = 0;
   bool reject_with_400 = false;
   pjsip_contact_hdr* contact_hdr = (pjsip_contact_hdr*)
                  pjsip_msg_find_hdr(rdata->msg_info.msg, PJSIP_H_CONTACT, NULL);
 
   while (contact_hdr != NULL)
   {
+    num_contacts++;
     pjsip_expires_hdr* expires = (pjsip_expires_hdr*)pjsip_msg_find_hdr(rdata->msg_info.msg, PJSIP_H_EXPIRES, NULL);
     expiry = expiry_for_binding(contact_hdr, expires);
 
@@ -477,10 +479,14 @@ void process_register_request(pjsip_rx_data* rdata)
       break;
     }
 
-    reject_with_501 = (reject_with_501 &&
-                       PJUtils::is_emergency_registration(contact_hdr) && (expiry == 0));
-    any_emergency_registrations = (any_emergency_registrations ||
-                                  PJUtils::is_emergency_registration(contact_hdr));
+    if (PJUtils::is_emergency_registration(contact_hdr))
+    {
+      num_emergency_bindings++;
+      if (expiry == 0)
+      {
+        num_emergency_deregisters++;
+      }
+    }
 
     contact_hdr = (pjsip_contact_hdr*) pjsip_msg_find_hdr(rdata->msg_info.msg,
                                                           PJSIP_H_CONTACT,
@@ -506,17 +512,22 @@ void process_register_request(pjsip_rx_data* rdata)
                                NULL,
                                NULL,
                                NULL);
-    if (expiry == 0)
+    // Only update statistics if this is going to change the state of the
+    // IRS (i.e. if the number of contact headers is non-zero)
+    if (num_contacts > 0)
     {
-      reg_stats_tables->de_reg_tbl->increment_attempts();
-      reg_stats_tables->de_reg_tbl->increment_failures();
-    }
-    else
-    // Invalid URI means this cannot be a re-register request, so if not
-    // a de-register request, then treat as an initial register request.
-    {
-      reg_stats_tables->init_reg_tbl->increment_attempts();
-      reg_stats_tables->init_reg_tbl->increment_failures();
+      if (expiry == 0)
+      {
+        reg_stats_tables->de_reg_tbl->increment_attempts();
+        reg_stats_tables->de_reg_tbl->increment_failures();
+      }
+      else
+      // Invalid URI means this cannot be a re-register request, so if not
+      // a de-register request, then treat as an initial register request.
+      {
+        reg_stats_tables->init_reg_tbl->increment_attempts();
+        reg_stats_tables->init_reg_tbl->increment_failures();
+      }
     }
     return;
   }
@@ -578,6 +589,13 @@ void process_register_request(pjsip_rx_data* rdata)
   event.add_var_param(private_id);
   SAS::report_event(event);
 
+  if (num_contacts == 0)
+  {
+    SAS::Event event(trail, SASEvent::REGISTER_NO_CONTACTS, 0);
+    event.add_var_param(public_id);
+    SAS::report_event(event);
+  }
+
   std::string regstate;
   std::deque<std::string> ccfs;
   std::deque<std::string> ecfs;
@@ -626,17 +644,20 @@ void process_register_request(pjsip_rx_data* rdata)
     acr->send();
     delete acr;
 
-    if (expiry == 0)
+    if (num_contacts > 0)
     {
-      reg_stats_tables->de_reg_tbl->increment_attempts();
-      reg_stats_tables->de_reg_tbl->increment_failures();
-    }
-    else
-    // Invalid public/private identity means this cannot be a re-register request,
-    // so if not a de-register request, then treat as an initial register request.
-    {
-      reg_stats_tables->init_reg_tbl->increment_attempts();
-      reg_stats_tables->init_reg_tbl->increment_failures();
+      if (expiry == 0)
+      {
+        reg_stats_tables->de_reg_tbl->increment_attempts();
+        reg_stats_tables->de_reg_tbl->increment_failures();
+      }
+      else
+      // Invalid public/private identity means this cannot be a re-register request,
+      // so if not a de-register request, then treat as an initial register request.
+      {
+        reg_stats_tables->init_reg_tbl->increment_attempts();
+        reg_stats_tables->init_reg_tbl->increment_failures();
+      }
     }
     return;
   }
@@ -661,13 +682,16 @@ void process_register_request(pjsip_rx_data* rdata)
     acr->send();
     delete acr;
 
-    reg_stats_tables->de_reg_tbl->increment_attempts();
-    reg_stats_tables->de_reg_tbl->increment_failures();
+    if (num_contacts > 0)
+    {
+      reg_stats_tables->de_reg_tbl->increment_attempts();
+      reg_stats_tables->de_reg_tbl->increment_failures();
+    }
 
     return;
   }
 
-  if (reject_with_501)
+  if ((num_emergency_deregisters > 0) && (num_emergency_deregisters == num_contacts))
   {
     TRC_ERROR("Rejecting register request as attempting to deregister an emergency registration");
 
@@ -685,8 +709,11 @@ void process_register_request(pjsip_rx_data* rdata)
     acr->send();
     delete acr;
 
-    reg_stats_tables->de_reg_tbl->increment_attempts();
-    reg_stats_tables->de_reg_tbl->increment_failures();
+    if (num_contacts > 0)
+    {
+      reg_stats_tables->de_reg_tbl->increment_attempts();
+      reg_stats_tables->de_reg_tbl->increment_failures();
+    }
 
     return;
   }
@@ -743,17 +770,20 @@ void process_register_request(pjsip_rx_data* rdata)
     // LCOV_EXCL_STOP
   }
 
-  if (expiry == 0)
+  if (num_contacts > 0)
   {
-    reg_stats_tables->de_reg_tbl->increment_attempts();
-  }
-  else if (is_initial_registration)
-  {
-    reg_stats_tables->init_reg_tbl->increment_attempts();
-  }
-  else
-  {
-    reg_stats_tables->re_reg_tbl->increment_attempts();
+    if (expiry == 0)
+    {
+      reg_stats_tables->de_reg_tbl->increment_attempts();
+    }
+    else if (is_initial_registration)
+    {
+      reg_stats_tables->init_reg_tbl->increment_attempts();
+    }
+    else
+    {
+      reg_stats_tables->re_reg_tbl->increment_attempts();
+    }
   }
 
   // Build and send the reply.
@@ -783,17 +813,20 @@ void process_register_request(pjsip_rx_data* rdata)
     delete acr;
     delete aor_pair;
 
-    if (is_initial_registration)
+    if (num_contacts > 0)
     {
-      reg_stats_tables->init_reg_tbl->increment_failures();
-    }
-    else if (expiry == 0)
-    {
-      reg_stats_tables->de_reg_tbl->increment_failures();
-    }
-    else
-    {
-      reg_stats_tables->re_reg_tbl->increment_failures();
+      if (is_initial_registration)
+      {
+        reg_stats_tables->init_reg_tbl->increment_failures();
+      }
+      else if (expiry == 0)
+      {
+        reg_stats_tables->de_reg_tbl->increment_failures();
+      }
+      else
+      {
+        reg_stats_tables->re_reg_tbl->increment_failures();
+      }
     }
 
     return;
@@ -817,17 +850,20 @@ void process_register_request(pjsip_rx_data* rdata)
     delete acr;
     delete aor_pair;
 
-    if (is_initial_registration)
+    if (num_contacts > 0)
     {
-      reg_stats_tables->init_reg_tbl->increment_failures();
-    }
-    else if (expiry == 0)
-    {
-      reg_stats_tables->de_reg_tbl->increment_failures();
-    }
-    else
-    {
-      reg_stats_tables->re_reg_tbl->increment_failures();
+      if (is_initial_registration)
+      {
+        reg_stats_tables->init_reg_tbl->increment_failures();
+      }
+      else if (expiry == 0)
+      {
+        reg_stats_tables->de_reg_tbl->increment_failures();
+      }
+      else
+      {
+        reg_stats_tables->re_reg_tbl->increment_failures();
+      }
     }
 
     return;
@@ -859,17 +895,20 @@ void process_register_request(pjsip_rx_data* rdata)
     delete acr;
     delete aor_pair;
 
-    if (is_initial_registration)
+    if (num_contacts > 0)
     {
-      reg_stats_tables->init_reg_tbl->increment_failures();
-    }
-    else if (expiry == 0)
-    {
-      reg_stats_tables->de_reg_tbl->increment_failures();
-    }
-    else
-    {
-      reg_stats_tables->re_reg_tbl->increment_failures();
+      if (is_initial_registration)
+      {
+        reg_stats_tables->init_reg_tbl->increment_failures();
+      }
+      else if (expiry == 0)
+      {
+        reg_stats_tables->de_reg_tbl->increment_failures();
+      }
+      else
+      {
+        reg_stats_tables->re_reg_tbl->increment_failures();
+      }
     }
 
     return;
@@ -948,17 +987,20 @@ void process_register_request(pjsip_rx_data* rdata)
   SAS::Event reg_Accepted(trail, SASEvent::REGISTER_ACCEPTED, 0);
   SAS::report_event(reg_Accepted);
 
-  if (expiry == 0)
+  if (num_contacts > 0)
   {
-    reg_stats_tables->de_reg_tbl->increment_successes();
-  }
-  else if (is_initial_registration)
-  {
-    reg_stats_tables->init_reg_tbl->increment_successes();
-  }
-  else
-  {
-    reg_stats_tables->re_reg_tbl->increment_successes();
+    if (expiry == 0)
+    {
+      reg_stats_tables->de_reg_tbl->increment_successes();
+    }
+    else if (is_initial_registration)
+    {
+      reg_stats_tables->init_reg_tbl->increment_successes();
+    }
+    else
+    {
+      reg_stats_tables->re_reg_tbl->increment_successes();
+    }
   }
 
   // Deal with path header related fields in the response.
@@ -1026,7 +1068,7 @@ void process_register_request(pjsip_rx_data* rdata)
   // nodes) and we should loop through that. Don't send any register that
   // contained emergency registrations to the application servers.
 
-  if (!any_emergency_registrations)
+  if (num_emergency_bindings == 0)
   {
     RegistrationUtils::register_with_application_servers(ifc_map[public_id],
                                                          sdm,
@@ -1160,4 +1202,5 @@ void destroy_registrar()
 {
   pjsip_endpt_unregister_module(stack_data.endpt, &mod_registrar);
 }
+
 

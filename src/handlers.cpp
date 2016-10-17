@@ -92,27 +92,7 @@ static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
         ((*previous_aor_pair)->get_current() != NULL) &&
         (!(*previous_aor_pair)->get_current()->bindings().empty()))
     {
-      for (SubscriberDataManager::AoR::Bindings::const_iterator i =
-             (*previous_aor_pair)->get_current()->bindings().begin();
-           i != (*previous_aor_pair)->get_current()->bindings().end();
-           ++i)
-      {
-        SubscriberDataManager::AoR::Binding* src = i->second;
-        SubscriberDataManager::AoR::Binding* dst =
-           (*aor_pair)->get_current()->get_binding(i->first);
-        *dst = *src;
-      }
-
-      for (SubscriberDataManager::AoR::Subscriptions::const_iterator i =
-             (*previous_aor_pair)->get_current()->subscriptions().begin();
-           i != (*previous_aor_pair)->get_current()->subscriptions().end();
-           ++i)
-      {
-        SubscriberDataManager::AoR::Subscription* src = i->second;
-        SubscriberDataManager::AoR::Subscription* dst =
-           (*aor_pair)->get_current()->get_subscription(i->first);
-        *dst = *src;
-      }
+      (*aor_pair)->get_current()->copy_subscriptions_and_bindings((*previous_aor_pair)->get_current());
     }
   }
   //LCOV_EXCL_STOP
