@@ -280,8 +280,15 @@ void DeregistrationTask::run()
 void AoRTimeoutTask::handle_response()
 {
   bool all_bindings_expired = false;
+
+  // Determine the set of IMPUs in the Implicit Registration Set
+  std::vector<std::string> irs_impus;
+  std::map<std::string, Ifcs> ifc_map;
+  get_reg_data(_cfg->_hss, _aor_id, irs_impus, ifc_map, trail());
+
   SubscriberDataManager::AoRPair* aor_pair = set_aor_data(_cfg->_sdm,
                                                           _aor_id,
+                                                          irs_impus,
                                                           NULL,
                                                           _cfg->_remote_sdm,
                                                           all_bindings_expired);
@@ -297,6 +304,7 @@ void AoRTimeoutTask::handle_response()
       SubscriberDataManager::AoRPair* remote_aor_pair =
                                          set_aor_data(_cfg->_remote_sdm,
                                                       _aor_id,
+                                                      irs_impus,
                                                       aor_pair,
                                                       NULL,
                                                       ignored);
@@ -335,6 +343,7 @@ void AoRTimeoutTask::handle_response()
 SubscriberDataManager::AoRPair* AoRTimeoutTask::set_aor_data(
                           SubscriberDataManager* current_sdm,
                           std::string aor_id,
+                          std::vector<std::string> irs_impus,
                           SubscriberDataManager::AoRPair* previous_aor_pair,
                           SubscriberDataManager* remote_sdm,
                           bool& all_bindings_expired)
@@ -342,11 +351,6 @@ SubscriberDataManager::AoRPair* AoRTimeoutTask::set_aor_data(
   SubscriberDataManager::AoRPair* aor_pair = NULL;
   bool previous_aor_pair_alloced = false;
   Store::Status set_rc;
-
-  // Determine the set of IMPUs in the Implicit Registration Set
-  std::vector<std::string> irs_impus;
-  std::map<std::string, Ifcs> ifc_map;
-  get_reg_data(_cfg->_hss, aor_id, irs_impus, ifc_map, trail());
 
   do
   {

@@ -262,11 +262,11 @@ TEST_F(AoRTimeoutTasksTest, RemoteAoRNoBindingsTest)
       EXPECT_CALL(*store, get_aor_data(aor_id, _)).WillOnce(Return(aor));
       EXPECT_CALL(*store, set_aor_data(aor_id, irs_impus, aor, _, _, _, _)).WillOnce(Return(Store::OK));
       EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(true));
-      EXPECT_CALL(*mock_hss, get_registration_data(_, _, _, _, _)).WillOnce(Return(HTTP_OK));
       EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor_pair));
       EXPECT_CALL(*remote_store, set_aor_data(aor_id, irs_impus, remote_aor_pair, _, _, _, _))
                    .WillOnce(Return(Store::OK));
   }
+
 
   handler->run();
 }
@@ -306,9 +306,6 @@ TEST_F(AoRTimeoutTasksTest, LocalAoRNoBindingsTest)
       EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor));
       EXPECT_CALL(*store, set_aor_data(aor_id, irs_impus, aor_pair, _, _, _, _)).WillOnce(Return(Store::OK));
       EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(true));
-      EXPECT_CALL(*mock_hss, get_registration_data(_, _, _, _, _))
-           .WillOnce(DoAll(SetArgReferee<3>(std::vector<std::string>(irs_impus)), //IMPUs in IRS
-                           Return(HTTP_OK)));
       EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor_2));
       EXPECT_CALL(*remote_store, set_aor_data(aor_id, irs_impus, remote_aor_2, _, _, _, _)).WillOnce(Return(Store::OK));
   }
@@ -355,9 +352,6 @@ TEST_F(AoRTimeoutTasksTest, NoBindingsTest)
       EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor_pair));
       EXPECT_CALL(*store, set_aor_data(aor_id, irs_impus, aor_pair, _, _, _, _)).WillOnce(DoAll(SetArgReferee<4>(true), Return(Store::OK)));
       EXPECT_CALL(*remote_store, has_servers()).WillOnce(Return(true));
-      EXPECT_CALL(*mock_hss, get_registration_data(_, _, _, _, _))
-           .WillOnce(DoAll(SetArgReferee<3>(std::vector<std::string>(irs_impus)), //IMPUs in IRS
-                           Return(HTTP_OK)));
       EXPECT_CALL(*remote_store, get_aor_data(aor_id, _)).WillOnce(Return(remote_aor_pair2));
       EXPECT_CALL(*remote_store, set_aor_data(aor_id, irs_impus, remote_aor_pair2, _, _, _, _)).WillOnce(DoAll(SetArgReferee<4>(true), Return(Store::OK)));
       EXPECT_CALL(*mock_hss, update_registration_state(aor_id, "", HSSConnection::DEREG_TIMEOUT, 0));
@@ -535,6 +529,28 @@ class DeregistrationTaskTest : public SipTest
 // Mainline case
 TEST_F(DeregistrationTaskTest, MainlineTest)
 {
+  // Set HSS result
+  _hss->set_impu_result("sip:6505550231@homedomain", "", HSSConnection::STATE_REGISTERED,
+                              "<IMSSubscription><ServiceProfile>\n"
+                              "  <PublicIdentity><Identity>sip:6505550231@homedomain</Identity></PublicIdentity>\n"
+                              "  <InitialFilterCriteria>\n"
+                              "    <Priority>1</Priority>\n"
+                              "    <TriggerPoint>\n"
+                              "      <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                              "      <SPT>\n"
+                              "        <ConditionNegated>0</ConditionNegated>\n"
+                              "        <Group>0</Group>\n"
+                              "        <Method>REGISTER</Method>\n"
+                              "        <Extension></Extension>\n"
+                              "      </SPT>\n"
+                              "    </TriggerPoint>\n"
+                              "    <ApplicationServer>\n"
+                              "      <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                              "      <DefaultHandling>1</DefaultHandling>\n"
+                              "    </ApplicationServer>\n"
+                              "  </InitialFilterCriteria>\n"
+                              "</ServiceProfile></IMSSubscription>");
+
   // Build the request
   std::string body = "{\"registrations\": [{\"primary-impu\": \"sip:6505550231@homedomain\", \"impi\": \"6505550231\"}]}";
   build_dereg_request(body);
@@ -572,6 +588,8 @@ TEST_F(DeregistrationTaskTest, MainlineTest)
   // Run the task
   EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
   _task->run();
+
+  _hss->flush_all();
 }
 
 // Test where there are multiple pairs of AoRs and Private IDs and single AoRs
