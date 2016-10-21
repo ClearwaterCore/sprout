@@ -94,6 +94,7 @@ protected:
   SubscriberDataManager::AoRPair* set_aor_data(
                         SubscriberDataManager* current_sdm,
                         std::string aor_id,
+                        std::vector<std::string> irs_impus,
                         SubscriberDataManager::AoRPair* previous_aor_data,
                         SubscriberDataManager* remote_sdm,
                         bool& all_bindings_expired);

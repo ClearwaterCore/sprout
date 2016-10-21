@@ -115,7 +115,9 @@ public:
     b1->_emergency_registration = false;
 
     // Add the AoR record to the store.
-    _sdm->set_aor_data(std::string("sip:6505550231@homedomain"), aor_pair, 0);
+    std::vector<std::string> irs_impus;
+    irs_impus.push_back("sip:6505550231@homedomain");
+    _sdm->set_aor_data(irs_impus[0], irs_impus, aor_pair, 0);
     delete aor_pair; aor_pair = NULL;
 
     _log_traffic = PrintingTestLogger::DEFAULT.isPrinting();
@@ -138,6 +140,7 @@ protected:
   void check_subscriptions(std::string aor, uint32_t expected);
   std::string check_OK_and_NOTIFY(std::string reg_state,
                                   std::pair<std::string, std::string> contact_values,
+                                  std::vector<std::string> irs_impus,
                                   bool terminated = false,
                                   std::string reason = "");
 };
@@ -305,7 +308,11 @@ TEST_F(SubscriptionTest, SimpleMainline)
   // a NOTIFY
   SubscribeMessage msg;
   inject_msg(msg.get());
-  std::string to_tag = check_OK_and_NOTIFY("active", std::make_pair("active", "registered"));
+
+  std::vector<std::string> irs_impus;
+  irs_impus.push_back("sip:6505550231@homedomain");
+
+  std::string to_tag = check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), irs_impus);
   check_subscriptions("sip:6505550231@homedomain", 1u);
 
   // Actively expire the subscription - this generates a 200 OK and a
@@ -313,7 +320,7 @@ TEST_F(SubscriptionTest, SimpleMainline)
   msg._to_tag = to_tag;
   msg._expires = "0";
   inject_msg(msg.get());
-  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), true, "timeout");
+  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), irs_impus, true, "timeout");
 
   check_subscriptions("sip:6505550231@homedomain", 0u);
 }
@@ -337,7 +344,9 @@ TEST_F(SubscriptionTest, SimpleMainlineWithTelURI)
   b1->_emergency_registration = false;
 
   // Add the AoR record to the store.
-  _sdm->set_aor_data(std::string("tel:6505550231"), aor_pair, 0);
+  std::vector<std::string> irs_impus;
+  irs_impus.push_back("tel:6505550231");
+  _sdm->set_aor_data(irs_impus[0], irs_impus, aor_pair, 0);
   delete aor_pair; aor_pair = NULL;
 
   check_subscriptions("tel:6505550231", 0u);
@@ -345,7 +354,8 @@ TEST_F(SubscriptionTest, SimpleMainlineWithTelURI)
   SubscribeMessage msg;
   msg._scheme = "tel";
   inject_msg(msg.get());
-  std::string to_tag = check_OK_and_NOTIFY("active", std::make_pair("active", "registered"));
+
+  std::string to_tag = check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), irs_impus);
   check_subscriptions("tel:6505550231", 1u);
 
   // Actively expire the subscription - this generates a 200 OK and a
@@ -353,7 +363,7 @@ TEST_F(SubscriptionTest, SimpleMainlineWithTelURI)
   msg._to_tag = to_tag;
   msg._expires = "0";
   inject_msg(msg.get());
-  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), true, "timeout");
+  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), irs_impus, true, "timeout");
 }
 
 /// Check that a subscription with immediate expiry is treated correctly
@@ -366,7 +376,11 @@ TEST_F(SubscriptionTest, OneShotSubscription)
   SubscribeMessage msg;
   msg._expires = "0";
   inject_msg(msg.get());
-  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), true, "timeout");
+
+  std::vector<std::string> irs_impus;
+  irs_impus.push_back("sip:6505550231@homedomain");
+
+  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), irs_impus, true, "timeout");
 
   // Check there's no subscriptions stored
   check_subscriptions("sip:6505550231@homedomain", 0u);
@@ -440,7 +454,11 @@ TEST_F(SubscriptionTest, SubscriptionWithDataContention)
   // a NOTIFY
   SubscribeMessage msg;
   inject_msg(msg.get());
-  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"));
+
+  std::vector<std::string> irs_impus;
+  irs_impus.push_back("sip:6505550231@homedomain");
+
+  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), irs_impus);
 
   // Check there's one subscription stored
   check_subscriptions("sip:6505550231@homedomain", 1u);
@@ -486,7 +504,11 @@ TEST_F(SubscriptionTest, EmptyAcceptsHeader)
   SubscribeMessage msg;
   msg._accepts = "";
   inject_msg(msg.get());
-  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"));
+
+  std::vector<std::string> irs_impus;
+  irs_impus.push_back("sip:6505550231@homedomain");
+
+  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), irs_impus);
 
   check_subscriptions("sip:6505550231@homedomain", 1u);
 }
@@ -515,7 +537,11 @@ TEST_F(SubscriptionTest, CorrectAcceptsHeader)
   SubscribeMessage msg;
   msg._accepts = "Accept: otherstuff,application/reginfo+xml";
   inject_msg(msg.get());
-  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"));
+
+  std::vector<std::string> irs_impus;
+  irs_impus.push_back("sip:6505550231@homedomain");
+
+  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), irs_impus);
 
   check_subscriptions("sip:6505550231@homedomain", 1u);
 }
@@ -571,7 +597,9 @@ TEST_F(SubscriptionTest, NonPrimaryAssociatedUri)
   b1->_emergency_registration = false;
 
   // Add the AoR record to the store.
-  _sdm->set_aor_data(std::string("sip:6505550233@homedomain"), aor_pair, 0);
+  std::vector<std::string> irs_impus;
+  irs_impus.push_back("sip:6505550233@homedomain");
+  _sdm->set_aor_data(irs_impus[0], irs_impus, aor_pair, 0);
   delete aor_pair; aor_pair = NULL;
 
   SubscribeMessage msg;
@@ -587,7 +615,13 @@ TEST_F(SubscriptionTest, NonPrimaryAssociatedUri)
                                    "</ServiceProfile></IMSSubscription>");
 
   inject_msg(msg.get());
-  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"));
+
+  // We expect one registration element per IMPU in the Implicit Registration Set
+  irs_impus.clear();
+  irs_impus.push_back("sip:6505550233@homedomain");
+  irs_impus.push_back("sip:6505550234@homedomain");
+
+  check_OK_and_NOTIFY("active", std::make_pair("active", "registered"), irs_impus);
   check_subscriptions("sip:6505550233@homedomain", 1u);
 }
 
@@ -623,7 +657,9 @@ TEST_F(SubscriptionTest, NoNotificationsForEmergencyRegistrations)
   b2->_emergency_registration = false;
 
   // Add the AoR record to the store.
-  _sdm->set_aor_data(std::string("sip:6505550231@homedomain"), aor_data1, 0);
+  std::vector<std::string> irs_impus;
+  irs_impus.push_back("sip:6505550231@homedomain");
+  _sdm->set_aor_data(irs_impus[0], irs_impus, aor_data1, 0);
   delete aor_data1; aor_data1 = NULL;
 
   check_subscriptions("sip:6505550231@homedomain", 0u);
@@ -707,6 +743,7 @@ TEST_F(SubscriptionTest, CheckNotifyCseqs)
 
 std::string SubscriptionTest::check_OK_and_NOTIFY(std::string reg_state,
                                                   std::pair<std::string, std::string> contact_values,
+                                                  std::vector<std::string> irs_impus,
                                                   bool terminated,
                                                   std::string reason)
 {
@@ -765,15 +802,25 @@ std::string SubscriptionTest::check_OK_and_NOTIFY(std::string reg_state,
 
   rapidxml::xml_node<> *reg_info = doc.first_node("reginfo");
   EXPECT_TRUE(reg_info);
-  rapidxml::xml_node<> *registration = reg_info->first_node("registration");
-  EXPECT_TRUE(registration);
-  rapidxml::xml_node<> *contact = registration->first_node("contact");
-  EXPECT_TRUE(contact);
 
-  EXPECT_EQ("full", std::string(reg_info->first_attribute("state")->value()));
-  EXPECT_EQ(reg_state, std::string(registration->first_attribute("state")->value()));
-  EXPECT_EQ(contact_values.first, std::string(contact->first_attribute("state")->value()));
-  EXPECT_EQ(contact_values.second, std::string(contact->first_attribute("event")->value()));
+  int num_reg = 0;
+
+  for (rapidxml::xml_node<> *registration = reg_info->first_node("registration");
+       registration;
+       registration = registration->next_sibling("registration"), num_reg++)
+  {
+    EXPECT_EQ(irs_impus.at(num_reg), std::string(registration->first_attribute("aor")->value()));
+    rapidxml::xml_node<> *contact = registration->first_node("contact");
+    EXPECT_TRUE(contact);
+
+    EXPECT_EQ("full", std::string(reg_info->first_attribute("state")->value()));
+    EXPECT_EQ(reg_state, std::string(registration->first_attribute("state")->value()));
+    EXPECT_EQ(contact_values.first, std::string(contact->first_attribute("state")->value()));
+    EXPECT_EQ(contact_values.second, std::string(contact->first_attribute("event")->value()));
+  }
+
+  // We should have found one registration element for each IMPU
+  EXPECT_EQ(irs_impus.size(), num_reg);
 
   EXPECT_THAT(get_headers(out, "To"), testing::MatchesRegex("To: .*;tag=10.114.61.213\\+1\\+8c8b232a\\+5fb751cf"));
   EXPECT_THAT(get_headers(out, "From"), testing::MatchesRegex(string(".*tag=").append(to_tag)));

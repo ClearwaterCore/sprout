@@ -100,6 +100,32 @@ static bool sdm_access_common(SubscriberDataManager::AoRPair** aor_pair,
   return true;
 }
 
+static bool get_reg_data(HSSConnection* hss,
+                         std::string aor_id,
+                         std::vector<std::string>& irs_impus,
+                         std::map<std::string, Ifcs>& ifc_map,
+                         SAS::TrailId trail)
+{
+  std::string state;
+  HTTPCode http_code = hss->get_registration_data(aor_id,
+                                                  state,
+                                                  ifc_map,
+                                                  irs_impus,
+                                                  trail);
+
+  if ((http_code != HTTP_OK) || irs_impus.empty())
+  {
+    // We were unable to determine the set of IMPUs for this AoR.  Push the AoR
+    // we have into the IRS list so that we have at least one IMPU we can issue
+    // NOTIFYs for.
+    TRC_WARNING("Unable to get Implicit Registration Set for %s: %d", aor_id.c_str(), http_code);
+    irs_impus.clear();
+    irs_impus.push_back(aor_id);
+  }
+
+  return (http_code == HTTP_OK);
+}
+
 static void report_sip_all_register_marker(SAS::TrailId trail, std::string uri_str)
 {
   // Parse the SIP URI and get the username from it.
@@ -234,8 +260,15 @@ void DeregistrationTask::run()
 void AoRTimeoutTask::handle_response()
 {
   bool all_bindings_expired = false;
+
+  // Determine the set of IMPUs in the Implicit Registration Set
+  std::vector<std::string> irs_impus;
+  std::map<std::string, Ifcs> ifc_map;
+  get_reg_data(_cfg->_hss, _aor_id, irs_impus, ifc_map, trail());
+
   SubscriberDataManager::AoRPair* aor_pair = set_aor_data(_cfg->_sdm,
                                                           _aor_id,
+                                                          irs_impus,
                                                           NULL,
                                                           _cfg->_remote_sdm,
                                                           all_bindings_expired);
@@ -251,6 +284,7 @@ void AoRTimeoutTask::handle_response()
       SubscriberDataManager::AoRPair* remote_aor_pair =
                                          set_aor_data(_cfg->_remote_sdm,
                                                       _aor_id,
+                                                      irs_impus,
                                                       aor_pair,
                                                       NULL,
                                                       ignored);
@@ -289,6 +323,7 @@ void AoRTimeoutTask::handle_response()
 SubscriberDataManager::AoRPair* AoRTimeoutTask::set_aor_data(
                           SubscriberDataManager* current_sdm,
                           std::string aor_id,
+                          std::vector<std::string> irs_impus,
                           SubscriberDataManager::AoRPair* previous_aor_pair,
                           SubscriberDataManager* remote_sdm,
                           bool& all_bindings_expired)
@@ -311,6 +346,7 @@ SubscriberDataManager::AoRPair* AoRTimeoutTask::set_aor_data(
     }
 
     set_rc = current_sdm->set_aor_data(aor_id,
+                                       irs_impus,
                                        aor_pair,
                                        trail(),
                                        all_bindings_expired);
@@ -506,8 +542,14 @@ SubscriberDataManager::AoRPair* DeregistrationTask::deregister_bindings(
   SubscriberDataManager::AoRPair* aor_pair = NULL;
   bool previous_aor_pair_alloced = false;
   bool all_bindings_expired = false;
+  bool got_ifcs;
   Store::Status set_rc;
   std::vector<std::string> impis_to_dereg;
+
+  // Get registration data
+  std::vector<std::string> irs_impus;
+  std::map<std::string, Ifcs> ifc_map;
+  got_ifcs = get_reg_data(_cfg->_hss, aor_id, irs_impus, ifc_map, trail());
 
   do
   {
@@ -554,6 +596,7 @@ SubscriberDataManager::AoRPair* DeregistrationTask::deregister_bindings(
     }
 
     set_rc = current_sdm->set_aor_data(aor_id,
+                                       irs_impus,
                                        aor_pair,
                                        trail(),
                                        all_bindings_expired);
@@ -567,12 +610,9 @@ SubscriberDataManager::AoRPair* DeregistrationTask::deregister_bindings(
   if (private_id == "")
   {
     // Deregister with any application servers
-    std::vector<std::string> uris;
-    std::map<std::string, Ifcs> ifc_map;
-    std::string state;
     TRC_INFO("ID %s", aor_id.c_str());
 
-    if (_cfg->_hss->get_registration_data(aor_id, state, ifc_map, uris, trail()) == HTTP_OK)
+    if (got_ifcs)
     {
       RegistrationUtils::deregister_with_application_servers(ifc_map[aor_id],
                                                              current_sdm,
