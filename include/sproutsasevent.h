@@ -204,6 +204,21 @@ namespace SASEvent
   const int AUTHENTICATION_NC_NOT_SUPP = SPROUT_BASE + 0x0100;
   const int AUTHENTICATION_NC_TOO_LOW = SPROUT_BASE + 0x0101;
   const int AUTHENTICATION_NC_ON_NON_REG = SPROUT_BASE + 0x0102;
+
+  const int BEGIN_SPROUTLET_REQ = SPROUT_BASE + 0x0120;
+  const int BEGIN_SPROUTLET_RSP = SPROUT_BASE + 0x0121;
+
+  // The "stateful proxy" logs are made by bono (the only remaining user of the
+  // stateful proxy code)
+  const int BEGIN_STATEFUL_PROXY_REQ = SPROUT_BASE + 0x0122;
+  const int BEGIN_STATEFUL_PROXY_RSP = SPROUT_BASE + 0x0123;
+
+  const int BEGIN_AUTHENTICATION_MODULE = SPROUT_BASE + 0x0124;
+  const int BEGIN_OPTIONS_MODULE = SPROUT_BASE + 0x0125;
+  const int BEGIN_REGISTRAR_MODULE = SPROUT_BASE + 0x0126;
+  const int BEGIN_SUBSCRIPTION_MODULE = SPROUT_BASE + 0x0127;
+  const int BEGIN_THREAD_DISPATCHER = SPROUT_BASE + 0x0128;
+
 } //namespace SASEvent
 
 #endif
