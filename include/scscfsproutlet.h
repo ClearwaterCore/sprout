@@ -84,10 +84,12 @@ public:
                  int port,
                  const std::string& uri,
                  SubscriberDataManager* sdm,
-                 SubscriberDataManager* remote_sdm,
+                 std::vector<SubscriberDataManager*> remote_sdms,
                  HSSConnection* hss,
                  EnumService* enum_service,
                  ACRFactory* acr_factory,
+                 SNMP::SuccessFailCountByRequestTypeTable* incoming_sip_transactions_tbl,
+                 SNMP::SuccessFailCountByRequestTypeTable* outgoing_sip_transactions_tbl,
                  bool override_npdi,
                  int session_continued_timeout = DEFAULT_SESSION_CONTINUED_TIMEOUT,
                  int session_terminated_timeout = DEFAULT_SESSION_TERMINATED_TIMEOUT,
@@ -156,8 +158,11 @@ private:
   /// Record that communication with an AS failed.
   ///
   /// @param uri               - The URI of the AS.
+  /// @param reason            - Textual representation of the reason the AS is
+  ///                            being treated as failed.
   /// @param default_handling  - The AS's default handling.
   void track_app_serv_comm_failure(const std::string& uri,
+                                   const std::string& reason,
                                    DefaultHandling default_handling);
 
   /// Record that communication with an AS succeeded.
@@ -166,6 +171,11 @@ private:
   /// @param default_handling  - The AS's default handling.
   void track_app_serv_comm_success(const std::string& uri,
                                    DefaultHandling default_handling);
+
+  /// Record the time an INVITE took to reach ringing state.
+  ///
+  /// @param ringing_us Time spent until a 180 Ringing, in microseconds.
+  void track_session_setup_time(uint64_t tsx_start_time_usec, bool video_call);
 
   /// Translate RequestURI using ENUM service if appropriate.
   void translate_request_uri(pjsip_msg* req, pj_pool_t* pool, SAS::TrailId trail);
@@ -193,7 +203,7 @@ private:
   pjsip_uri* _bgcf_uri;
 
   SubscriberDataManager* _sdm;
-  SubscriberDataManager* _remote_sdm;
+  std::vector<SubscriberDataManager*> _remote_sdms;
 
   HSSConnection* _hss;
 
@@ -218,6 +228,8 @@ private:
   SNMP::CounterTable* _routed_by_preloaded_route_tbl = NULL;
   SNMP::CounterTable* _invites_cancelled_before_1xx_tbl = NULL;
   SNMP::CounterTable* _invites_cancelled_after_1xx_tbl = NULL;
+  SNMP::EventAccumulatorTable* _video_session_setup_time_tbl = NULL;
+  SNMP::EventAccumulatorTable* _audio_session_setup_time_tbl = NULL;
 
   AsCommunicationTracker* _sess_term_as_tracker;
   AsCommunicationTracker* _sess_cont_as_tracker;
@@ -314,7 +326,7 @@ private:
   bool lookup_ifcs(std::string public_id,
                    Ifcs& ifcs);
 
-  /// Record-Route the S-CSCF sproutlet into a dialog.  The third parameter
+  /// Add the S-CSCF sproutlet into a dialog.  The third parameter
   /// passed may be attached to the Record-Route and can be used to recover the
   /// billing role that is in use on subsequent in-dialog messages.
   ///
@@ -322,9 +334,9 @@ private:
   /// @param billing_rr   - Whether to add a `billing-role` parameter to the RR
   /// @param billing_role - The contents of the `billing-role` (ignored if
   ///                       `billing_rr` is false)
-  void add_record_route(pjsip_msg* msg,
-                        bool billing_rr,
-                        ACR::NodeRole billing_role);
+  void add_to_dialog(pjsip_msg* msg,
+                     bool billing_rr,
+                     ACR::NodeRole billing_role);
 
   /// Retrieve the billing role for the incoming message.  This should have been
   /// set during session initiation.
@@ -343,6 +355,12 @@ private:
   /// through this API, not by inspecting _acr directly, since the ACR may be
   /// owned by the AsChain as a whole.  May return NULL in some cases.
   ACR* get_acr();
+
+  /// Get a string representation of why a fork failed.
+  ///
+  /// @param fork_id  - The fork's number.
+  /// @param sip_code - The reported SIP return code
+  std::string fork_failure_reason_as_string(int fork_id, int sip_code);
 
   /// Pointer to the parent SCSCFSproutlet object - used for various operations
   /// that require access to global configuration or services.
@@ -394,10 +412,24 @@ private:
   /// us accidentally record routing twice.
   bool _record_routed;
 
-  /// Track request type and whether a 1xx response has been seen so that the
-  /// correct stats can be updated.
+  /// Track various properties of the transaction / transaction state so that
+  /// we can generate the correct stats:
+  /// - _req_type:   the type of the request, e.g. INVITE, REGISTER etc.
+  /// - _seen_1xx:   whether we've seen a 1xx response to this transaction.
+  /// - _record_session_setup_time:
+  ///                whether we should record session setup time for this
+  ///                transaction.  Set to false if this is a transaction that we
+  ///                shouldn't track, or if we have already tracked it.
+  /// - _tsx_start_time_usec:
+  ///                the time that the session started -- only valid if
+  ///                _record_session_setup_time is true.
+  /// - _video_call: whether this is a video call -- only valid if
+  ///                _record_session_setup_time is true.
   pjsip_method_e _req_type;
   bool _seen_1xx;
+  bool _record_session_setup_time;
+  uint64_t _tsx_start_time_usec;
+  bool _video_call;
 
   static const int MAX_FORKING = 10;
 

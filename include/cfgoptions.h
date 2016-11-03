@@ -91,7 +91,6 @@ struct options
   std::string                          sas_system_name;
   std::string                          hss_server;
   std::string                          xdm_server;
-  std::string                          chronos_service;
   std::string                          store_servers;
   std::string                          remote_store_servers;
   std::string                          ralf_server;
@@ -100,11 +99,11 @@ struct options
   std::vector<std::string>             enum_servers;
   std::string                          enum_suffix;
   std::string                          enum_file;
+  bool                                 default_tel_uri_translation;
   bool                                 analytics_enabled;
   std::string                          analytics_directory;
   int                                  reg_max_expires;
   int                                  sub_max_expires;
-  int                                  pjsip_threads;
   std::string                          http_address;
   int                                  http_port;
   int                                  http_threads;
@@ -146,7 +145,11 @@ struct options
   SPROUTLET_MACRO(SPROUTLET_CFG_OPTIONS)
   ImpiStore::Mode                      impi_store_mode;
   bool                                 nonce_count_supported;
+  std::string                          scscf_node_uri;
   bool                                 sas_signaling_if;
+  bool                                 disable_tcp_switch;
+  std::string                          chronos_hostname;
+  bool                                 allow_fallback_ifcs;
 };
 
 // Objects that must be shared with dynamically linked sproutlets must be
@@ -157,9 +160,11 @@ extern Store* local_data_store;
 extern SubscriberDataManager* local_sdm;
 extern SubscriberDataManager* remote_sdm;
 extern RalfProcessor* ralf_processor;
+extern DnsCachedResolver* dns_resolver;
 extern HttpResolver* http_resolver;
 extern ACRFactory* scscf_acr_factory;
 extern EnumService* enum_service;
 extern ExceptionHandler* exception_handler;
+extern AlarmManager* alarm_manager;
 
 #endif

@@ -1,5 +1,9 @@
+#!/bin/bash
+
+# @file create-sprout-nginx-config
+#
 # Project Clearwater - IMS in the Cloud
-# Copyright (C) 2015  Metaswitch Networks Ltd
+# Copyright (C) 2016 Metaswitch Networks Ltd
 #
 # This program is free software: you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -30,39 +34,56 @@
 # under which the OpenSSL Project distributes the OpenSSL toolkit software,
 # as those licenses appear in the file LICENSE-OPENSSL.
 
-from metaswitch.clearwater.config_manager.plugin_base import ConfigPluginBase, FileStatus
-from metaswitch.clearwater.etcd_shared.plugin_utils import run_command, safely_write
-import logging
+# This file creates an nginx config file for sprout.
 
-_log = logging.getLogger("sprout_json_plugin")
+. /etc/clearwater/config
 
-class SproutJsonPlugin(ConfigPluginBase):
-    def __init__(self, file, key):
-        self._file = file
-        self._key = key
+split_domain_and_port()
+{
+  echo $1 | perl -ne '$_ =~ /(.+):([0-9]+)$/ && print "$1 $2\n"'
+}
 
-    def key(self):
-        return self._key
+if [ -n "$sprout_mgmt_hostname" ]
+then
+  site_file=/etc/nginx/sites-available/sprout
+  enabled_file=/etc/nginx/sites-enabled/sprout
+  temp_file=$(mktemp sprout.nginx.XXXXXXXX)
+  server_name_and_port=( $( split_domain_and_port $sprout_mgmt_hostname ) )
 
-    def file(self):
-        return self._file
+  cat > $temp_file << EOF
+upstream http_sprout {
+        server unix:/tmp/sprout-http-mgmt-socket;
 
-    def status(self, value):
-        try:
-            with open(self._file, "r") as ifile:
-                current = ifile.read()
-                if current == value:
-                    return FileStatus.UP_TO_DATE
-                else:
-                    return FileStatus.OUT_OF_SYNC
-        except IOError:
-            return FileStatus.MISSING
+        # The minimum number of idle connections to keep alive to the upstream.
+        keepalive 2;
+}
 
-    def on_config_changed(self, value, alarm):
-        _log.info("Updating {}".format(self._file))
+server {
+        listen       [::]:9886 ipv6only=off;
+        server_name  ${server_name_and_port[0]};
 
-        safely_write(self._file, value)
+        location / {
+                proxy_pass http://http_sprout;
+                proxy_http_version 1.1;
 
-        run_command("service sprout reload")
+                # The client may have instructed the server to close the
+                # connection - do not forward this upstream.
+                proxy_set_header Connection "";
+        }
+}
+EOF
 
-        alarm.update_file(self._file)
+  if ! diff $temp_file $enabled_file > /dev/null 2>&1
+  then
+    # Update the site file
+    mv $temp_file $site_file
+
+    # Enable the sprout nginx site
+    if ( nginx_ensite sprout > /dev/null )
+    then
+      service nginx stop
+    fi
+  else
+    rm $temp_file
+  fi
+fi

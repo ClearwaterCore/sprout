@@ -40,11 +40,11 @@
  */
 
 #include "cfgoptions.h"
-#include "ipv6utils.h"
 #include "sproutletplugin.h"
 #include "scscfsproutlet.h"
 #include "sprout_alarmdefinition.h"
 #include "sprout_pd_definitions.h"
+#include "log.h"
 
 class SCSCFPlugin : public SproutletPlugin
 {
@@ -59,6 +59,9 @@ private:
   SCSCFSproutlet* _scscf_sproutlet;
   Alarm* _sess_cont_as_alarm;
   Alarm* _sess_term_as_alarm;
+
+  SNMP::SuccessFailCountByRequestTypeTable* _incoming_sip_transactions_tbl;
+  SNMP::SuccessFailCountByRequestTypeTable* _outgoing_sip_transactions_tbl;
 };
 
 /// Export the plug-in using the magic symbol "sproutlet_plugin"
@@ -67,12 +70,16 @@ SCSCFPlugin sproutlet_plugin;
 }
 
 SCSCFPlugin::SCSCFPlugin() :
-  _scscf_sproutlet(NULL)
+  _scscf_sproutlet(NULL),
+  _incoming_sip_transactions_tbl(NULL),
+  _outgoing_sip_transactions_tbl(NULL)
 {
 }
 
 SCSCFPlugin::~SCSCFPlugin()
 {
+  delete _incoming_sip_transactions_tbl;
+  delete _outgoing_sip_transactions_tbl;
 }
 
 /// Loads the S-CSCF plug-in, returning the supported Sproutlets.
@@ -80,17 +87,37 @@ bool SCSCFPlugin::load(struct options& opt, std::list<Sproutlet*>& sproutlets)
 {
   bool plugin_loaded = true;
 
+  // Create the SNMP tables here - they should exist based on whether the
+  // plugin is loaded, not whether the Sproutlet is enabled, in order to
+  // simplify SNMP polling of multiple differently-configured Sprout nodes.
+  _incoming_sip_transactions_tbl = SNMP::SuccessFailCountByRequestTypeTable::create("scscf_incoming_sip_transactions",
+                                                                                    "1.2.826.0.1.1578918.9.3.20");
+  _outgoing_sip_transactions_tbl = SNMP::SuccessFailCountByRequestTypeTable::create("scscf_outgoing_sip_transactions",
+                                                                                    "1.2.826.0.1.1578918.9.3.21");
+
   if (opt.enabled_scscf)
   {
-    // Determine the S-CSCF, BGCF and I-CSCF URIs.
-    std::string node_ip(stack_data.local_host.ptr, stack_data.local_host.slen);
+    TRC_STATUS("S-CSCF plugin enabled");
 
-    if (is_ipv6(node_ip))
+    // Determine the S-CSCF node URI and then S-SCSCF, BGCF and I-CSCF cluster URIs.
+    std::string scscf_node_uri;
+
+    if (opt.scscf_node_uri != "")
     {
-      node_ip = "[" + node_ip + "]";
+      scscf_node_uri = opt.scscf_node_uri;
+    }
+    else
+    {
+      std::string node_host(stack_data.local_host.ptr, stack_data.public_host.slen);
+
+      if (Utils::parse_ip_address(node_host) == Utils::IPV6_ADDRESS)
+      {
+        node_host = "[" + node_host + "]";
+      }
+
+      scscf_node_uri = "sip:" + node_host + ":" + std::to_string(opt.port_scscf);
     }
 
-    std::string scscf_node_uri = "sip:" + node_ip + ":" + std::to_string(opt.port_scscf);
     std::string icscf_uri;
 
     if (opt.enabled_icscf)
@@ -103,7 +130,8 @@ bool SCSCFPlugin::load(struct options& opt, std::list<Sproutlet*>& sproutlets)
     }
 
     // Create Application Server communication trackers.
-    _sess_term_as_alarm = new Alarm("sprout",
+    _sess_term_as_alarm = new Alarm(alarm_manager,
+                                    "sprout",
                                     AlarmDef::SPROUT_SESS_TERMINATED_AS_COMM_ERROR,
                                     AlarmDef::MAJOR);
     AsCommunicationTracker* sess_term_as_tracker =
@@ -111,7 +139,8 @@ bool SCSCFPlugin::load(struct options& opt, std::list<Sproutlet*>& sproutlets)
                                    &CL_SPROUT_SESS_TERM_AS_COMM_FAILURE,
                                    &CL_SPROUT_SESS_TERM_AS_COMM_SUCCESS);
 
-    _sess_cont_as_alarm =  new Alarm("sprout",
+    _sess_cont_as_alarm =  new Alarm(alarm_manager,
+                                     "sprout",
                                      AlarmDef::SPROUT_SESS_CONTINUED_AS_COMM_ERROR,
                                      AlarmDef::MINOR);
     AsCommunicationTracker* sess_cont_as_tracker =
@@ -127,10 +156,12 @@ bool SCSCFPlugin::load(struct options& opt, std::list<Sproutlet*>& sproutlets)
                                           opt.port_scscf,
                                           opt.uri_scscf,
                                           local_sdm,
-                                          remote_sdm,
+                                          {remote_sdm},
                                           hss_connection,
                                           enum_service,
                                           scscf_acr_factory,
+                                          _incoming_sip_transactions_tbl,
+                                          _outgoing_sip_transactions_tbl,
                                           opt.override_npdi,
                                           opt.session_continued_timeout_ms,
                                           opt.session_terminated_timeout_ms,
@@ -138,7 +169,9 @@ bool SCSCFPlugin::load(struct options& opt, std::list<Sproutlet*>& sproutlets)
                                           sess_cont_as_tracker);
     plugin_loaded = _scscf_sproutlet->init();
 
-    sproutlets.push_back(_scscf_sproutlet);
+    // We want to prioritise choosing the S-CSCF in ambiguous situations, so
+    // make sure it's at the front of the sproutlet list
+    sproutlets.push_front(_scscf_sproutlet);
   }
 
   return plugin_loaded;

@@ -43,6 +43,7 @@
 #include "log.h"
 #include "sproutsasevent.h"
 #include "bgcfsproutlet.h"
+#include "constants.h"
 #include <fstream>
 
 /// BGCFSproutlet constructor.
@@ -52,25 +53,21 @@ BGCFSproutlet::BGCFSproutlet(const std::string& bgcf_name,
                              BgcfService* bgcf_service,
                              EnumService* enum_service,
                              ACRFactory* acr_factory,
+                             SNMP::SuccessFailCountByRequestTypeTable* incoming_sip_transactions_tbl,
+                             SNMP::SuccessFailCountByRequestTypeTable* outgoing_sip_transactions_tbl,
                              bool override_npdi) :
-  Sproutlet(bgcf_name, port, uri),
+  Sproutlet(bgcf_name, port, uri, "", incoming_sip_transactions_tbl, outgoing_sip_transactions_tbl),
   _bgcf_service(bgcf_service),
   _enum_service(enum_service),
   _acr_factory(acr_factory),
   _override_npdi(override_npdi)
 {
-  _incoming_sip_transactions_tbl = SNMP::SuccessFailCountByRequestTypeTable::create("bgcf_incoming_sip_transactions",
-                                                                                    "1.2.826.0.1.1578918.9.3.22");
-  _outgoing_sip_transactions_tbl = SNMP::SuccessFailCountByRequestTypeTable::create("bgcf_outgoing_sip_transactions",
-                                                                                    "1.2.826.0.1.1578918.9.3.23");
 }
 
 
 /// BGCFSproutlet destructor.
 BGCFSproutlet::~BGCFSproutlet()
 {
-  delete _incoming_sip_transactions_tbl;
-  delete _outgoing_sip_transactions_tbl;
 }
 
 
@@ -160,24 +157,40 @@ void BGCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     bgcf_routes = _bgcf->get_route_from_number(routing_value, trail());
     routing_with_number = true;
   }
-  else if (uri_class == OFFNET_SIP_URI)
+  else if ((uri_class == LOCAL_PHONE_NUMBER) ||
+           (uri_class == GLOBAL_PHONE_NUMBER))
+  {
+    // Try to route based on the phone number first
+    pj_str_t pj_user = PJUtils::user_from_uri(req_uri);
+    routing_value = PJUtils::pj_str_to_string(&pj_user);
+    bgcf_routes = _bgcf->get_route_from_number(routing_value, trail());
+
+    // If there are no matching routes, just route based on the domain - this
+    // only matches any wild card routing set up
+    if (bgcf_routes.empty())
+    {
+      routing_value = "";
+      bgcf_routes = _bgcf->get_route_from_domain(routing_value, trail());
+    }
+    else
+    {
+      routing_with_number = true;
+    }
+  }
+  else
   {
     routing_value = PJUtils::pj_str_to_string(&((pjsip_sip_uri*)req_uri)->host);
 
     // Find the downstream routes based on the domain.
     bgcf_routes = _bgcf->get_route_from_domain(routing_value, trail());
   }
-  else if ((uri_class == LOCAL_PHONE_NUMBER) ||
-           (uri_class == GLOBAL_PHONE_NUMBER))
-  {
-    // Find the downstream routes based on the domain - this only matches
-    // any wild card routing set up
-    routing_value = "";
-    bgcf_routes = _bgcf->get_route_from_domain(routing_value, trail());
-  }
 
   if (!bgcf_routes.empty())
   {
+    // The BGCF should be in control of what routes get added - delete existing
+    // ones first.
+    PJUtils::remove_hdr(req, &STR_ROUTE);
+
     for (std::vector<std::string>::iterator ii = bgcf_routes.begin();
          ii != bgcf_routes.end();
          ++ii)

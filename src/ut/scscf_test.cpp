@@ -67,6 +67,7 @@ using testing::HasSubstr;
 using testing::Not;
 using testing::_;
 using testing::NiceMock;
+using testing::HasSubstr;
 
 namespace SP
 {
@@ -255,14 +256,12 @@ public:
   /// Set up test case.  Caller must clear host_mapping.
   static void SetUpTestCase()
   {
-    SipTest::SetUpTestCase(false);
+    SipTest::SetUpTestCase();
 
     _chronos_connection = new FakeChronosConnection();
     _local_data_store = new LocalStore();
     _sdm = new SubscriberDataManager((Store*)_local_data_store, _chronos_connection, true);
-    _analytics = new AnalyticsLogger(&PrintingTestLogger::DEFAULT);
-    _hss_connection = new FakeHSSConnection();
-    _scscf_selector = new SCSCFSelector(string(UT_DIR).append("/test_stateful_proxy_scscf.json"));
+    _analytics = new AnalyticsLogger();
     _bgcf_service = new BgcfService(string(UT_DIR).append("/test_stateful_proxy_bgcf.json"));
     _xdm_connection = new FakeXDMConnection();
     _sess_term_comm_tracker = new NiceMock<MockAsCommunicationTracker>();
@@ -274,6 +273,35 @@ public:
     _enum_service = new JSONEnumService(string(UT_DIR).append("/test_stateful_proxy_enum.json"));
 
     _acr_factory = new ACRFactory();
+    // Schedule timers.
+    SipTest::poll();
+  }
+
+  static void TearDownTestCase()
+  {
+    // Shut down the transaction module first, before we destroy the
+    // objects that might handle any callbacks!
+    pjsip_tsx_layer_destroy();
+    delete _acr_factory; _acr_factory = NULL;
+    delete _sdm; _sdm = NULL;
+    delete _chronos_connection; _chronos_connection = NULL;
+    delete _local_data_store; _local_data_store = NULL;
+    delete _analytics; _analytics = NULL;
+    delete _enum_service; _enum_service = NULL;
+    delete _bgcf_service; _bgcf_service = NULL;
+    delete _xdm_connection; _xdm_connection = NULL;
+    delete _sess_cont_comm_tracker; _sess_cont_comm_tracker = NULL;
+    delete _sess_term_comm_tracker; _sess_term_comm_tracker = NULL;
+    SipTest::TearDownTestCase();
+  }
+
+  SCSCFTest()
+  {
+    _log_traffic = PrintingTestLogger::DEFAULT.isPrinting(); // true to see all traffic
+    _local_data_store->flush_all();  // start from a clean slate on each test
+    
+    _hss_connection = new FakeHSSConnection();
+
 
     // Create the S-CSCF Sproutlet.
     _scscf_sproutlet = new SCSCFSproutlet("scscf",
@@ -284,10 +312,12 @@ public:
                                           5058,
                                           "sip:scscf.homedomain:5058;transport=tcp",
                                           _sdm,
-                                          NULL,
+                                          {},
                                           _hss_connection,
                                           _enum_service,
                                           _acr_factory,
+                                          &SNMP::FAKE_INCOMING_SIP_TRANSACTIONS_TABLE,
+                                          &SNMP::FAKE_OUTGOING_SIP_TRANSACTIONS_TABLE,
                                           false,
                                           3000, // Session continue timeout - different from default
                                           6000, // Session terminated timeout - different from default
@@ -303,6 +333,8 @@ public:
                                         _bgcf_service,
                                         _enum_service,
                                         _acr_factory,
+                                        nullptr,
+                                        nullptr,
                                         false);
 
     // Create the MMTEL AppServer.
@@ -326,45 +358,10 @@ public:
                                 "homedomain",
                                 aliases,
                                 sproutlets,
-                                std::set<std::string>());
+                                std::set<std::string>(),
+                                "scscf");
 
-    // Schedule timers.
-    SipTest::poll();
-  }
 
-  static void TearDownTestCase()
-  {
-    // Shut down the transaction module first, before we destroy the
-    // objects that might handle any callbacks!
-    pjsip_tsx_layer_destroy();
-    delete _proxy; _proxy = NULL;
-    delete _mmtel_sproutlet; _mmtel_sproutlet = NULL;
-    delete _mmtel; _mmtel = NULL;
-    delete _bgcf_sproutlet; _bgcf_sproutlet = NULL;
-    delete _scscf_sproutlet; _scscf_sproutlet = NULL;
-    delete _scscf_selector; _scscf_selector = NULL;
-    delete _acr_factory; _acr_factory = NULL;
-    delete _sdm; _sdm = NULL;
-    delete _chronos_connection; _chronos_connection = NULL;
-    delete _local_data_store; _local_data_store = NULL;
-    delete _analytics; _analytics = NULL;
-    delete _hss_connection; _hss_connection = NULL;
-    delete _enum_service; _enum_service = NULL;
-    delete _bgcf_service; _bgcf_service = NULL;
-    delete _xdm_connection; _xdm_connection = NULL;
-    delete _sess_cont_comm_tracker; _sess_cont_comm_tracker = NULL;
-    delete _sess_term_comm_tracker; _sess_term_comm_tracker = NULL;
-    SipTest::TearDownTestCase();
-  }
-
-  SCSCFTest()
-  {
-    _log_traffic = PrintingTestLogger::DEFAULT.isPrinting(); // true to see all traffic
-    _local_data_store->flush_all();  // start from a clean slate on each test
-    if (_hss_connection)
-    {
-      _hss_connection->flush_all();
-    }
   }
 
   ~SCSCFTest()
@@ -400,10 +397,15 @@ public:
     // Reset any configuration changes
     URIClassifier::enforce_user_phone = false;
     URIClassifier::enforce_global = false;
-    _scscf_sproutlet->set_override_npdi(false);
-    _scscf_sproutlet->set_session_continued_timeout(3000);
-    _scscf_sproutlet->set_session_terminated_timeout(6000);
     ((SNMP::FakeCounterTable*)_scscf_sproutlet->_routed_by_preloaded_route_tbl)->reset_count();
+
+    delete _hss_connection; _hss_connection = NULL;
+    delete _proxy; _proxy = NULL;
+    delete _mmtel_sproutlet; _mmtel_sproutlet = NULL;
+    delete _mmtel; _mmtel = NULL;
+    delete _bgcf_sproutlet; _bgcf_sproutlet = NULL;
+    delete _scscf_sproutlet; _scscf_sproutlet = NULL;
+
   }
 
   /// Send a response back through multiple hops in a dialog. The response is
@@ -453,12 +455,11 @@ protected:
   static BgcfService* _bgcf_service;
   static EnumService* _enum_service;
   static ACRFactory* _acr_factory;
-  static SCSCFSelector* _scscf_selector;
-  static SCSCFSproutlet* _scscf_sproutlet;
-  static BGCFSproutlet* _bgcf_sproutlet;
-  static Mmtel* _mmtel;
-  static SproutletAppServerShim* _mmtel_sproutlet;
-  static SproutletProxy* _proxy;
+  SCSCFSproutlet* _scscf_sproutlet;
+  BGCFSproutlet* _bgcf_sproutlet;
+  Mmtel* _mmtel;
+  SproutletAppServerShim* _mmtel_sproutlet;
+  SproutletProxy* _proxy;
   static MockAsCommunicationTracker* _sess_term_comm_tracker;
   static MockAsCommunicationTracker* _sess_cont_comm_tracker;
 
@@ -496,12 +497,6 @@ FakeXDMConnection* SCSCFTest::_xdm_connection;
 BgcfService* SCSCFTest::_bgcf_service;
 EnumService* SCSCFTest::_enum_service;
 ACRFactory* SCSCFTest::_acr_factory;
-SCSCFSelector* SCSCFTest::_scscf_selector;
-SCSCFSproutlet* SCSCFTest::_scscf_sproutlet;
-BGCFSproutlet* SCSCFTest::_bgcf_sproutlet;
-Mmtel* SCSCFTest::_mmtel;
-SproutletAppServerShim* SCSCFTest::_mmtel_sproutlet;
-SproutletProxy* SCSCFTest::_proxy;
 MockAsCommunicationTracker* SCSCFTest::_sess_term_comm_tracker;
 MockAsCommunicationTracker* SCSCFTest::_sess_cont_comm_tracker;
 
@@ -1267,6 +1262,11 @@ TEST_F(SCSCFTest, TestSimpleMainline)
   Message msg;
   list<HeaderMatcher> hdrs;
   doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs);
+
+  // This is a terminating call so should not result in a session setup time
+  // getting tracked.
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 }
 
 // Send a request where the URI is for the same port as a Sproutlet,
@@ -1325,6 +1325,34 @@ TEST_F(SCSCFTest, TestSimpleTelURI)
   msg._todomain = "";
   list<HeaderMatcher> hdrs;
   doSuccessfulFlow(msg, testing::MatchesRegex(".*16505551234@ut.cw-ngv.com.*"), hdrs, false);
+
+  // Successful originating call.  We should have tracked a single session
+  // setup time.
+  EXPECT_EQ(1, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
+}
+
+// Test that a successful originating video call results in the correct stats
+// being tracked.
+TEST_F(SCSCFTest, TestSimpleTelURIVideo)
+{
+  add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
+  SCOPED_TRACE("");
+  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
+  Message msg;
+  msg._toscheme = "tel";
+  msg._to = "16505551234";
+  msg._route = "Route: <sip:homedomain;orig>";
+  msg._todomain = "";
+  msg._body = "\r\nv=0\r\no=Andrew 2890844526 2890844526 IN IP4 10.120.42.3\r\nc=IN IP4 10.120.42.3\r\nt=0 0\r\nm=audio 49170 RTP/AVP 0 8 97\r\na=rtpmap:0 PCMU/8000\r\nm=video 51372 RTP/AVP 31 32\r\na=rtpmap:31 H261/90000\r\n";
+  list<HeaderMatcher> hdrs;
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*16505551234@ut.cw-ngv.com.*"), hdrs, false);
+
+  // Successful originating call.  We should have tracked a single session
+  // setup time.
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(1, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 }
 
 
@@ -1367,6 +1395,100 @@ TEST_F(SCSCFTest, TestTerminatingTelURI)
   msg._method = "INVITE";
   list<HeaderMatcher> hdrs;
   doSuccessfulFlow(msg, testing::MatchesRegex("sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob"), hdrs, false);
+}
+
+// Test that allowing fallback IFCs (for when we don't have a matching bit of
+// XML) doesn't break mainline flows when we do.
+TEST_F(SCSCFTest, TestSimpleMainlineFallbackIFCs)
+{
+  SCOPED_TRACE("");
+  _hss_connection->allow_fallback_ifcs();
+  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+  Message msg;
+  list<HeaderMatcher> hdrs;
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs);
+
+  // This is a terminating call so should not result in a session setup time
+  // getting tracked.
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
+}
+
+
+
+TEST_F(SCSCFTest, TestTelURIWildcard)
+{
+  _hss_connection->set_impu_result("tel:6505551235", "call", "REGISTERED",
+                                "<IMSSubscription><ServiceProfile>\n"
+                                "<PublicIdentity><Identity>tel:65055512!*!</Identity></PublicIdentity>"
+                                "  <InitialFilterCriteria>\n"
+                                "    <Priority>1</Priority>\n"
+                                "    <TriggerPoint>\n"
+                                "    <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                                "    <SPT>\n"
+                                "      <ConditionNegated>0</ConditionNegated>\n"
+                                "      <Group>0</Group>\n"
+                                "      <Method>INVITE</Method>\n"
+                                "      <Extension></Extension>\n"
+                                "    </SPT>\n"
+                                "  </TriggerPoint>\n"
+                                "  <ApplicationServer>\n"
+                                "    <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                                "    <DefaultHandling>0</DefaultHandling>\n"
+                                "  </ApplicationServer>\n"
+                                "  </InitialFilterCriteria>\n"
+                                "</ServiceProfile></IMSSubscription>");
+  _hss_connection->allow_fallback_ifcs();
+
+  TransportFlow tpBono(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
+  TransportFlow tpAS1(TransportFlow::Protocol::UDP, stack_data.scscf_port, "1.2.3.4", 56789);
+
+  // Send a terminating INVITE for a subscriber with a tel: URI
+  Message msg;
+  msg._via = "10.99.88.11:12345;transport=TCP";
+  msg._to = "6505551234@homedomain";
+  msg._route = "Route: <sip:homedomain>";
+  msg._todomain = "";
+  msg._requri = "tel:6505551235";
+
+  msg._method = "INVITE";
+  list<HeaderMatcher> hdrs;
+
+  inject_msg(msg.get_request(), &tpBono);
+  poll();
+  ASSERT_EQ(2, txdata_count());
+
+  // 100 Trying goes back to bono
+  pjsip_msg* out = current_txdata()->msg;
+  RespMatcher(100).matches(out);
+  tpBono.expect_target(current_txdata(), true);  // Requests always come back on same transport
+  msg.set_route(out);
+  free_txdata();
+  ASSERT_EQ(1, txdata_count());
+
+  // INVITE passed on to AS1
+  SCOPED_TRACE("INVITE (S)");
+  pjsip_tx_data* tdata = current_txdata();
+  out = tdata->msg;
+  ReqMatcher r1("INVITE");
+  ASSERT_NO_FATAL_FAILURE(r1.matches(out));
+
+  tpAS1.expect_target(tdata, false);
+  EXPECT_THAT(get_headers(out, "Route"),
+              testing::MatchesRegex("Route: <sip:1\\.2\\.3\\.4:56789;transport=UDP;lr>\r\nRoute: <sip:odi_[+/A-Za-z0-9]+@127.0.0.1:5058;transport=UDP;lr;service=scscf>"));
+  
+  string fresp1 = respond_to_txdata(tdata, 404);
+  inject_msg(fresp1, &tpAS1);
+  ASSERT_EQ(3, txdata_count());
+  free_txdata();
+  free_txdata();
+  ASSERT_EQ(1, txdata_count());
+  
+  // 100 Trying goes back to bono
+  out = current_txdata()->msg;
+  RespMatcher(404).matches(out);
+  free_txdata();
+  ASSERT_EQ(0, txdata_count());
 }
 
 
@@ -1830,6 +1952,33 @@ TEST_F(SCSCFTest, TestEnumNPBGCFTel)
   hdrs.push_back(HeaderMatcher("Route", "Route: <sip:10.0.0.1:5060;transport=TCP;lr>"));
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580401;rn.*+151085804;npdi@homedomain.*"), hdrs, false);
 }
+
+// We can run with no ENUM service - in this case we expect the Request-URI to
+// be unchanged (as there's no lookup which can change it) and for it to just
+// be routed normally to the I-CSCF.
+TEST_F(SCSCFTest, TestWithoutEnum)
+{
+  SCOPED_TRACE("");
+  _hss_connection->set_impu_result("sip:+16505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
+
+  // Disable ENUM.
+  _scscf_sproutlet->_enum_service = NULL;
+
+  Message msg;
+  msg._to = "+15108580271";
+  msg._requri = "sip:+15108580271@homedomain;user=phone";
+
+  // We only do ENUM on originating calls
+  msg._route = "Route: <sip:homedomain;orig>";
+  msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
+  add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
+  list<HeaderMatcher> hdrs;
+
+  // Skip the ACK and BYE on this request by setting the last
+  // parameter to false, as we're only testing Sprout functionality
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580271@homedomain;user=phone.*"), hdrs, false);
+}
+
 
 /// Test a forked flow - setup phase.
 void SCSCFTest::setupForkedFlow(SP::Message& msg)
@@ -2419,9 +2568,19 @@ TEST_F(SCSCFTest, ISCMultipleResponses)
   // more realistic test of AS communication tracking.
   send_response_back_through_dialog(respond_to_txdata(txdata, 180), 180, 2);
 
+  // The 180 counts as the session having been setup from a stats perspective.
+  // Check that the stats have been incremented accordingly.
+  EXPECT_EQ(1, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
+
   // Also send a 200 OK to check that the AS only gets tracked as successful
   // once.
   send_response_back_through_dialog(respond_to_txdata(txdata, 200), 200, 2);
+
+  // Check that 200 OK hasn't resulted in any more session setup stats being
+  // accumulated.
+  EXPECT_EQ(1, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 
   pjsip_tx_data_dec_ref(txdata); txdata = NULL;
 }
@@ -3256,7 +3415,7 @@ TEST_F(SCSCFTest, DefaultHandlingTerminate)
                                 "  </ApplicationServer>\n"
                                 "  </InitialFilterCriteria>\n"
                                 "</ServiceProfile></IMSSubscription>");
-  EXPECT_CALL(*_sess_term_comm_tracker, on_failure(_));
+  EXPECT_CALL(*_sess_term_comm_tracker, on_failure(_, HasSubstr("408")));
 
   TransportFlow tpBono(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::UDP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -3349,7 +3508,7 @@ TEST_F(SCSCFTest, DISABLED_DefaultHandlingTerminateTimeout)
                                 "  </ApplicationServer>\n"
                                 "  </InitialFilterCriteria>\n"
                                 "</ServiceProfile></IMSSubscription>");
-  EXPECT_CALL(*_sess_term_comm_tracker, on_failure(_));
+  EXPECT_CALL(*_sess_term_comm_tracker, on_failure(_, HasSubstr("timeout")));
 
   TransportFlow tpCaller(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::TCP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -3532,6 +3691,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueRecordRouting)
                                 "  </InitialFilterCriteria>\n"
                                 "</ServiceProfile></IMSSubscription>");
 
+  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_, HasSubstr("Transport"))).Times(2);
   TransportFlow tpBono(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
 
   Message msg;
@@ -3659,7 +3819,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueNonResponsive)
                                 "  </ApplicationServer>\n"
                                 "  </InitialFilterCriteria>\n"
                                 "</ServiceProfile></IMSSubscription>");
-  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(StrEq("sip:1.2.3.4:56789;transport=UDP")));
+  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(StrEq("sip:1.2.3.4:56789;transport=UDP"), _));
 
   TransportFlow tpBono(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::UDP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -3748,7 +3908,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueImmediateError)
 
   // This flow counts as an unsuccessful AS communication, as a 100 trying does
   // not cause an AS to be treated as responsive.
-  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_));
+  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_, HasSubstr("500")));
 
   TransportFlow tpBono(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::UDP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -3842,7 +4002,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinue100ThenError)
 
   // This flow counts as an unsuccessful AS communication, as a 100 trying does
   // not cause an AS to be treated as responsive.
-  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_));
+  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_, _));
 
   TransportFlow tpBono(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::UDP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -4182,7 +4342,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueTimeout)
                                 "  </ApplicationServer>\n"
                                 "  </InitialFilterCriteria>\n"
                                 "</ServiceProfile></IMSSubscription>");
-  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_));
+  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_, HasSubstr("timeout")));
 
   TransportFlow tpCaller(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::TCP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -4269,7 +4429,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueDisabled)
                                 "  </ApplicationServer>\n"
                                 "  </InitialFilterCriteria>\n"
                                 "</ServiceProfile></IMSSubscription>");
-  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_));
+  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_, _));
 
   TransportFlow tpCaller(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::TCP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -4715,7 +4875,10 @@ void SCSCFTest::doAsOriginated(const std::string& msg, bool expect_orig)
   EXPECT_EQ("sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob", r1.uri());
   EXPECT_EQ("", get_headers(out, "Route"));
 
-  free_txdata();
+  // Inject succesful responses to finish up the flow
+  inject_msg(respond_to_current_txdata(200));
+  inject_msg(respond_to_current_txdata(200));
+  inject_msg(respond_to_current_txdata(200));
 }
 
 
@@ -4735,6 +4898,11 @@ TEST_F(SCSCFTest, AsOriginatedOrig)
 
   SCOPED_TRACE("orig");
   doAsOriginated(msg, true);
+
+  // This is an originating call so we track a session setup time regardless of
+  // the fact that it is initiated by an app server.
+  EXPECT_EQ(1, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 }
 
 
@@ -4918,6 +5086,8 @@ TEST_F(SCSCFTest, Cdiv)
   EXPECT_EQ("", get_headers(out, "Route"));
 
   free_txdata();
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 }
 
 
@@ -5715,7 +5885,6 @@ TEST_F(SCSCFTest, ExpiredChain)
   doAsOriginated(string(buf, len), true);
 }
 
-#if 0
 // Test a simple MMTEL flow.
 TEST_F(SCSCFTest, MmtelFlow)
 {
@@ -5808,8 +5977,8 @@ TEST_F(SCSCFTest, MmtelFlow)
   tpAS1.expect_target(current_txdata(), false);
   EXPECT_EQ("sip:6505551234@homedomain", r1.uri());
   EXPECT_THAT(get_headers(out, "Route"),
-              testing::MatchesRegex("Route: <sip:5\\.2\\.3\\.4:56787;transport=UDP;lr>\r\nRoute: <sip:odi_[+/A-Za-z0-9]+@127.0.0.1:5058;transport=UDP;lr>"));
-  EXPECT_EQ("Privacy: id, header, user", get_headers(out, "Privacy"));
+              testing::MatchesRegex("Route: <sip:5\\.2\\.3\\.4:56787;transport=UDP;lr>\r\nRoute: <sip:odi_[+/A-Za-z0-9]+@127.0.0.1:5058;transport=UDP;lr;service=scscf>"));
+  EXPECT_EQ("Privacy: id; header; user", get_headers(out, "Privacy"));
 
   // ---------- AS1 turns it around (acting as proxy)
   const pj_str_t STR_ROUTE = pj_str("Route");
@@ -5836,11 +6005,10 @@ TEST_F(SCSCFTest, MmtelFlow)
   tpBono.expect_target(current_txdata(), false);
   EXPECT_EQ("sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob", r1.uri());
   EXPECT_EQ("", get_headers(out, "Route"));
-  EXPECT_EQ("Privacy: id, header, user", get_headers(out, "Privacy"));
+  EXPECT_EQ("Privacy: id; header; user", get_headers(out, "Privacy"));
 
   free_txdata();
 }
-
 
 /// Test MMTEL-then-external-AS flows (both orig and term).
 //
@@ -5991,19 +6159,13 @@ TEST_F(SCSCFTest, MmtelThenExternal)
   EXPECT_EQ("sip:6505551234@homedomain", r1.uri());
   EXPECT_THAT(get_headers(out, "Route"),
               testing::MatchesRegex("Route: <sip:1\\.2\\.3\\.4:56789;transport=UDP;lr>\r\nRoute: <sip:odi_[+/A-Za-z0-9]+@127.0.0.1:5058;transport=UDP;lr;orig;service=scscf>"));
-  EXPECT_EQ("Privacy: id, header, user", get_headers(out, "Privacy"));
+  EXPECT_EQ("Privacy: id; header; user", get_headers(out, "Privacy"));
   EXPECT_THAT(get_headers(out, "P-Served-User"),
               testing::MatchesRegex("P-Served-User: <sip:6505551000@homedomain>;sescase=orig;regstate=unreg"));
 
   // ---------- AS1 turns it around (acting as proxy)
   const pj_str_t STR_ROUTE = pj_str("Route");
   pjsip_hdr* hdr = (pjsip_hdr*)pjsip_msg_find_hdr_by_name(out, &STR_ROUTE, NULL);
-  if (hdr)
-  {
-    pj_list_erase(hdr);
-  }
-  // @@@KSW Work around https://github.com/Metaswitch/sprout/issues/43
-  hdr = (pjsip_hdr*)pjsip_msg_find_hdr_by_name(out, &STR_PRIVACY, NULL);
   if (hdr)
   {
     pj_list_erase(hdr);
@@ -6029,7 +6191,7 @@ TEST_F(SCSCFTest, MmtelThenExternal)
   tpAS2.expect_target(current_txdata(), false);
   EXPECT_EQ("sip:6505551234@homedomain", r1.uri());
   EXPECT_THAT(get_headers(out, "Route"),
-              testing::MatchesRegex("Route: <sip:5\\.2\\.3\\.4:56787;transport=UDP;lr>\r\nRoute: <sip:odi_[+/A-Za-z0-9]+@127.0.0.1:5058;transport=UDP;lr>"));
+              testing::MatchesRegex("Route: <sip:5\\.2\\.3\\.4:56787;transport=UDP;lr>\r\nRoute: <sip:odi_[+/A-Za-z0-9]+@127.0.0.1:5058;transport=UDP;lr;service=scscf>"));
   EXPECT_THAT(get_headers(out, "P-Served-User"),
               testing::MatchesRegex("P-Served-User: <sip:6505551234@homedomain>;sescase=term;regstate=reg"));
 
@@ -6057,7 +6219,7 @@ TEST_F(SCSCFTest, MmtelThenExternal)
   tpBono.expect_target(current_txdata(), false);
   EXPECT_EQ("sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob", r1.uri());
   EXPECT_EQ("", get_headers(out, "Route"));
-  // @@@KSW Work around https://github.com/Metaswitch/sprout/issues/43: omit: EXPECT_EQ("Privacy: id, header, user", get_headers(out, "Privacy"));
+  EXPECT_EQ("Privacy: id; header; user", get_headers(out, "Privacy"));
 
   free_txdata();
 }
@@ -6076,7 +6238,7 @@ TEST_F(SCSCFTest, MmtelThenExternal)
 //     * external AS1 (5.2.3.4:56787) is invoked
 // * call reaches registered contact for 6505551234.
 //
-TEST_F(SCSCFTest, DISABLED_MultipleMmtelFlow)  // @@@KSW not working: https://github.com/Metaswitch/sprout/issues/44
+TEST_F(SCSCFTest, MultipleMmtelFlow)
 {
   register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
   _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED,
@@ -6226,8 +6388,8 @@ TEST_F(SCSCFTest, DISABLED_MultipleMmtelFlow)  // @@@KSW not working: https://gi
   tpAS1.expect_target(current_txdata(), false);
   EXPECT_EQ("sip:6505551234@homedomain", r1.uri());
   EXPECT_THAT(get_headers(out, "Route"),
-              testing::MatchesRegex("Route: <sip:5\\.2\\.3\\.4:56787;transport=UDP;lr>\r\nRoute: <sip:odi_[+/A-Za-z0-9]+@127.0.0.1:5058;transport=UDP;lr>"));
-  EXPECT_EQ("Privacy: id, header, user", get_headers(out, "Privacy"));
+              testing::MatchesRegex("Route: <sip:5\\.2\\.3\\.4:56787;transport=UDP;lr>\r\nRoute: <sip:odi_[+/A-Za-z0-9]+@127.0.0.1:5058;transport=UDP;lr;service=scscf>"));
+  EXPECT_EQ("Privacy: id; header; user", get_headers(out, "Privacy"));
 
   // ---------- AS1 turns it around (acting as proxy)
   const pj_str_t STR_ROUTE = pj_str("Route");
@@ -6254,11 +6416,10 @@ TEST_F(SCSCFTest, DISABLED_MultipleMmtelFlow)  // @@@KSW not working: https://gi
   tpBono.expect_target(current_txdata(), false);
   EXPECT_EQ("sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob", r1.uri());
   EXPECT_EQ("", get_headers(out, "Route"));
-  EXPECT_EQ("Privacy: id, header, user", get_headers(out, "Privacy"));
+  EXPECT_EQ("Privacy: id; header; user", get_headers(out, "Privacy"));
 
   free_txdata();
 }
-#endif
 
 
 // Test basic ISC (AS) OPTIONS final acceptance flow (AS sinks request).
@@ -6473,6 +6634,9 @@ TEST_F(SCSCFTest, TerminatingDiversionExternal)
   tpBono.expect_target(current_txdata(), true);  // Requests always come back on same transport
   msg.set_route(out);
   free_txdata();
+
+  EXPECT_EQ(1, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 }
 
 
@@ -6616,6 +6780,9 @@ TEST_F(SCSCFTest, OriginatingExternal)
   tpBono.expect_target(current_txdata(), true);  // Requests always come back on same transport
   msg.set_route(out);
   free_txdata();
+
+  EXPECT_EQ(1, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 }
 
 
@@ -6830,6 +6997,9 @@ TEST_F(SCSCFTest, OriginatingTerminatingAS)
   tpBono.expect_target(current_txdata(), true);  // Requests always come back on same transport
   msg.set_route(out);
   free_txdata();
+
+  EXPECT_EQ(1, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 }
 
 
@@ -7116,6 +7286,11 @@ TEST_F(SCSCFTest, OriginatingTerminatingASTimeout)
   msg._method = "ACK";
   msg._branch = "2222222222";
   inject_msg(msg.get_request(), &tpAS);
+
+  // Session didn't get set up successfully so no session setup time will be
+  // tracked.
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 }
 
 
@@ -7533,6 +7708,10 @@ TEST_F(SCSCFTest, TerminatingDiversionExternalOrigCdiv)
   tpBono.expect_target(current_txdata(), true);  // Requests always come back on same transport
   msg.set_route(out);
   free_txdata();
+
+  //  We should have tracked the session setup time for just the original session.
+  EXPECT_EQ(1, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_audio_session_setup_time_tbl)->_count);
+  EXPECT_EQ(0, ((SNMP::FakeEventAccumulatorTable*)_scscf_sproutlet->_video_session_setup_time_tbl)->_count);
 }
 
 TEST_F(SCSCFTest, TestAddSecondTelPAIHdr)
@@ -8272,3 +8451,133 @@ TEST_F(SCSCFTest, TestSessionExpires)
   rsp_hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires: .*"));
   doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs, false, rsp_hdrs);
 }
+
+TEST_F(SCSCFTest, TestSessionExpiresInDialog)
+{
+  SCOPED_TRACE("");
+  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
+
+  // Send an UPDATE in-dialog request to which we should always add RR and SE.
+  // Then check that if the UAS strips the SE, that Sprout tells the UAC to be
+  // the refresher. This ensures that our response processing is correct.
+  Message msg;
+  msg._extra = "Supported: timer";
+  msg._in_dialog = true;
+
+  list<HeaderMatcher> hdrs;
+  hdrs.push_back(HeaderMatcher("Record-Route"));
+  hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires:.*"));
+
+  list<HeaderMatcher> rsp_hdrs;
+  rsp_hdrs.push_back(HeaderMatcher("Session-Expires", "Session-Expires:.*;refresher=uac"));
+  rsp_hdrs.push_back(HeaderMatcher("Record-Route"));
+
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*homedomain.*"), hdrs, false, rsp_hdrs);
+}
+
+TEST_F(SCSCFTest, TestSessionExpiresWhenNoRecordRoute)
+{
+  SCOPED_TRACE("");
+  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED,
+                                R"(<IMSSubscription><ServiceProfile>
+                                <PublicIdentity><Identity>sip:6505551000@homedomain</Identity></PublicIdentity>
+                                  <InitialFilterCriteria>
+                                    <Priority>2</Priority>
+                                    <TriggerPoint>
+                                    <ConditionTypeCNF>0</ConditionTypeCNF>
+                                    <SPT>
+                                      <ConditionNegated>0</ConditionNegated>
+                                      <Group>0</Group>
+                                      <Method>INVITE</Method>
+                                      <Extension></Extension>
+                                    </SPT>
+                                  </TriggerPoint>
+                                  <ApplicationServer>
+                                    <ServerName>sip:4.2.3.4:56788;transport=UDP</ServerName>
+                                    <DefaultHandling>0</DefaultHandling>
+                                  </ApplicationServer>
+                                  </InitialFilterCriteria>
+                                  <InitialFilterCriteria>
+                                    <Priority>1</Priority>
+                                    <TriggerPoint>
+                                    <ConditionTypeCNF>0</ConditionTypeCNF>
+                                    <SPT>
+                                      <ConditionNegated>0</ConditionNegated>
+                                      <Group>0</Group>
+                                      <Method>INVITE</Method>
+                                      <Extension></Extension>
+                                    </SPT>
+                                  </TriggerPoint>
+                                  <ApplicationServer>
+                                    <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>
+                                    <DefaultHandling>0</DefaultHandling>
+                                  </ApplicationServer>
+                                  </InitialFilterCriteria>
+                                </ServiceProfile></IMSSubscription>)");
+
+  TransportFlow tpAS1(TransportFlow::Protocol::UDP, stack_data.scscf_port, "1.2.3.4", 56789);
+  TransportFlow tpAS2(TransportFlow::Protocol::UDP, stack_data.scscf_port, "4.2.3.4", 56788);
+
+
+  // Send an INVITE
+  Message msg;
+  msg._via = "10.99.88.11:12345;transport=TCP";
+  msg._to = "6505551234@homedomain";
+  msg._todomain = "";
+  msg._route = "Route: <sip:homedomain;orig>";
+  msg._requri = "sip:6505551234@homedomain";
+  msg._method = "INVITE";
+
+  pjsip_msg* out;
+  inject_msg(msg.get_request());
+
+  // INVITE passed to AS1
+  SCOPED_TRACE("INVITE (1)");
+  ASSERT_EQ(2, txdata_count());
+  free_txdata();
+  out = current_txdata()->msg;
+  ReqMatcher r1("INVITE");
+  ASSERT_NO_FATAL_FAILURE(r1.matches(out));
+
+  ASSERT_TRUE(!get_headers(out, "Record-Route").empty());
+  ASSERT_TRUE(!get_headers(out, "Session-Expires").empty());
+
+
+  // AS proxies INVITE back.
+  const pj_str_t STR_ROUTE = pj_str("Route");
+  const pj_str_t STR_REC_ROUTE = pj_str("Record-Route");
+  const pj_str_t STR_SESS_EXP = pj_str("Session-Expires");
+  pjsip_hdr* hdr = (pjsip_hdr*)pjsip_msg_find_hdr_by_name(out, &STR_ROUTE, NULL);
+  pjsip_hdr* rr_hdr = (pjsip_hdr*)pjsip_msg_find_hdr_by_name(out, &STR_REC_ROUTE, NULL);
+  pjsip_hdr* se_hdr = (pjsip_hdr*)pjsip_msg_find_hdr_by_name(out, &STR_SESS_EXP, NULL);
+  pj_list_erase(rr_hdr);
+  pj_list_erase(se_hdr);
+
+  if (hdr)
+  {
+    pj_list_erase(hdr);
+  }
+
+  inject_msg(out, &tpAS1);
+  free_txdata();
+
+  // 100 Trying goes back to AS1
+  out = current_txdata()->msg;
+  RespMatcher(100).matches(out);
+  tpAS1.expect_target(current_txdata(), true);  // Requests always come back on same transport
+  msg.set_route(out);
+  free_txdata();
+
+  // INVITE passed on to AS2
+  SCOPED_TRACE("INVITE (2)");
+  out = current_txdata()->msg;
+  ASSERT_NO_FATAL_FAILURE(r1.matches(out));
+  tpAS2.expect_target(current_txdata(), false);
+
+  // Should not RR between AS's and therefore shouldn't SE
+  ASSERT_TRUE(get_headers(out, "Record-Route").empty());
+  ASSERT_TRUE(get_headers(out, "Session-Expires").empty());
+}
+

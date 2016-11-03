@@ -67,6 +67,7 @@ class EnumServiceTest : public ::testing::Test
 };
 
 class JSONEnumServiceTest : public EnumServiceTest {};
+class DummyEnumServiceTest : public EnumServiceTest {};
 class DNSEnumServiceTest : public EnumServiceTest
 {
   DNSEnumServiceTest() : EnumServiceTest()
@@ -104,6 +105,14 @@ private:
   string _in; //^ input
   string _out; //^ expected output
 };
+
+
+TEST_F(DummyEnumServiceTest, SimpleTests)
+{
+  DummyEnumService enum_("ut.cw-ngv.com");
+
+  ET("+15108580277", "sip:+15108580277@ut.cw-ngv.com").test(enum_);
+}
 
 
 TEST_F(JSONEnumServiceTest, SimpleTests)
@@ -195,7 +204,8 @@ struct ares_naptr_reply basic_naptr_reply[] = {
 
 TEST_F(DNSEnumServiceTest, BasicTest)
 {
-  CommunicationMonitor cm_(new Alarm("sprout", AlarmDef::SPROUT_ENUM_COMM_ERROR, AlarmDef::MAJOR), "sprout", "enum");
+  AlarmManager am;
+  CommunicationMonitor cm_(new Alarm(&am, "sprout", AlarmDef::SPROUT_ENUM_COMM_ERROR, AlarmDef::MAJOR), "sprout", "enum");
   FakeDNSResolver::_database.insert(std::make_pair(std::string("4.3.2.1.e164.arpa"), (struct ares_naptr_reply*)basic_naptr_reply));
   DNSEnumService enum_(_servers, ".e164.arpa", new FakeDNSResolverFactory(), &cm_);
   ET("1234", "sip:1234@ut.cw-ngv.com").test(enum_);
@@ -368,14 +378,16 @@ TEST_F(DNSEnumServiceTest, DifferentSuffixTest)
 
 TEST_F(DNSEnumServiceTest, ResolverErrorTest)
 {
-  CommunicationMonitor cm_(new Alarm("sprout", AlarmDef::SPROUT_ENUM_COMM_ERROR, AlarmDef::MAJOR), "sprout", "enum");
+  AlarmManager am;
+  CommunicationMonitor cm_(new Alarm(&am, "sprout", AlarmDef::SPROUT_ENUM_COMM_ERROR, AlarmDef::MAJOR), "sprout", "enum");
   DNSEnumService enum_(_servers, ".e164.arpa", new FakeDNSResolverFactory(), &cm_);
   ET("1234", "").test(enum_);
 }
 
 TEST_F(DNSEnumServiceTest, ResolverOkCommMonMockTest)
 {
-  MockCommunicationMonitor cm_;
+  AlarmManager am;
+  MockCommunicationMonitor cm_(&am);
   EXPECT_CALL(cm_, inform_success(_));
   FakeDNSResolver::_database.insert(std::make_pair(std::string("4.3.2.1.e164.arpa"), (struct ares_naptr_reply*)basic_naptr_reply));
   DNSEnumService enum_(_servers, ".e164.arpa", new FakeDNSResolverFactory(), &cm_);
@@ -386,7 +398,8 @@ TEST_F(DNSEnumServiceTest, ResolverNotFoundCommMonMockTest)
 {
   // If we request a nonexistent number, and the ENUM server tells us it doesn't exist,
   // we shouldn't treat that as a communications error.
-  MockCommunicationMonitor cm_;
+  AlarmManager am;
+  MockCommunicationMonitor cm_(&am);
   EXPECT_CALL(cm_, inform_success(_));
   DNSEnumService enum_(_servers, ".e164.arpa", new FakeDNSResolverFactory(), &cm_);
   ET("1234", "").test(enum_);
@@ -396,7 +409,8 @@ TEST_F(DNSEnumServiceTest, ResolverErrorCommMonMockTest)
 {
   // If we request a number, and the ENUM server fails to respond,
   // we should treat that as a communications error.
-  MockCommunicationMonitor cm_;
+  AlarmManager am;
+  MockCommunicationMonitor cm_(&am);
   EXPECT_CALL(cm_, inform_failure(_));
   DNSEnumService enum_(_servers, ".e164.arpa", new BrokenDNSResolverFactory(), &cm_);
   ET("1234", "").test(enum_);

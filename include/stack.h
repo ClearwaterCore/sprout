@@ -66,6 +66,7 @@ struct stack_data_struct
   pj_caching_pool      cp;
   pj_pool_t           *pool;
   pjsip_endpoint      *endpt;
+  pj_thread_t         *pjsip_transport_thread;
   int                  pcscf_untrusted_port;
   pjsip_tpfactory     *pcscf_untrusted_tcp_factory;
   int                  pcscf_trusted_port;
@@ -81,12 +82,12 @@ struct stack_data_struct
   std::unordered_set<std::string> home_domains;
   std::unordered_set<std::string> aliases;
   pj_str_t             cdf_domain;
-  pj_str_t             scscf_uri;
+  pj_str_t             scscf_uri_str;
+  pjsip_sip_uri*       scscf_uri;
 
   int                  addr_family;
 
-  unsigned             name_cnt;
-  pj_str_t             name[30];
+  std::vector<pj_str_t> name;
   LastValueCache *     stats_aggregator;
 
   bool record_route_on_every_hop;
@@ -103,6 +104,22 @@ struct stack_data_struct
 };
 
 extern struct stack_data_struct stack_data;
+
+inline bool is_pjsip_transport_thread()
+{
+#ifdef UNIT_TEST
+  // This check doesn't make sense in UT, where we use a different threading model
+  return true;
+#else
+  return (pj_thread_this() == stack_data.pjsip_transport_thread);
+#endif
+}
+
+#define CHECK_PJ_TRANSPORT_THREAD() \
+  if (!is_pjsip_transport_thread()) \
+  { \
+    TRC_ERROR("Function expected to be called on PJSIP transport thread (%s) has been called on different thread (%s)", pj_thread_get_name(stack_data.pjsip_transport_thread), pj_thread_get_name(pj_thread_this())); \
+  };
 
 inline void set_trail(pjsip_rx_data* rdata, SAS::TrailId trail)
 {
@@ -134,6 +151,10 @@ inline SAS::TrailId get_trail(const pjsip_transaction* tsx)
   return (SAS::TrailId)tsx->mod_data[stack_data.sas_logging_module_id];
 }
 
+extern void set_quiescing_true();
+
+extern void set_quiescing_false();
+
 extern void init_pjsip_logging(int log_level,
                                pj_bool_t log_to_file,
                                const std::string& directory);
@@ -153,7 +174,6 @@ extern pj_status_t init_stack(const std::string& sas_system_name,
                               const std::string& sprout_hostname,
                               const std::string& alias_hosts,
                               SIPResolver* sipresolver,
-                              int num_pjsip_threads,
                               int record_routing_model,
                               const int default_session_expires,
                               const int max_session_expires,
@@ -162,8 +182,8 @@ extern pj_status_t init_stack(const std::string& sas_system_name,
                               QuiescingManager *quiescing_mgr,
                               const std::string& cdf_domain,
                               std::vector<std::string> sproutlet_uris);
-extern pj_status_t start_pjsip_threads();
-extern pj_status_t stop_pjsip_threads();
+extern pj_status_t start_pjsip_thread();
+extern pj_status_t stop_pjsip_thread();
 extern void stop_stack();
 extern void destroy_stack();
 extern pj_status_t init_pjsip();

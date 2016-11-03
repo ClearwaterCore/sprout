@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 # @file bono.init.d
 #
@@ -80,6 +80,9 @@ log_directory=/var/log/$NAME
 #
 setup_environment()
 {
+        # Net-snmp will attempt to load all MIBs listed in the MIBS
+        # environment variable. We don't install them by default. Clear
+        # the environment variable to stop net-snmp complaining.
         export MIBS=""
         export LD_LIBRARY_PATH=/usr/share/clearwater/sprout/lib
         ulimit -Hn 1000000
@@ -97,19 +100,19 @@ get_settings()
         # Set up defaults and then pull in the settings for this node.
         sas_server=0.0.0.0
         signaling_dns_server=127.0.0.1
+        bono_alias_list=""
         . /etc/clearwater/config
 
-        # Set the upsteam hostname to the sprout hostname only if it hasn't
+        # Set the upstream hostname to the sprout hostname only if it hasn't
         # already been set (we have to do this after dotting in the config
         # as the sprout_hostname value comes from the config file)
-        [ -n "$upstream_hostname" ] || upstream_hostname=scscf.$sprout_hostname
-        [ -n "$upstream_port" ] || upstream_port=5054
+        [ -n "$upstream_hostname" ] || upstream_hostname=icscf.$sprout_hostname
+        [ -n "$upstream_port" ] || upstream_port=5052
 
         # Set up defaults for user settings then pull in any overrides.
         # Bono doesn't need multi-threading, so set the number of threads to
         # the number of cores.  The number of PJSIP threads must be 1, as its
         # code is not multi-threadable.
-        num_pjsip_threads=1
         num_worker_threads=$(grep processor /proc/cpuinfo | wc -l)
         log_level=2
         upstream_connections=50
@@ -138,6 +141,7 @@ get_daemon_args()
         if [ $IBCF_ENABLED = Y ]
         then
           [ -z "$trusted_peers" ] || ibcf_arg="--ibcf=$trusted_peers"
+          [ -z "$ibcf_domain" ] || bono_alias_list="$bono_alias_list,$ibcf_domain"
         fi
 
         [ -z "$ralf_hostname" ] || ralf_arg="--ralf=$ralf_hostname"
@@ -148,24 +152,21 @@ get_daemon_args()
         [ -z "$max_tokens" ] || max_tokens_arg="--max-tokens=$max_tokens"
         [ -z "$init_token_rate" ] || init_token_rate_arg="--init-token-rate=$init_token_rate"
         [ -z "$min_token_rate" ] || min_token_rate_arg="--min-token-rate=$min_token_rate"
-        [ -z "$signaling_namespace" ] || namespace_prefix="ip netns exec $signaling_namespace"
         [ -z "$exception_max_ttl" ] || exception_max_ttl_arg="--exception-max-ttl=$exception_max_ttl"
 
         DAEMON_ARGS="--domain=$home_domain
                      --localhost=$local_ip,$public_hostname
-                     --alias=$public_ip
+                     --alias=$public_ip,$public_hostname,$bono_alias_list
                      --pcscf=5060,5058
                      --webrtc-port=5062
                      --routing-proxy=$upstream_hostname,$upstream_port,$upstream_connections,$upstream_recycle_connections
                      $ralf_arg
                      --sas=$sas_server,$NAME@$public_hostname
                      --dns-server=$signaling_dns_server
-                     --pjsip-threads=$num_pjsip_threads
                      --worker-threads=$num_worker_threads
                      --analytics=$log_directory
                      --log-file=$log_directory
                      --log-level=$log_level
-                     --pidfile=$PIDFILE
                      $target_latency_us_arg
                      $max_tokens_arg
                      $init_token_rate_arg
@@ -202,7 +203,7 @@ do_start()
         # daemon is not running, so attempt to start it.
         setup_environment
         get_daemon_args
-        $namespace_prefix start-stop-daemon --start --quiet --background --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
+        /usr/share/clearwater/bin/run-in-signaling-namespace start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS --daemon --pidfile=$PIDFILE \
                 || return 2
         # Add code here, if necessary, that waits for the process to be ready
         # to handle requests from services started subsequently which depend
@@ -234,7 +235,7 @@ do_run()
 
         setup_environment
         get_daemon_args
-        $namespace_prefix start-stop-daemon --start --quiet --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
+        /usr/share/clearwater/bin/run-in-signaling-namespace start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS --pidfile=$PIDFILE \
                 || return 2
 }
 

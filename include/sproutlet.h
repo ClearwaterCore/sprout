@@ -564,8 +564,8 @@ public:
   /// Virtual destructor.
   virtual ~Sproutlet() {}
 
-  SNMP::SuccessFailCountByRequestTypeTable* _incoming_sip_transactions_tbl = NULL;
-  SNMP::SuccessFailCountByRequestTypeTable* _outgoing_sip_transactions_tbl = NULL;
+  SNMP::SuccessFailCountByRequestTypeTable* _incoming_sip_transactions_tbl;
+  SNMP::SuccessFailCountByRequestTypeTable* _outgoing_sip_transactions_tbl;
 
   /// Called when the system determines the service should be invoked for a
   /// received request.  The Sproutlet can either return NULL indicating it
@@ -605,7 +605,11 @@ protected:
   Sproutlet(const std::string& service_name,
             int port,
             const std::string& uri,
-            const std::string& service_host="") :
+            const std::string& service_host="",
+            SNMP::SuccessFailCountByRequestTypeTable* incoming_sip_transactions_tbl = NULL,
+            SNMP::SuccessFailCountByRequestTypeTable* outgoing_sip_transactions_tbl = NULL) :
+    _incoming_sip_transactions_tbl(incoming_sip_transactions_tbl),
+    _outgoing_sip_transactions_tbl(outgoing_sip_transactions_tbl),
     _service_name(service_name),
     _port(port),
     _uri(uri),

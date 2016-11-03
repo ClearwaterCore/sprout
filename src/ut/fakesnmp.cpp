@@ -45,6 +45,7 @@ struct in_addr dummy_addr;
 FakeIPCountRow FAKE_IP_COUNT_ROW;
 FakeIPCountTable FAKE_IP_COUNT_TABLE;
 FakeCounterTable FAKE_COUNTER_TABLE;
+FakeCounterByScopeTable FAKE_COUNTER_BY_SCOPE_TABLE;
 FakeEventAccumulatorTable FAKE_EVENT_ACCUMULATOR_TABLE;
 FakeContinuousAccumulatorTable FAKE_CONTINUOUS_ACCUMULATOR_TABLE;
 FakeSuccessFailCountTable FAKE_INIT_REG_TABLE;
@@ -81,11 +82,13 @@ AuthenticationStatsTables FAKE_AUTHENTICATION_STATS_TABLES =
 };
 
 // Alternative implementations is some functions, so we aren't calling real SNMP code in UT
+EventAccumulatorTable* EventAccumulatorTable::create(std::string name, std::string oid) { return new FakeEventAccumulatorTable(); };
+
 CounterTable* CounterTable::create(std::string name, std::string oid) { return new FakeCounterTable(); };
 
 IPCountTable* IPCountTable::create(std::string name, std::string oid) { return new FakeIPCountTable(); };
-IPCountRow::IPCountRow(struct in_addr addr) {};
-IPCountRow::IPCountRow(struct in6_addr addr) {};
+IPCountRow::IPCountRow(struct in_addr addr) : IPRow(addr) {};
+IPCountRow::IPCountRow(struct in6_addr addr) : IPRow(addr) {};
 
 ColumnData IPCountRow::get_columns()
 {
@@ -96,6 +99,11 @@ ColumnData IPCountRow::get_columns()
 SuccessFailCountByRequestTypeTable* SuccessFailCountByRequestTypeTable::create(std::string name, std::string oid)
 {
   return new FakeSuccessFailCountByRequestTypeTable();
+};
+
+SuccessFailCountTable* SuccessFailCountTable::create(std::string name, std::string oid)
+{
+  return new FakeSuccessFailCountTable();
 };
 
 } // Namespace SNMP ends

@@ -101,6 +101,7 @@ get_settings()
         # These Sproutlets are enabled by default. They listen on different
         # ports to help ensure that requests have a unambiguous Sproutlet
         # to route to.
+        icscf=5052
         bgcf=5053
         scscf=5054
         mmtel=5055
@@ -108,11 +109,13 @@ get_settings()
         alias_list=""
         default_session_expires=600
         signaling_dns_server=127.0.0.1
-        chronos_hostname=127.0.0.1:7253
+        scscf_node_uri=""
+
+        # Enable no-ENUM TEL URI translation fallback by default for backwards compatibility
+        default_tel_uri_translation="Y"
 
         # Set up defaults for user settings then pull in any overrides.
         # Sprout uses blocking look-up services, so must run multi-threaded.
-        num_pjsip_threads=1
         num_worker_threads=$(($(grep processor /proc/cpuinfo | wc -l) * 50))
         num_http_threads=$(($(grep processor /proc/cpuinfo | wc -l) * 50))
 
@@ -138,7 +141,7 @@ get_settings()
         # IP address needs to be surrounded by square brackets if it is IPv6.
         if [ ! -f /etc/clearwater/cluster_settings ]
         then
-          cluster_ip=$(python /usr/share/clearwater/bin/bracket_ipv6_address.py $local_ip)
+          cluster_ip=$(/usr/share/clearwater/bin/bracket-ipv6-address $local_ip)
           echo "servers=$cluster_ip:11211" > /etc/clearwater/cluster_settings
         fi
 
@@ -161,6 +164,7 @@ get_daemon_args()
         [ -z "$enum_server" ] || enum_server_arg="--enum=$enum_server"
         [ -z "$enum_suffix" ] || enum_suffix_arg="--enum-suffix=$enum_suffix"
         [ -z "$enum_file" ] || enum_file_arg="--enum-file=$enum_file"
+        [ "$default_tel_uri_translation" != "Y" ] || default_tel_uri_translation_arg="--default-tel-uri-translation"
 
         if [ $MMTEL_SERVICES_ENABLED = Y ]
         then
@@ -176,6 +180,7 @@ get_daemon_args()
         [ "$override_npdi" != "Y" ] || override_npdi_arg="--override-npdi"
         [ "$force_third_party_reg_body" != "Y" ] || force_3pr_body_arg="--force-3pr-body"
         [ "$sas_use_signaling_interface" != "Y" ] || sas_signaling_if_arg="--sas-use-signaling-interface"
+        [ "$disable_tcp_switch" != "Y" ] || disable_tcp_switch_arg="--disable-tcp-switch"
 
         [ -z "$target_latency_us" ] || target_latency_us_arg="--target-latency-us=$target_latency_us"
         [ -z "$cass_target_latency_us" ] || cass_target_latency_us_arg="--cass-target-latency-us=$cass_target_latency_us"
@@ -184,6 +189,8 @@ get_daemon_args()
         [ -z "$min_token_rate" ] || min_token_rate_arg="--min-token-rate=$min_token_rate"
         [ -z "$exception_max_ttl" ] || exception_max_ttl_arg="--exception-max-ttl=$exception_max_ttl"
         [ -z "$max_session_expires" ] || max_session_expires_arg="--max-session-expires=$max_session_expires"
+        [ -z "$chronos_hostname" ] || chronos_hostname_arg="--chronos-hostname=$chronos_hostname"
+        [ -z "$allow_fallback_ifcs" ] || allow_fallback_ifcs_arg="--allow-fallback-ifcs"
 
         DAEMON_ARGS="
                      --domain=$home_domain
@@ -192,16 +199,17 @@ get_daemon_args()
                      --memstore=/etc/clearwater/cluster_settings
                      --remote-memstore=/etc/clearwater/remote_cluster_settings
                      --hss=$hs_hostname
-                     --chronos=$chronos_hostname
                      --sprout-hostname=$sprout_hostname
+                     --scscf-node-uri=$scscf_node_uri
+                     $chronos_hostname_arg
                      $xdms_hostname_arg
                      $ralf_arg
                      $enum_server_arg
                      $enum_suffix_arg
                      $enum_file_arg
+                     $default_tel_uri_translation_arg
                      --sas=$sas_server,$NAME@$public_hostname
                      --dns-server=$signaling_dns_server
-                     --pjsip-threads=$num_pjsip_threads
                      --worker-threads=$num_worker_threads
                      --http-threads=$num_http_threads
                      --record-routing-model=$sprout_rr_level
@@ -215,16 +223,17 @@ get_daemon_args()
                      $authentication_arg
                      $user_phone_arg
                      $sas_signaling_if_arg
+                     $disable_tcp_switch_arg
                      $global_only_lookups_arg
                      $override_npdi_arg
                      $exception_max_ttl_arg
                      $force_3pr_body_arg
+                     $allow_fallback_ifcs_arg
                      --http-address=$local_ip
                      --http-port=9888
                      --analytics=$log_directory
                      --log-file=$log_directory
                      --log-level=$log_level
-                     --pidfile=$PIDFILE
                      --alias=$public_ip,$public_hostname,$alias_list"
 
         if [ -n "$reg_max_expires" ]
@@ -255,6 +264,11 @@ get_daemon_args()
         if [ -n "$call_list_ttl" ]
         then
           DAEMON_ARGS="$DAEMON_ARGS --call-list-ttl=$call_list_ttl"
+        fi
+
+        if [ -n "$memento" ] && [ -n "$cassandra_hostname" ]
+        then
+          DAEMON_ARGS="$DAEMON_ARGS --plugin-option=memento,cassandra,$cassandra_hostname"
         fi
 
         # TODO improve this so we don't have to have the same parameters
@@ -326,7 +340,7 @@ do_start()
         # daemon is not running, so attempt to start it.
         setup_environment
         get_daemon_args
-        /usr/share/clearwater/bin/run-in-signaling-namespace start-stop-daemon --start --quiet --background --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
+        /usr/share/clearwater/bin/run-in-signaling-namespace start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS --daemon --pidfile=$PIDFILE \
                 || return 2
         # Add code here, if necessary, that waits for the process to be ready
         # to handle requests from services started subsequently which depend
@@ -358,7 +372,7 @@ do_run()
 
         setup_environment
         get_daemon_args
-        /usr/share/clearwater/bin/run-in-signaling-namespace start-stop-daemon --start --quiet --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
+        /usr/share/clearwater/bin/run-in-signaling-namespace start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS --pidfile=$PIDFILE \
                 || return 2
 }
 

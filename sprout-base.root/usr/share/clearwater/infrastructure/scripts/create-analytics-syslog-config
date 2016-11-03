@@ -1,5 +1,9 @@
+#!/bin/bash
+
+# @file create-analytic-syslog-config
+#
 # Project Clearwater - IMS in the Cloud
-# Copyright (C) 2015  Metaswitch Networks Ltd
+# Copyright (C) 2016 Metaswitch Networks Ltd
 #
 # This program is free software: you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -30,22 +34,42 @@
 # under which the OpenSSL Project distributes the OpenSSL toolkit software,
 # as those licenses appear in the file LICENSE-OPENSSL.
 
-from metaswitch.clearwater.config_manager.plugin_base import \
-    ConfigPluginBase
-from metaswitch.clearwater.etcd_shared.plugin_utils import \
-    run_command
-import logging
-import sys
-import os
+# This file creates a syslog config file for Sprout's analytics logs.
 
-sys.path.append(os.path.dirname(__file__))
-from sprout_json_plugin import SproutJsonPlugin
+syslog_conf_file=/etc/rsyslog.d/30-sproutanalytics.conf
+temp_file=$(mktemp sproutanalytics.syslog.XXXXXXXX)
 
-_log = logging.getLogger("sprout_enum_json_plugin")
+. /etc/clearwater/config
 
-class SproutENUMJsonPlugin(SproutJsonPlugin):
-    def __init__(self, _params):
-        super(SproutENUMJsonPlugin, self).__init__("/etc/clearwater/enum.json", "enum_json")
+if [ -n "$remote_audit_logging_server" ]; then
+  # If a remote syslog server is configured for auditing registrations, we need
+  # an rsyslog config line for directing the correct syslogs to this server. We
+  # use a regex to forward messages that start with the correct tag and are
+  # registrations.
+  remote_syslog_audit_server_str=":msg, regex, \"<analytics>.*Registration:.*\" @@${remote_audit_logging_server}"
+fi
 
-def load_as_plugin(params):
-    return SproutENUMJsonPlugin(params)
+cat > $temp_file << EOF
+\$FileCreateMode 0666
+\$umask 0000
+
+# Define a template that strips the "<analytics>" tag off the front of it.
+\$template analytics-format,"%msg:14:$%\r\n"
+
+:msg, contains, "<analytics>" /var/log/sprout/analytics.log;analytics-format
+$remote_syslog_audit_server_str
+:msg, contains, "<analytics>" stop
+
+\$FileCreateMode 0644
+EOF
+
+if ! diff $temp_file $syslog_conf_file > /dev/null 2>&1
+then
+  # Update the config file.
+  mv $temp_file $syslog_conf_file
+
+  # Restart rsyslog to pick up the new config file.
+  service rsyslog restart
+else
+  rm $temp_file
+fi

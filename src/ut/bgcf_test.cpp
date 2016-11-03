@@ -190,7 +190,7 @@ public:
   /// Set up test case.  Caller must clear host_mapping.
   static void SetUpTestCase()
   {
-    SipTest::SetUpTestCase(false);
+    SipTest::SetUpTestCase();
 
     // BGCF selector built with test_bgcf_sproutlet_bgcf.json. This has a
     // wildcard domain, so the BGCF tests will always route to something
@@ -209,6 +209,8 @@ public:
                                         _bgcf_service,
                                         _enum_service,
                                         _acr_factory,
+                                        nullptr,
+                                        nullptr,
                                         false);
 
     // Create the SproutletProxy.
@@ -221,7 +223,8 @@ public:
                                 "homedomain",
                                 aliases,
                                 sproutlets,
-                                std::set<std::string>());
+                                std::set<std::string>(),
+                                "scscf");
 
     // Schedule timers.
     SipTest::poll();
@@ -342,7 +345,7 @@ void BGCFTest::doFailureFlow(BGCFMessage& msg, int st_code)
   inject_msg(msg.get_request());
   ASSERT_EQ(2, txdata_count());
 
-  // We get the 100 Trying from the SproutletProxy, so check this first  
+  // We get the 100 Trying from the SproutletProxy, so check this first
   pjsip_msg* out = current_txdata()->msg;
   RespMatcher(100).matches(out);
   free_txdata();
@@ -353,8 +356,49 @@ void BGCFTest::doFailureFlow(BGCFMessage& msg, int st_code)
   free_txdata();
 }
 
-// Test that a simple Tel URI is picked up by the wild card domain
-TEST_F(BGCFTest, TestSimpleTelURI)
+// Test that a simple Tel URI is picked up by the number route
+TEST_F(BGCFTest, TestSimpleTelURIMatched)
+{
+  add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
+  SCOPED_TRACE("");
+  BGCFMessage msg;
+  msg._toscheme = "tel";
+  msg._to = "+16505551234";
+  msg._todomain = "";
+  list<HeaderMatcher> hdrs;
+  hdrs.push_back(HeaderMatcher("Route", ".*10.0.0.1:5060.*"));
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*16505551234$"), hdrs);
+}
+
+// Tests that a sip: URI with user=phone and no routing number parameter matches
+// on the number route
+TEST_F(BGCFTest, TestSipPhoneNumberUriMatched)
+{
+  add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
+  SCOPED_TRACE("");
+  BGCFMessage msg;
+  msg._requri = "sip:+16505551234@notamatchingdomain;user=phone";
+  list<HeaderMatcher> hdrs;
+  hdrs.push_back(HeaderMatcher("Route", ".*10.0.0.1:5060.*"));
+  doSuccessfulFlow(msg, testing::MatchesRegex("sip:[+]16505551234@notamatchingdomain;user=phone"), hdrs);
+}
+
+// Tests that a SIP URI representing a phone number that doesn't match a number
+// route is picked up by the wildcard domain
+TEST_F(BGCFTest, TestSipPhoneNumberUriNotMatched)
+{
+  add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
+  SCOPED_TRACE("");
+  BGCFMessage msg;
+  msg._requri = "sip:16505551234@notamatchingdomain;user=phone";
+  list<HeaderMatcher> hdrs;
+  hdrs.push_back(HeaderMatcher("Route", ".*10.0.0.2:5060.*"));
+  doSuccessfulFlow(msg, testing::MatchesRegex("sip:16505551234@notamatchingdomain;user=phone"), hdrs);
+}
+
+// Test that a simple Tel URI that doesn't match a route is picked up by the
+// wildcard domain
+TEST_F(BGCFTest, TestSimpleTelURIUnmatched)
 {
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   SCOPED_TRACE("");
@@ -422,4 +466,21 @@ TEST_F(BGCFTest, TestInvalidBGCFRouteNameAddrMix)
   add_host_mapping("domainnotasipurianglebracketmix", "10.9.8.7");
   list<HeaderMatcher> hdrs;
   doFailureFlow(msg, 500);
+}
+
+// If the BGCF receives a request with pre-loaded Route headers, it should
+// remove them before applying its own routes.
+TEST_F(BGCFTest, OverrideRoutes)
+{
+  SCOPED_TRACE("");
+  BGCFMessage msg;
+  msg._to = "12345";
+  msg._todomain = "domainvalid";
+  msg._route = "Route: <sip:bgcf.homedomain>\nRoute: <sip:1.2.3.4;lr>";
+  add_host_mapping("domainvalid", "10.9.8.7");
+  list<HeaderMatcher> hdrs;
+
+  // Check that the preloaded 1.2.3.4 route has now gone.
+  hdrs.push_back(HeaderMatcher("Route", "Route: <sip:10.0.0.1:5060;transport=TCP;lr>"));
+  doSuccessfulFlow(msg, testing::MatchesRegex("sip:12345@domainvalid"), hdrs);
 }
