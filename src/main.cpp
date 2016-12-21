@@ -1140,10 +1140,17 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
     case OPT_SPROUT_HOSTNAME:
       options->sprout_hostname = std::string(pj_optarg);
 
-      if (Utils::parse_ip_address(options->sprout_hostname) !=
-          Utils::IPAddressType::INVALID)
+      if (Utils::parse_ip_address(options->sprout_hostname) ==
+          Utils::IPAddressType::INVALID_WITH_PORT)
       {
-        TRC_ERROR("The sprout hostname (%s) can't be an IP address",
+        TRC_ERROR("The sprout hostname (%s) must not include a port",
+                  options->sprout_hostname.c_str());
+        return -1;
+      }
+      else if (Utils::parse_ip_address(options->sprout_hostname) !=
+               Utils::IPAddressType::INVALID)
+      {
+        TRC_ERROR("The sprout hostname (%s) must not be an IP address",
                   options->sprout_hostname.c_str());
         return -1;
       }
@@ -1502,20 +1509,6 @@ int main(int argc, char* argv[])
   {
     CL_SPROUT_SI_CSCF_NO_HOMESTEAD.log();
     TRC_ERROR("S/I-CSCF enabled with no Homestead server");
-    return 1;
-  }
-
-  if ((opt.auth_enabled) && (opt.hss_server == ""))
-  {
-    CL_SPROUT_AUTH_NO_HOMESTEAD.log();
-    TRC_ERROR("Authentication enabled, but no Homestead server specified");
-    return 1;
-  }
-
-  if ((opt.xdm_server != "") && (opt.hss_server == ""))
-  {
-    CL_SPROUT_XDM_NO_HOMESTEAD.log();
-    TRC_ERROR("XDM server configured for services, but no Homestead server specified");
     return 1;
   }
 
