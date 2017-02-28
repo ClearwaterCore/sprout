@@ -368,7 +368,8 @@ SCSCFSproutletTsx::SCSCFSproutletTsx(SproutletTsxHelper* helper,
   _seen_1xx(false),
   _impi(),
   _auto_reg(false),
-  _se_helper(stack_data.default_session_expires)
+  _se_helper(stack_data.default_session_expires),
+  _base_req(nullptr)
 {
   TRC_DEBUG("S-CSCF Transaction (%p) created", this);
 }
@@ -407,6 +408,11 @@ SCSCFSproutletTsx::~SCSCFSproutletTsx()
   }
 
   _target_bindings.clear();
+
+  if (_base_req != nullptr)
+  {
+    free_msg(_base_req);
+  }
 }
 
 
@@ -617,7 +623,7 @@ void SCSCFSproutletTsx::on_rx_response(pjsip_msg* rsp, int fork_id)
           SAS::report_event(bypass_As);
 
           _as_chain_link = _as_chain_link.next();
-          pjsip_msg* req = original_request();
+          pjsip_msg* req = get_base_request();
           _record_routed = false;
           if (_session_case->is_originating())
           {
@@ -1745,6 +1751,14 @@ void SCSCFSproutletTsx::add_record_route(pjsip_msg* msg,
       pj_list_insert_before(&uri->other_param, param);
     }
   }
+
+  // Store off the modified message - we may need it later if we need to invoke
+  // default handling for an AS.
+  if (_base_req != nullptr)
+  {
+    free_msg(_base_req);
+  }
+  _base_req = clone_msg(msg);
 }
 
 
@@ -1819,7 +1833,7 @@ void SCSCFSproutletTsx::on_timer_expiry(void* context)
       SAS::report_event(bypass_as);
 
       _as_chain_link = _as_chain_link.next();
-      pjsip_msg* req = original_request();
+      pjsip_msg* req = get_base_request();
       _record_routed = false;
       if (_session_case->is_originating())
       {
@@ -1837,7 +1851,7 @@ void SCSCFSproutletTsx::on_timer_expiry(void* context)
       SAS::report_event(as_failed);
 
       // Build and send a timeout response upstream.
-      pjsip_msg* req = original_request();
+      pjsip_msg* req = get_base_request();
       pjsip_msg* rsp = create_response(req,
                                        PJSIP_SC_REQUEST_TIMEOUT);
       free_msg(req);
@@ -1984,5 +1998,17 @@ ACR* SCSCFSproutletTsx::get_acr()
   else
   {
     return _failed_ood_acr;
+  }
+}
+
+pjsip_msg* SCSCFSproutletTsx::get_base_request()
+{
+  if (_base_req)
+  {
+    return clone_msg(_base_req);
+  }
+  else
+  {
+    return original_request();
   }
 }
