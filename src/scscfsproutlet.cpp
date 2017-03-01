@@ -2003,7 +2003,7 @@ ACR* SCSCFSproutletTsx::get_acr()
 
 pjsip_msg* SCSCFSproutletTsx::get_base_request()
 {
-  if (_base_req)
+  if (_base_req != nullptr)
   {
     return clone_msg(_base_req);
   }
