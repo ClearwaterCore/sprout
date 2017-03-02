@@ -1758,7 +1758,7 @@ void SCSCFSproutletTsx::add_record_route(pjsip_msg* msg,
   {
     free_msg(_base_req);
   }
-  _base_req = clone_msg(msg);
+  _base_req = clone_request(msg);
 }
 
 
@@ -2005,7 +2005,7 @@ pjsip_msg* SCSCFSproutletTsx::get_base_request()
 {
   if (_base_req != nullptr)
   {
-    return clone_msg(_base_req);
+    return clone_request(_base_req);
   }
   else
   {

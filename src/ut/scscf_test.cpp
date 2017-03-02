@@ -1419,14 +1419,14 @@ TEST_F(SCSCFTest, TestTelURIWildcard)
   tpAS1.expect_target(tdata, false);
   EXPECT_THAT(get_headers(out, "Route"),
               testing::MatchesRegex("Route: <sip:1\\.2\\.3\\.4:56789;transport=UDP;lr>\r\nRoute: <sip:odi_[+/A-Za-z0-9]+@127.0.0.1:5058;transport=UDP;lr;service=scscf>"));
-  
+
   string fresp1 = respond_to_txdata(tdata, 404);
   inject_msg(fresp1, &tpAS1);
   ASSERT_EQ(3, txdata_count());
   free_txdata();
   free_txdata();
   ASSERT_EQ(1, txdata_count());
-  
+
   // 100 Trying goes back to bono
   out = current_txdata()->msg;
   RespMatcher(404).matches(out);
@@ -1910,7 +1910,7 @@ TEST_F(SCSCFTest, TestWithoutEnum)
   Message msg;
   msg._to = "+15108580271";
   msg._requri = "sip:+15108580271@homedomain;user=phone";
-  
+
   // We only do ENUM on originating calls
   msg._route = "Route: <sip:homedomain;orig>";
   msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
@@ -4653,7 +4653,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueTimeoutRRTest)
                                 "  </ApplicationServer>\n"
                                 "  </InitialFilterCriteria>\n"
                                 "</ServiceProfile></IMSSubscription>");
-  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_, HasSubstr("timeout")));
+  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_));
 
   TransportFlow tpCaller(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::TCP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -4762,7 +4762,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueFirstAsFailsRRTest)
                                 "  </ApplicationServer>\n"
                                 "  </InitialFilterCriteria>\n"
                                 "</ServiceProfile></IMSSubscription>");
-  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_, HasSubstr("Transport error")));
+  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_));
 
   TransportFlow tpCaller(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::TCP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -4856,7 +4856,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueFirstTermAsFailsRRTest)
                                 "</ServiceProfile></IMSSubscription>");
   _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
 
-  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_, HasSubstr("Transport error")));
+  EXPECT_CALL(*_sess_cont_comm_tracker, on_failure(_));
 
   TransportFlow tpCaller(TransportFlow::Protocol::TCP, stack_data.scscf_port, "10.99.88.11", 12345);
   TransportFlow tpAS1(TransportFlow::Protocol::TCP, stack_data.scscf_port, "1.2.3.4", 56789);
@@ -4901,7 +4901,7 @@ TEST_F(SCSCFTest, DefaultHandlingContinueFirstTermAsFailsRRTest)
   //    should only be one RR header from originating processing, which should
   //    indicate originating billing).
   EXPECT_THAT(get_headers(out, "Record-Route"),
-              MatchesRegex("Record-Route:.*billing-role=charge-none.*"
+              MatchesRegex("Record-Route:.*"
                            "Record-Route:.*billing-role=charge-orig.*"));
   free_txdata();
 
