@@ -154,7 +154,8 @@ TYPED_TEST(BasicSubscriberDataManagerTest, BindingTests)
   b1->_expires = now + 300;
   b1->_timer_id = "shouldbecomeDeprecated";
   b1->_priority = 0;
-  b1->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b1->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b1->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b1->_params["reg-id"] = "1";
   b1->_params["+sip.ice"] = "";
@@ -179,8 +180,13 @@ TYPED_TEST(BasicSubscriberDataManagerTest, BindingTests)
   EXPECT_EQ(now + 300, b1->_expires);
   EXPECT_EQ(0, b1->_priority);
   EXPECT_EQ(std::string("Deprecated"), b1->_timer_id);
+  if (typeid(TypeParam) == typeid(SubscriberDataManager::JsonSerializerDeserializer))
+  {
+    EXPECT_EQ(1u, b1->_path_uris.size());
+    EXPECT_EQ(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"), b1->_path_uris.front());
+  }
   EXPECT_EQ(1u, b1->_path_headers.size());
-  EXPECT_EQ(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"), b1->_path_headers.front());
+  EXPECT_EQ(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"), b1->_path_headers.front());
   EXPECT_EQ(3u, b1->_params.size());
   EXPECT_EQ(std::string("\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\""), b1->_params["+sip.instance"]);
   EXPECT_EQ(std::string("1"), b1->_params["reg-id"]);
@@ -263,7 +269,8 @@ TYPED_TEST(BasicSubscriberDataManagerTest, SubscriptionTests)
   b1->_expires = now + 300;
   b1->_timer_id = "shouldbecomeDeprecated";
   b1->_priority = 0;
-  b1->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b1->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b1->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b1->_params["reg-id"] = "1";
   b1->_params["+sip.ice"] = "";
@@ -355,7 +362,8 @@ TYPED_TEST(BasicSubscriberDataManagerTest, CopyTests)
   b1->_expires = now + 300;
   b1->_timer_id = "shouldbecomeDeprecated";
   b1->_priority = 0;
-  b1->_path_headers.push_back(std::string("<sip:abcdefgh@bono1.homedomain;lr>"));
+  b1->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.homedomain;lr"));
+  b1->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.homedomain;lr>;tag=6ht7"));
   b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b1->_params["reg-id"] = "1";
   b1->_params["+sip.ice"] = "";
@@ -587,7 +595,8 @@ TYPED_TEST(MultiFormatSubscriberDataManagerTest, AllFormatsCanBeRead)
   b1->_expires = now + 300;
   b1->_timer_id = "shouldbecomeDeprecated";
   b1->_priority = 0;
-  b1->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b1->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b1->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817621>\"";
   b1->_params["reg-id"] = "1";
   b1->_params["+sip.ice"] = "";
@@ -605,8 +614,14 @@ TYPED_TEST(MultiFormatSubscriberDataManagerTest, AllFormatsCanBeRead)
   b1 = aor_data1->get_current()->get_binding(std::string("urn:uuid:00000000-0000-0000-0000-b4dd32817621:1"));
   EXPECT_EQ(std::string("cid1"), b1->_cid);
 
+  if (typeid(TypeParam) == typeid(SubscriberDataManager::JsonSerializerDeserializer))
+  {
+    EXPECT_EQ(1u, b1->_path_uris.size());
+    EXPECT_EQ(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"), b1->_path_uris.front());
+  }
+
   EXPECT_EQ(1u, b1->_path_headers.size());
-  EXPECT_EQ(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"), b1->_path_headers.front());
+  EXPECT_EQ(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"), b1->_path_headers.front());
 
   EXPECT_EQ(3u, b1->_params.size());
   EXPECT_EQ(std::string("1"), b1->_params["reg-id"]);
@@ -761,7 +776,8 @@ TEST_F(SubscriberDataManagerChronosRequestsTest, BasicAoRTimerTest)
   b1->_expires = now + 300;
   b1->_timer_id = "shouldbecomeDeprecated";
   b1->_priority = 0;
-  b1->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b1->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b1->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b1->_params["reg-id"] = "1";
   b1->_params["+sip.ice"] = "";
@@ -831,7 +847,8 @@ TEST_F(SubscriberDataManagerChronosRequestsTest, UpdateAoRTimerTest)
   b1->_expires = now + 300;
   b1->_timer_id = "shouldbecomeDeprecated";
   b1->_priority = 0;
-  b1->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b1->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b1->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b1->_params["reg-id"] = "1";
   b1->_params["+sip.ice"] = "";
@@ -887,7 +904,8 @@ TEST_F(SubscriberDataManagerChronosRequestsTest, UpdateAoRTimerTest)
   b2->_expires = now + 300;
   b2->_timer_id = "shouldbecomeDeprecated";
   b2->_priority = 0;
-  b2->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b2->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b2->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b2->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b2->_params["reg-id"] = "1";
   b2->_params["+sip.ice"] = "";
@@ -930,7 +948,8 @@ TEST_F(SubscriberDataManagerChronosRequestsTest, AoRChangeNoUpdateTimerTest)
   b1->_expires = now + 300;
   b1->_timer_id = "shouldbecomeDeprecated";
   b1->_priority = 0;
-  b1->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b1->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b1->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b1->_params["reg-id"] = "1";
   b1->_params["+sip.ice"] = "";
@@ -974,7 +993,8 @@ TEST_F(SubscriberDataManagerChronosRequestsTest, AoRChangeNoUpdateTimerTest)
   b2->_expires = now + 300;
   b2->_timer_id = "shouldbecomeDeprecated";
   b2->_priority = 0;
-  b2->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b2->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b2->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b2->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b2->_params["reg-id"] = "1";
   b2->_params["+sip.ice"] = "";
@@ -1043,7 +1063,8 @@ TEST_F(SubscriberDataManagerChronosRequestsTest, AoRNextExpiresUpdateTimerTest)
   b1->_expires = now + 300;
   b1->_timer_id = "shouldbecomeDeprecated";
   b1->_priority = 0;
-  b1->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b1->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b1->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b1->_params["reg-id"] = "1";
   b1->_params["+sip.ice"] = "";
@@ -1139,7 +1160,8 @@ TEST_F(SubscriberDataManagerChronosRequestsTest, AoRTimerBadRequestNoIDTest)
   b1->_expires = now + 300;
   b1->_timer_id = "shouldbecomeDeprecated";
   b1->_priority = 0;
-  b1->_path_headers.push_back(std::string("<sip:abcdefgh@bono-1.cw-ngv.com;lr>"));
+  b1->_path_uris.push_back(std::string("sip:abcdefgh@bono-1.cw-ngv.com;lr"));
+  b1->_path_headers.push_back(std::string("\"Bob\" <sip:abcdefgh@bono-1.cw-ngv.com;lr>;tag=6ht7"));
   b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
   b1->_params["reg-id"] = "1";
   b1->_params["+sip.ice"] = "";
