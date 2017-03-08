@@ -674,7 +674,7 @@ TEST_F(ContactFilteringBindingToTargetTest, SimpleConversionPathUri)
   // binding.
 
   std::string aor = "sip:user@domain.com";
-  SubscriberDataManager::AoR::Binding binding(aor);
+  SubscriberDataManager::AoR::Binding binding(&aor);
   create_binding(binding);
   binding._path_headers.clear();
   std::string binding_id = "<sip:user@10.1.2.3>";
@@ -742,7 +742,7 @@ TEST_F(ContactFilteringBindingToTargetTest, InvalidPath)
 TEST_F(ContactFilteringBindingToTargetTest, InvalidPathDownlevel)
 {
   std::string aor = "sip:user@domain.com";
-  SubscriberDataManager::AoR::Binding binding(aor);
+  SubscriberDataManager::AoR::Binding binding(&aor);
   create_binding(binding);
   binding._path_headers.clear();
   std::string binding_id = "<sip:user@10.1.2.3>";

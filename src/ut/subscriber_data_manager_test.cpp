@@ -546,14 +546,8 @@ TEST_F(BasicSubscriberDataManagerTestJSON, BindingTests)
   b1->_emergency_registration = false;
 
   // Add the AoR record to the store.
-  std::vector<std::string> irs_impus;
-  irs_impus.push_back("5102175698@cw-ngv.com");
-  EXPECT_CALL(*(this->_analytics_logger),
-              registration("5102175698@cw-ngv.com",
-                           "urn:uuid:00000000-0000-0000-0000-b4dd32817622:1",
-                           "<sip:5102175698@192.91.191.29:59934;transport=tcp;ob>",
-                           300)).Times(1);
-  rc = this->_store->set_aor_data(irs_impus[0], irs_impus, aor_data1, 0);
+  std::string uri = "5102175698@cw-ngv.com";
+  rc = this->_store->set_aor_data(uri, aor_data1, 0);
   EXPECT_TRUE(rc);
   delete aor_data1; aor_data1 = NULL;
 
