@@ -1193,8 +1193,8 @@ std::string SubscriberDataManager::JsonSerializerDeserializer::serialize_aor(AoR
           writer.String(JSON_PATH_HEADERS);
           writer.StartArray();
           {
-            for (std::list<std::string>::const_iterator p = _path_headers.begin();
-                 p != _path_headers.end();
+            for (std::list<std::string>::const_iterator p = b->_path_headers.begin();
+                 p != b->_path_headers.end();
                  ++p)
             {
               writer.String(p->c_str());
@@ -1205,8 +1205,8 @@ std::string SubscriberDataManager::JsonSerializerDeserializer::serialize_aor(AoR
           writer.String(JSON_PATHS);
           writer.StartArray();
           {
-            for (std::list<std::string>::const_iterator p = _path_uris.begin();
-                 p != _path_uris.end();
+            for (std::list<std::string>::const_iterator p = b->_path_uris.begin();
+                 p != b->_path_uris.end();
                  ++p)
             {
               writer.String(p->c_str());
