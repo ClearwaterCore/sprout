@@ -443,6 +443,12 @@ bool decode_homestead_xml(const std::string public_user_identity,
           }
         }
 
+        rapidxml::xml_node<>* extension = public_id->first_node(RegDataXmlUtils::EXTENSION);
+        if (extension)
+        {
+          RegDataXmlUtils::parse_extension(uri, extension);
+        }
+
         associated_uris.add(uri, barred);
         ifcs_map[uri] = ifc;
 
