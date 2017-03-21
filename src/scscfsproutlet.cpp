@@ -313,7 +313,7 @@ long SCSCFSproutlet::read_hss_data(const std::string& public_id,
     // We may want to route to bindings that are barred (in case of an emergency),
     // so get all the URIs.
     uris = associated_uris.all_uris();
-    registered = (regstate == HSSConnection::STATE_REGISTERED);
+    registered = (regstate == RegDataXMLUtils::STATE_REGISTERED);
     barred = associated_uris.is_barred(public_id);
   }
 

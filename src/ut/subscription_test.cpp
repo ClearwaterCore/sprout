@@ -78,8 +78,8 @@ public:
     pj_status_t ret = init_subscription(_sdm, remote_sdms, _hss_connection, _acr_factory, _analytics, 300);
     ASSERT_EQ(PJ_SUCCESS, ret);
 
-    _hss_connection->set_impu_result("sip:6505550231@homedomain", "", HSSConnection::STATE_REGISTERED, "");
-    _hss_connection->set_impu_result("tel:6505550231", "", HSSConnection::STATE_REGISTERED, "");
+    _hss_connection->set_impu_result("sip:6505550231@homedomain", "", RegDataXMLUtils::STATE_REGISTERED, "");
+    _hss_connection->set_impu_result("tel:6505550231", "", RegDataXMLUtils::STATE_REGISTERED, "");
   }
 
   static void TearDownTestCase()
@@ -672,7 +672,7 @@ TEST_F(SubscriptionTest, NonPrimaryAssociatedUri)
   msg._user = "6505550234";
   _hss_connection->set_impu_result("sip:6505550234@homedomain",
                                    "",
-                                   HSSConnection::STATE_REGISTERED,
+                                   RegDataXMLUtils::STATE_REGISTERED,
                                    "<IMSSubscription><ServiceProfile>\n"
                                    "  <PublicIdentity><Identity>sip:6505550233@homedomain</Identity></PublicIdentity>\n"
                                    "  <PublicIdentity><Identity>sip:6505550234@homedomain</Identity></PublicIdentity>\n"
@@ -851,7 +851,7 @@ TEST_F(SubscriptionTest, SubscriptionWithBarredIdentity)
   _sdm->set_aor_data(irs_impus_aor[0], irs_impus_aor, aor_pair, 0);
   delete aor_pair; aor_pair = NULL;
 
-  _hss_connection->set_impu_result("sip:6505551231@homedomain", "", HSSConnection::STATE_REGISTERED,
+  _hss_connection->set_impu_result("sip:6505551231@homedomain", "", RegDataXMLUtils::STATE_REGISTERED,
                                    "<IMSSubscription><ServiceProfile>\n"
                                    "<PublicIdentity><Identity>sip:6505551231@homedomain</Identity></PublicIdentity>"
                                    "<PublicIdentity><Identity>sip:6505551232@homedomain</Identity><BarringIndication>1</BarringIndication></PublicIdentity>"
@@ -992,8 +992,8 @@ public:
     pj_status_t ret = init_subscription(_sdm, {}, _hss_connection, _acr_factory, _analytics, 300);
     ASSERT_EQ(PJ_SUCCESS, ret);
 
-    _hss_connection->set_impu_result("sip:6505550231@homedomain", "", HSSConnection::STATE_REGISTERED, "");
-    _hss_connection->set_impu_result("tel:6505550231", "", HSSConnection::STATE_REGISTERED, "");
+    _hss_connection->set_impu_result("sip:6505550231@homedomain", "", RegDataXMLUtils::STATE_REGISTERED, "");
+    _hss_connection->set_impu_result("tel:6505550231", "", RegDataXMLUtils::STATE_REGISTERED, "");
 
     _log_traffic = PrintingTestLogger::DEFAULT.isPrinting();
   }

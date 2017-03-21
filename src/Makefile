@@ -90,7 +90,8 @@ SPROUT_COMMON_SOURCES := logger.cpp \
                          as_communication_tracker.cpp \
                          astaire_resolver.cpp \
                          associated_uris.cpp \
-                         reg_data_xml_utils.cpp
+                         xml_utils.cpp \
+                         ifc.cpp
 
 sprout_SOURCES := ${SPROUT_COMMON_SOURCES} \
                   snmp_counter_table.cpp \

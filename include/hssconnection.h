@@ -34,9 +34,6 @@
  * as those licenses appear in the file LICENSE-OPENSSL.
  */
 
-///
-///
-
 #ifndef HSSCONNECTION_H__
 #define HSSCONNECTION_H__
 
@@ -150,11 +147,6 @@ public:
   static const std::string DEREG_TIMEOUT;
   static const std::string AUTH_TIMEOUT;
   static const std::string AUTH_FAIL;
-
-  static const std::string STATE_REGISTERED;
-  static const std::string STATE_NOT_REGISTERED;
-
-  static const std::string STATE_BARRED;
 
 private:
   virtual long get_json_object(const std::string& path,
