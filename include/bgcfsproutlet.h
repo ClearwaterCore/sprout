@@ -56,6 +56,7 @@ extern "C" {
 #include "acr.h"
 #include "bgcfservice.h"
 #include "sproutlet.h"
+#include "enumservice.h"
 
 #include <map>
 #include <vector>
@@ -67,14 +68,25 @@ class BGCFSproutletTsx;
 class BGCFSproutlet : public Sproutlet
 {
 public:
-  BGCFSproutlet(int port,
+  BGCFSproutlet(const std::string& bgcf_name,
+                int port,
+                const std::string& uri,
                 BgcfService* bgcf_service,
-                ACRFactory* acr_factory);
+                EnumService* enum_service,
+                ACRFactory* acr_factory,
+                SNMP::SuccessFailCountByRequestTypeTable* incoming_sip_transactions_tbl,
+                SNMP::SuccessFailCountByRequestTypeTable* outgoing_sip_transactions_tbl,
+                bool override_npdi);
   ~BGCFSproutlet();
 
   SproutletTsx* get_tsx(SproutletTsxHelper* helper,
                         const std::string& alias,
                         pjsip_msg* req);
+
+  inline bool should_override_npdi() const
+  {
+    return _override_npdi;
+  }
 
 private:
 
@@ -82,18 +94,35 @@ private:
   ///
   /// @return            - The URIs to route the message on to (in order).
   /// @param domain      - The domain to find the route to.
-  std::vector<std::string> get_route(const std::string &domain,
-                                     SAS::TrailId trail) const;
+  std::vector<std::string> get_route_from_domain(const std::string &domain,
+                                                 SAS::TrailId trail) const;
+
+  /// Lookup a route from the configured rules.
+  ///
+  /// @return            - The URIs to route the message on to (in order).
+  /// @param number      - The number to route on
+  std::vector<std::string> get_route_from_number(const std::string &number,
+                                                 SAS::TrailId trail) const;
 
   /// Get an ACR instance from the factory.
   /// @param trail                SAS trail identifier to use for the ACR.
   ACR* get_acr(SAS::TrailId trail);
 
+  /// Do an ENUM lookup .
+  ///
+  /// @return            - The URI translation.
+  /// @param uri         - The URI to translate
+  std::string enum_lookup(pjsip_uri* uri, SAS::TrailId trail);
+
   friend class BGCFSproutletTsx;
 
   BgcfService* _bgcf_service;
 
+  EnumService* _enum_service;
+
   ACRFactory* _acr_factory;
+
+  bool _override_npdi;
 };
 
 
@@ -104,11 +133,11 @@ public:
                    BGCFSproutlet* bgcf);
   ~BGCFSproutletTsx();
 
-  virtual void on_rx_initial_request(pjsip_msg* req);
-  virtual void on_tx_request(pjsip_msg* req);
-  virtual void on_rx_response(pjsip_msg* rsp, int fork_id);
-  virtual void on_tx_response(pjsip_msg* rsp);
-  virtual void on_cancel(int status_code, pjsip_msg* req);
+  virtual void on_rx_initial_request(pjsip_msg* req) override;
+  virtual void on_tx_request(pjsip_msg* req, int fork_id) override;
+  virtual void on_rx_response(pjsip_msg* rsp, int fork_id) override;
+  virtual void on_tx_response(pjsip_msg* rsp) override;
+  virtual void on_rx_cancel(int status_code, pjsip_msg* req) override;
 
 private:
   BGCFSproutlet* _bgcf;

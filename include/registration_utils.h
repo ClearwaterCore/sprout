@@ -45,30 +45,42 @@ extern "C" {
 }
 
 #include <string>
-#include "regstore.h"
+#include "subscriber_data_manager.h"
 #include "ifchandler.h"
 #include "hssconnection.h"
+#include "snmp_success_fail_count_table.h"
 
 namespace RegistrationUtils {
 
-void network_initiated_deregistration(RegStore* store,
-                                      Ifcs& ifcs,
-                                      const std::string& served_user,
-                                      const std::string& binding_id,
-                                      SAS::TrailId trail);
+void init(SNMP::RegistrationStatsTables* third_party_reg_stats_tables_arg,
+          bool force_third_party_register_body_arg);
+
+bool remove_bindings(SubscriberDataManager* sdm,
+                     std::vector<SubscriberDataManager*> remote_sdms,
+                     HSSConnection* hss,
+                     const std::string& aor,
+                     const std::string& binding_id,
+                     const std::string& dereg_type,
+                     SAS::TrailId trail,
+                     HTTPCode* hss_status_code = nullptr);
+
 void register_with_application_servers(Ifcs& ifcs,
-                                       RegStore* store,
-                                       pjsip_rx_data* received_register,
-                                       pjsip_tx_data* ok_response,
+                                       SubscriberDataManager* sdm,
+                                       std::vector<SubscriberDataManager*> remote_sdms,
+                                       HSSConnection* hss,
+                                       pjsip_msg* received_register_msg,
+                                       pjsip_msg* ok_response_msg,
                                        int expires,
                                        bool is_initial_registration,
                                        const std::string& served_user,
                                        SAS::TrailId trail);
+
 void deregister_with_application_servers(Ifcs&,
-                                         RegStore* store,
+                                         SubscriberDataManager* sdm,
+                                         std::vector<SubscriberDataManager*> remote_sdms,
+                                         HSSConnection* hss,
                                          const std::string&,
                                          SAS::TrailId trail);
-
-} // namespace RegistrationUtils
+}
 
 #endif

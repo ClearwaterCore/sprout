@@ -10,9 +10,6 @@
 [submodule "modules/gmock"]
 	path = modules/gmock
 	url = git@github.com:ClearwaterCore/gmock-upstream.git
-[submodule "modules/jsoncpp"]
-	path = modules/jsoncpp
-	url = git@github.com:ClearwaterCore/jsoncpp-upstream.git
 [submodule "modules/libmemcached"]
 	path = modules/libmemcached
 	url = git@github.com:ClearwaterCore/libmemcached-upstream.git
@@ -55,6 +52,15 @@
 [submodule "modules/gemini"]
 	path = modules/gemini
 	url = git@github.com:ClearwaterCore/gemini.git
-[submodule "modules/memento"]
-	path = modules/memento
-	url = git@github.com:ClearwaterCore/memento.git
+[submodule "modules/thrift"]
+	path = modules/thrift
+	url = git@github.com:ClearwaterCore/thrift.git
+[submodule "modules/cassandra"]
+	path = modules/cassandra
+	url = https://github.com/apache/cassandra.git
+[submodule "modules/memento-as"]
+	path = modules/memento-as
+	url = git@github.com:ClearwaterCore/memento-as.git
+[submodule "clearwater-etcd-plugins"]
+	path = modules/clearwater-etcd-plugins
+	url = git@github.com:ClearwaterCore/clearwater-etcd-plugins.git

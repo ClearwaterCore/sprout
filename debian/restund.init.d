@@ -57,6 +57,7 @@ DESC="Restund STUN/TURN server"
 NAME=restund
 #PIDFILE=/var/run/$NAME.pid
 DAEMON=/usr/share/clearwater/bin/restund
+DAEMON_ARGS="-f /etc/clearwater/restund.conf"
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
@@ -73,6 +74,17 @@ DAEMON=/usr/share/clearwater/bin/restund
 . /lib/lsb/init-functions
 
 #
+# Function to set up environment
+#
+setup_environment()
+{
+        export LD_LIBRARY_PATH=/usr/share/clearwater/restund/lib
+        ulimit -Hn 10000
+        ulimit -Sn 10000
+        ulimit -c unlimited
+}
+
+#
 # Function that starts the daemon/service
 #
 do_start()
@@ -85,11 +97,7 @@ do_start()
                 || return 1
 
         # daemon is not running, so attempt to start it.
-        export LD_LIBRARY_PATH=/usr/share/clearwater/restund/lib
-        ulimit -Hn 10000
-        ulimit -Sn 10000
-        ulimit -c unlimited
-        DAEMON_ARGS="-f /etc/clearwater/restund.conf"
+        setup_environment
         start-stop-daemon --start --quiet --exec $DAEMON --chuid $NAME -- $DAEMON_ARGS \
                 || return 2
         # Add code here, if necessary, that waits for the process to be ready
@@ -107,20 +115,19 @@ do_stop()
         #   1 if daemon was already stopped
         #   2 if daemon could not be stopped
         #   other if a failure occurred
-        start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --name $NAME
+        start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --name $NAME --exec $DAEMON
         RETVAL="$?"
-        [ "$RETVAL" = 2 ] && return 2
-        # Wait for children to finish too if this is a daemon that forks
-        # and if the daemon is only ever run from this initscript.
-        # If the above conditions are not satisfied then add some other code
-        # that waits for the process to drop all resources that could be
-        # needed by services started subsequently.  A last resort is to
-        # sleep for some time.
-        #start-stop-daemon --stop --quiet --oknodo --retry=0/30/KILL/5 --exec $DAEMON
-        [ "$?" = 2 ] && return 2
-        # Many daemons don't delete their pidfiles when they exit.
-        #rm -f $PIDFILE
         return "$RETVAL"
+}
+
+#
+# Function that runs the daemon/service in the foreground
+#
+do_run()
+{
+        setup_environment
+        $namespace_prefix start-stop-daemon --start --quiet --exec $DAEMON --chuid $NAME -- -n $DAEMON_ARGS \
+                || return 2
 }
 
 #
@@ -139,8 +146,6 @@ do_abort()
         start-stop-daemon --stop --quiet --retry=ABRT/60/KILL/5 --name $NAME
         RETVAL="$?"
         [ "$RETVAL" = 2 ] && return 2
-        # Many daemons don't delete their pidfiles when they exit.
-        #rm -f $PIDFILE
         return "$RETVAL"
 }
 
@@ -169,6 +174,14 @@ case "$1" in
   stop)
         [ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
         do_stop
+        case "$?" in
+                0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+                2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+        esac
+        ;;
+  run)
+        [ "$VERBOSE" != no ] && log_daemon_msg "Running $DESC" "$NAME"
+        do_run
         case "$?" in
                 0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
                 2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
@@ -208,6 +221,10 @@ case "$1" in
                 ;;
         esac
         ;;
+  abort)
+        log_daemon_msg "Aborting $DESC" "$NAME"
+        do_abort
+        ;;
   abort-restart)
         log_daemon_msg "Abort-Restarting $DESC" "$NAME"
         do_abort
@@ -227,8 +244,7 @@ case "$1" in
         esac
         ;;
   *)
-        #echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload}" >&2
-        echo "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
+        echo "Usage: $SCRIPTNAME {start|stop|run|status|restart|force-reload|abort|abort-restart}" >&2
         exit 3
         ;;
 esac

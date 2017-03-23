@@ -43,11 +43,14 @@
 #include <list>
 #include <string>
 #include <boost/regex.hpp>
+#include <boost/thread.hpp>
 #include <netinet/in.h>
 #include <ares.h>
 #include "sas.h"
 #include "baseresolver.h"
 #include "dnsresolver.h"
+#include "communicationmonitor.h"
+#include "updater.h"
 
 /// @class EnumService
 ///
@@ -78,6 +81,23 @@ public:
 };
 
 
+/// @class DummyEnumService
+///
+/// Provides an "ENUM service" which just translates tel:whatever to sip:whatever.
+class DummyEnumService : public EnumService
+{
+public:
+  DummyEnumService(std::string home_domain):
+    EnumService(),
+    _default_home_domain(home_domain)
+  {}
+  std::string lookup_uri_from_user(const std::string& user, SAS::TrailId trail) const;
+
+private:
+  std::string _default_home_domain;
+};
+
+
 /// @class JSONEnumService
 ///
 /// Provides an "ENUM service" based on configuration read from a JSON file.
@@ -86,6 +106,9 @@ class JSONEnumService : public EnumService
 public:
   JSONEnumService(std::string configuration = "./enum.json");
   ~JSONEnumService();
+
+  // Updates the enum configuration
+  void update_enum();
 
   std::string lookup_uri_from_user(const std::string& user, SAS::TrailId trail) const;
 
@@ -97,10 +120,16 @@ private:
     std::string replace;
   };
 
-  std::list<struct NumberPrefix*> _number_prefixes;
+  std::vector<NumberPrefix> _number_prefixes;
+  std::map<std::string, NumberPrefix> _prefix_regex_map;
+  std::string _configuration;
+  Updater<void, JSONEnumService>* _updater;
 
-  NumberPrefix* prefix_match(const std::string& number) const;
+  // Mark as mutable to flag that this can be modified without affecting the
+  // external behaviour of the class, allowing for locking in 'const' methods.
+  mutable boost::shared_mutex _number_prefixes_rw_lock;
 
+  const NumberPrefix* prefix_match(const std::string& number) const;
 };
 
 /// @class DNSEnumService
@@ -109,9 +138,11 @@ private:
 class DNSEnumService : public EnumService
 {
 public:
-  DNSEnumService(const std::string& dns_server = "127.0.0.1",
+  DNSEnumService(const std::vector<std::string>& dns_server,
                  const std::string& dns_suffix = ".e164.arpa",
-                 const DNSResolverFactory* resolver_factory = new DNSResolverFactory());
+                 const DNSResolverFactory* resolver_factory = 
+                                                       new DNSResolverFactory(),
+                 CommunicationMonitor* comm_monitor = NULL);
   ~DNSEnumService();
 
   std::string lookup_uri_from_user(const std::string& user, SAS::TrailId trail) const;
@@ -166,13 +197,17 @@ private:
                                 std::vector<DNSEnumService::Rule>& rules);
 
   // The IP address of the DNS server to query.
-  struct IP46Address _dns_server;
+  std::vector<struct IP46Address> _servers;
   // The suffix to apply to domain names used for ENUM lookups.
   const std::string _dns_suffix;
   // The thread-local store - used for storing DNSResolvers.
   pthread_key_t _thread_local;
   // DNSResolverFactory, used for constructing DNSResolvers when required.
   const DNSResolverFactory* _resolver_factory;
+
+  // Helper used to track enum communication state, and issue/clear alarms
+  // based upon recent activity.
+  CommunicationMonitor* _comm_monitor;
 };
 
 #endif

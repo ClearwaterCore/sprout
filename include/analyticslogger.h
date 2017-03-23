@@ -42,44 +42,41 @@
 
 #include <sstream>
 
-#include "logger.h"
-
 class AnalyticsLogger
 {
 public:
-  AnalyticsLogger(Logger* logger);
-  ~AnalyticsLogger();
+  AnalyticsLogger();
+  virtual ~AnalyticsLogger();
 
-  void registration(const std::string& aor,
+  void log_with_tag_and_timestamp(char* log);
+
+  virtual void registration(const std::string& aor,
                     const std::string& binding_id,
                     const std::string& contact,
                     int expires);
 
-  void subscription(const std::string& aor,
+  virtual void subscription(const std::string& aor,
                     const std::string& subscription_id,
                     const std::string& contact,
                     int expires);
 
-  void auth_failure(const std::string& auth,
+  virtual void auth_failure(const std::string& auth,
                     const std::string& to);
 
-  void call_connected(const std::string& from,
+  virtual void call_connected(const std::string& from,
                       const std::string& to,
                       const std::string& call_id);
 
-  void call_not_connected(const std::string& from,
+  virtual void call_not_connected(const std::string& from,
                           const std::string& to,
                           const std::string& call_id,
                           int reason);
 
-  void call_disconnected(const std::string& call_id,
+  virtual void call_disconnected(const std::string& call_id,
                          int reason);
 
 private:
   static const int BUFFER_SIZE = 1000;
-
-  Logger* _logger;
-  Logger* _default_logger;
 };
 
 #endif

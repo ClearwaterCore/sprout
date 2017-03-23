@@ -44,18 +44,11 @@
 
 extern "C" {
 #include <pjsip.h>
+#include <pjsip/print_util.h>
 }
 
 // Main entry point
 pj_status_t register_custom_headers();
-
-// Utility macro from sip_parser.c
-#define copy_advance(buf,str)                   \
-  do {                                          \
-    if ((str).slen >= (endbuf-buf)) return -1;  \
-    pj_memcpy(buf, (str).ptr, (str).slen);      \
-    buf += (str).slen;                          \
-  } while (0)
 
 /// Custom header structures.
 
@@ -72,6 +65,13 @@ typedef struct pjsip_session_expires_hdr {
   session_refresher_t refresher;
   pjsip_param other_param;
 } pjsip_session_expires_hdr;
+
+typedef struct pjsip_min_se_hdr {
+  PJSIP_DECL_HDR_MEMBER(struct pjsip_min_se_hdr);
+  pj_int32_t expires;
+  session_refresher_t refresher;
+  pjsip_param other_param;
+} pjsip_min_se_hdr;
 
 typedef struct pjsip_p_c_v_hdr {
   PJSIP_DECL_HDR_MEMBER(struct pjsip_p_c_v_hdr);
@@ -104,6 +104,7 @@ typedef struct pjsip_reject_contact_hdr {
 /// Utility functions (parse, create, init, clone, print_on)
 
 // Privacy
+pjsip_generic_array_hdr* pjsip_privacy_hdr_create( pj_pool_t *pool, const pj_str_t *hnames);
 pjsip_hdr* parse_hdr_privacy(pjsip_parse_ctx* ctx);
 
 // Assocciated URI
@@ -117,14 +118,22 @@ void* pjsip_session_expires_hdr_clone(pj_pool_t* pool, const void* o);
 void* pjsip_session_expires_hdr_shallow_clone(pj_pool_t* pool, const void* o);
 int pjsip_session_expires_hdr_print_on(void *hdr, char* buf, pj_size_t len);
 
+// Min-SE
+pjsip_hdr* parse_hdr_min_se(pjsip_parse_ctx* ctx);
+pjsip_min_se_hdr* pjsip_min_se_hdr_create(pj_pool_t* pool);
+pjsip_min_se_hdr* pjsip_min_se_hdr_init(pj_pool_t* pool, void* mem);
+void* pjsip_min_se_hdr_clone(pj_pool_t* pool, const void* o);
+void* pjsip_min_se_hdr_shallow_clone(pj_pool_t* pool, const void* o);
+int pjsip_min_se_hdr_print_on(void *hdr, char* buf, pj_size_t len);
+
 // Preferred/Asserted Identity
 pjsip_hdr* parse_hdr_p_asserted_identity(pjsip_parse_ctx* ctx);
 pjsip_hdr* parse_hdr_p_preferred_identity(pjsip_parse_ctx* ctx);
 pjsip_routing_hdr* identity_hdr_create(pj_pool_t* pool, const pj_str_t name);
 pjsip_routing_hdr* identity_hdr_init(pj_pool_t* pool, void* mem, const pj_str_t name);
-pjsip_routing_hdr* identity_hdr_clone(pj_pool_t* pool, const pjsip_routing_hdr* rhs);
-pjsip_routing_hdr* identity_hdr_shallow_clone(pj_pool_t* pool, const pjsip_routing_hdr* rhs);
-int identity_hdr_print(pjsip_routing_hdr* hdr, char* buf, pj_size_t size);
+void* identity_hdr_clone(pj_pool_t* pool, const void* rhs);
+void* identity_hdr_shallow_clone(pj_pool_t* pool, const void* rhs);
+int identity_hdr_print(void* hdr, char* buf, pj_size_t size);
 
 // Service-Route
 pjsip_hdr* parse_hdr_service_route(pjsip_parse_ctx* ctx);

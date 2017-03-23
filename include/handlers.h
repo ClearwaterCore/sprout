@@ -41,9 +41,9 @@
 #include "httpstack_utils.h"
 #include "chronosconnection.h"
 #include "hssconnection.h"
-#include "regstore.h"
+#include "subscriber_data_manager.h"
 #include "sipresolver.h"
-#include "avstore.h"
+#include "impistore.h"
 
 /// Common factory for all handlers that deal with chronos timer pops. This is
 /// a subclass of SpawningHandler that requests HTTP flows to be
@@ -63,22 +63,26 @@ public:
   }
 };
 
-class RegistrationTimeoutTask : public HttpStackUtils::Task
+class AoRTimeoutTask : public HttpStackUtils::Task
 {
 public:
   struct Config
   {
-    Config(RegStore* store, RegStore* remote_store, HSSConnection* hss) :
-      _store(store), _remote_store(remote_store), _hss(hss)
-      {}
-    RegStore* _store;
-    RegStore* _remote_store;
+    Config(SubscriberDataManager* sdm,
+           std::vector<SubscriberDataManager*> remote_sdms,
+           HSSConnection* hss) :
+      _sdm(sdm),
+      _remote_sdms(remote_sdms),
+      _hss(hss)
+    {}
+    SubscriberDataManager* _sdm;
+    std::vector<SubscriberDataManager*> _remote_sdms;
     HSSConnection* _hss;
   };
 
-  RegistrationTimeoutTask(HttpStack::Request& req,
-                          const Config* cfg,
-                          SAS::TrailId trail) :
+  AoRTimeoutTask(HttpStack::Request& req,
+                       const Config* cfg,
+                       SAS::TrailId trail) :
     HttpStackUtils::Task(req, trail), _cfg(cfg)
   {};
 
@@ -87,17 +91,17 @@ public:
 protected:
   void handle_response();
   HTTPCode parse_response(std::string body);
-  RegStore::AoR* set_aor_data(RegStore* current_store,
-                              std::string aor_id,
-                              RegStore::AoR* previous_aor_data,
-                              RegStore* remote_store,
-                              bool update_chronos,
-                              bool& all_bindings_expired);
+  SubscriberDataManager::AoRPair* set_aor_data(
+                        SubscriberDataManager* current_sdm,
+                        std::string aor_id,
+                        std::vector<std::string> irs_impus,
+                        SubscriberDataManager::AoRPair* previous_aor_data,
+                        std::vector<SubscriberDataManager*> remote_sdms,
+                        bool& all_bindings_expired);
 
 protected:
   const Config* _cfg;
   std::string _aor_id;
-  std::string _binding_id;
 };
 
 class DeregistrationTask : public HttpStackUtils::Task
@@ -105,13 +109,22 @@ class DeregistrationTask : public HttpStackUtils::Task
 public:
   struct Config
   {
-    Config(RegStore* store, RegStore* remote_store, HSSConnection* hss, SIPResolver* sipresolver) :
-      _store(store), _remote_store(remote_store), _hss(hss), _sipresolver(sipresolver)
-      {}
-    RegStore* _store;
-    RegStore* _remote_store;
+    Config(SubscriberDataManager* sdm,
+           std::vector<SubscriberDataManager*> remote_sdms,
+           HSSConnection* hss,
+           SIPResolver* sipresolver,
+           ImpiStore* impi_store) :
+      _sdm(sdm),
+      _remote_sdms(remote_sdms),
+      _hss(hss),
+      _sipresolver(sipresolver),
+      _impi_store(impi_store)
+    {}
+    SubscriberDataManager* _sdm;
+    std::vector<SubscriberDataManager*> _remote_sdms;
     HSSConnection* _hss;
     SIPResolver* _sipresolver;
+    ImpiStore* _impi_store;
   };
 
 
@@ -124,12 +137,14 @@ public:
   void run();
   HTTPCode handle_request();
   HTTPCode parse_request(std::string body);
-  RegStore::AoR* set_aor_data(RegStore* current_store,
-                              std::string aor_id,
-                              std::string private_id,
-                              RegStore::AoR* previous_aor_data,
-                              RegStore* remote_store,
-                              bool is_primary);
+  SubscriberDataManager::AoRPair* deregister_bindings(
+                    SubscriberDataManager* current_sdm,
+                    HSSConnection* hss,
+                    std::string aor_id,
+                    std::string private_id,
+                    SubscriberDataManager::AoRPair* previous_aor_data,
+                    std::vector<SubscriberDataManager*> remote_sdms,
+                    std::set<std::string>& impis_to_delete);
 
 protected:
   const Config* _cfg;
@@ -142,9 +157,9 @@ class AuthTimeoutTask : public HttpStackUtils::Task
 public:
   struct Config
   {
-  Config(AvStore* store, HSSConnection* hss) :
-    _avstore(store), _hss(hss) {}
-    AvStore* _avstore;
+  Config(ImpiStore* store, HSSConnection* hss) :
+    _impi_store(store), _hss(hss) {}
+    ImpiStore* _impi_store;
     HSSConnection* _hss;
   };
   AuthTimeoutTask(HttpStack::Request& req,
@@ -161,6 +176,91 @@ protected:
   std::string _impu;
   std::string _nonce;
 
+};
+
+
+/// Abstract class that contains most of the logic for retrieving stored
+/// bindings and subscriptions.
+///
+/// This class handles checking the request, extracting the requested IMPU and
+/// retrieving data from the store. It calls into the subclass to build a
+/// response, which it then sends.
+class GetCachedDataTask : public HttpStackUtils::Task
+{
+public:
+  struct Config
+  {
+    Config(SubscriberDataManager* sdm,
+           std::vector<SubscriberDataManager*> remote_sdms) :
+      _sdm(sdm),
+      _remote_sdms(remote_sdms)
+    {}
+
+    SubscriberDataManager* _sdm;
+    std::vector<SubscriberDataManager*> _remote_sdms;
+  };
+
+  GetCachedDataTask(HttpStack::Request& req, const Config* cfg, SAS::TrailId trail) :
+    HttpStackUtils::Task(req, trail), _cfg(cfg)
+  {};
+
+  void run();
+
+protected:
+  virtual std::string serialize_data(SubscriberDataManager::AoR* aor) = 0;
+  const Config* _cfg;
+};
+
+/// Concrete subclass for retrieving bindings.
+class GetBindingsTask : public GetCachedDataTask
+{
+public:
+  using GetCachedDataTask::GetCachedDataTask;
+protected:
+  std::string serialize_data(SubscriberDataManager::AoR* aor);
+};
+
+/// Concrete subclass for retrieving subscriptions.
+class GetSubscriptionsTask : public GetCachedDataTask
+{
+public:
+  using GetCachedDataTask::GetCachedDataTask;
+protected:
+  std::string serialize_data(SubscriberDataManager::AoR* aor);
+};
+
+/// Task for performing an administrative deregistration at the S-CSCF. This
+///
+/// -  Deletes subscriber data from the store (including all bindings and
+///    subscriptions).
+/// -  Sends a deregistration request to homestead.
+/// -  Sends NOTIFYs for any subscriptions to the reg state package for the AoR.
+/// -  Sends 3rd party deregister requests to Application Servers if required.
+class DeleteImpuTask : public HttpStackUtils::Task
+{
+public:
+  struct Config
+  {
+    Config(SubscriberDataManager* sdm,
+           std::vector<SubscriberDataManager*> remote_sdms,
+           HSSConnection* hss) :
+      _sdm(sdm), _remote_sdms(remote_sdms), _hss(hss)
+    {}
+
+    SubscriberDataManager* _sdm;
+    std::vector<SubscriberDataManager*> _remote_sdms;
+    HSSConnection* _hss;
+  };
+
+  DeleteImpuTask(HttpStack::Request& req, const Config* cfg, SAS::TrailId trail) :
+    HttpStackUtils::Task(req, trail), _cfg(cfg)
+  {};
+  virtual ~DeleteImpuTask() {}
+
+  void run();
+
+private:
+  const Config* _cfg;
 };
 
 #endif

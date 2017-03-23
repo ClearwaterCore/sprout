@@ -7,14 +7,14 @@
 # - sipp_count - number of sipp instances per node
 # - password - SIP password to use for all DNs (insecure but OK for stress)
 base=2010000000
-count=87500
+count=30000
 node_idx=1
 sipp_count=1
 password=7kkzTyGW
 . /etc/clearwater/config
 
 # Clear out old configuration files.
-rm /usr/share/clearwater/sip-stress/users.csv.*
+rm -f /usr/share/clearwater/sip-stress/users.csv.*
 
 # Figure out how many targets we have.  Due to TCP port limitations, we can't
 # run more than one sipp instance per target.

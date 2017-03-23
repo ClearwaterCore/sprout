@@ -36,6 +36,14 @@ override_dh_installinit:
 override_dh_shlibdeps:
 override_dh_strip:
 	dh_strip -psprout-libs --dbg-package=sprout-libs-dbg
-	dh_strip -psprout --dbg-package=sprout-dbg
+	dh_strip -psprout-base --dbg-package=sprout-base-dbg
+	dh_strip -psprout-scscf --dbg-package=sprout-scscf-dbg
+	dh_strip -psprout-icscf --dbg-package=sprout-icscf-dbg
+	dh_strip -psprout-bgcf --dbg-package=sprout-bgcf-dbg
+	dh_strip -psprout-mmtel-as --dbg-package=sprout-mmtel-as-dbg
+	dh_strip -pgemini-as --dbg-package=gemini-as-dbg
+	dh_strip -pmemento-as --dbg-package=memento-as-dbg
+	dh_strip -pcall-diversion-as --dbg-package=call-diversion-as-dbg
+	dh_strip -pmangelwurzel-as --dbg-package=mangelwurzel-as-dbg
 	dh_strip -pbono --dbg-package=bono-dbg
-	dh_strip -pclearwater-sip-stress --dbg-package=clearwater-sip-stress-dbg
+	dh_strip -pclearwater-sipp --dbg-package=clearwater-sipp-dbg

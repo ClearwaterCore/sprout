@@ -82,7 +82,7 @@ The stateful proxy is the largest and most complex component within Sprout, part
 The stateful proxy actually registers as two modules with PJSIP.
 
 - The first module, termed the proxy module, registers for receiving requests and responses at the UA layer with a priority slight higher than the registrar.  This module handles all requests, setting up the necessary transactions, and any responses which do not correspond to an active transaction (for example, 200 OK retransmissions).
-- The second module is a special kind of PJSIP module, termed a transaction user module.  It does not get invoked for received and sent messages, instead it gets invoked by the transaction layer for events on the transaction, including sent/received messages, timer expiries and transport failures.
+- The second module is a special kind of PJSIP module, termed a transaction user module.  It does not get invoked for received and sent messages, instead it gets invoked by the transaction layer for events on the transaction, including sent/received messages, timer expires and transport failures.
 
 The function of the stateful proxy can be divided into [common processing](#commonproc), and [Bono](#bonoproc) and [Sprout](#sproutproc) specific processing.
 
@@ -120,7 +120,7 @@ When the stateful proxy module is running as a Bono node, it performs various ed
 
 When running as a Bono node all routing of requests is performed based on route headers and request URI.  If a request cannot be routed based on route headers or the request URI then Bono will always route it to a Sprout node - it does not access the registration store directly itself.  This means that a Bono node will never fork a SIP request.
 
-Each Bono node uses the ConnectionPool class to manage a pool of TCP connections to the Sprout nodes for this purpose.  The ConnectionPool class periodically recycles these connections to keep the load evenly spread across the Sprout nodes.
+Each Bono node uses the SIPConnectionPool class to manage a pool of TCP connections to the Sprout nodes for this purpose.  The SIPConnectionPool class periodically recycles these connections to keep the load evenly spread across the Sprout nodes.
 
 Bono tracks incoming client connections in the FlowTable class, including recording when the connection has been authenticated by the client correctly responding to a challenge from a Sprout node.  Each client connection is identified by a flow token which is used in Path and Route headers as per [RFC5626](http://tools.ietf.org/html/rfc5626) for ensuring that SIP flows for the client use the appropriate connection (both for security and NAT traversal purposes).
 

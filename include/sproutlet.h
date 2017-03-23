@@ -51,6 +51,9 @@ extern "C" {
 
 #include <list>
 #include "sas.h"
+#include "snmp_success_fail_count_by_request_type_table.h"
+
+#define API_VERSION 1
 
 class SproutletTsxHelper;
 class Sproutlet;
@@ -72,7 +75,7 @@ struct ForkState
 /// a single transaction.  Once a service has been triggered as part of handling
 /// a transaction, the related SproutletTsxHelper is inspected to determine what should
 /// be done next, e.g. forward the request, reject it, fork it etc.
-/// 
+///
 /// This is an abstract base class to allow for alternative implementations -
 /// in particular, production and test.  It is implemented by the underlying
 /// service infrastructure, not by the services themselves.
@@ -83,7 +86,7 @@ public:
   /// Virtual destructor.
   virtual ~SproutletTsxHelper() {}
 
-  /// Returns a mutable clone of the original request.  This can be modified 
+  /// Returns a mutable clone of the original request.  This can be modified
   /// and sent by the Sproutlet using the send_request call.
   ///
   /// @returns             - A clone of the original request message.
@@ -118,6 +121,14 @@ public:
   /// @param  uri          - The URI to check.
   virtual bool is_uri_reflexive(const pjsip_uri* uri) const = 0;
 
+  /// Creates a new, blank request.  This is typically used when creating
+  /// a downstream request to another SIP server as part of handling a
+  /// request.
+  ///
+  /// @returns             - A new, blank request message.
+  ///
+  virtual pjsip_msg* create_request() = 0;
+
   /// Clones the request.  This is typically used when forking a request if
   /// different request modifications are required on each fork or for storing
   /// off to handle late forking.
@@ -126,6 +137,14 @@ public:
   /// @param  req          - The request message to clone.
   ///
   virtual pjsip_msg* clone_request(pjsip_msg* req) = 0;
+
+  /// Clones the message.  This is typically used when we want to keep a
+  /// message after calling a mutating method on it.
+  ///
+  /// @returns             - The cloned message.
+  /// @param  msg          - The message to clone.
+  ///
+  virtual pjsip_msg* clone_msg(pjsip_msg* msg) = 0;
 
   /// Create a response from a given request, this response can be passed to
   /// send_response or stored for later.  It may be freed again by passing
@@ -142,7 +161,7 @@ public:
 
   /// Indicate that the request should be forwarded following standard routing
   /// rules.
-  /// 
+  ///
   /// This function may be called repeatedly to create downstream forks of an
   /// original upstream request and may also be called during response processing
   /// or an original request to create a late fork.  When processing an in-dialog
@@ -184,7 +203,7 @@ public:
   /// transaction state and whether a timeout or transport error has been
   /// detected on the fork.
   ///
-  /// @returns             - ForkState structure containing transaction and 
+  /// @returns             - ForkState structure containing transaction and
   ///                        error status for the fork.
   /// @param  fork_id      - The identifier of the fork.
   ///
@@ -216,7 +235,7 @@ public:
 
   /// Schedules a timer with the specified identifier and expiry period.
   /// The on_timer_expiry callback will be called back with the timer identity
-  /// and context parameter when the timer expires.  If the identifier 
+  /// and context parameter when the timer expires.  If the identifier
   /// corresponds to a timer that is already running, the timer will be stopped
   /// and restarted with the new duration and context parameter.
   ///
@@ -237,7 +256,7 @@ public:
   /// Queries the state of a timer.
   ///
   /// @returns             - true if the timer is running, false otherwise.
-  /// @param  id           - The unique identifier for the timer. 
+  /// @param  id           - The unique identifier for the timer.
   ///
   virtual bool timer_running(TimerID id) = 0;
 
@@ -246,6 +265,18 @@ public:
   ///
   virtual SAS::TrailId trail() const = 0;
 
+  /// Get a URI that routes to the given named service.
+  ///
+  /// @returns            - The new URI.
+  ///
+  /// @param service      - Name of the service to route to.
+  /// @param pool         - Pool to allocate the URI in.
+  /// @param existing_uri - An existing URI to use as a base for the new one.
+  ///                       Parameters from this URI will be preserved if
+  ///                       possible.
+  virtual pjsip_sip_uri* get_uri_for_service(const std::string& service,
+                                             pj_pool_t* pool,
+                                             pjsip_sip_uri* existing_uri) const = 0;
 };
 
 
@@ -266,7 +297,7 @@ public:
   /// Called when an initial request (dialog-initiating or out-of-dialog) is
   /// received for the transaction.
   ///
-  /// During this function, exactly one of the following functions must be called, 
+  /// During this function, exactly one of the following functions must be called,
   /// otherwise the request will be rejected with a 503 Server Internal
   /// Error:
   ///
@@ -279,7 +310,7 @@ public:
 
   /// Called when an in-dialog request is received for the transaction.
   ///
-  /// During this function, exactly one of the following functions must be called, 
+  /// During this function, exactly one of the following functions must be called,
   /// otherwise the request will be rejected with a 503 Server Internal
   /// Error:
   ///
@@ -319,7 +350,7 @@ public:
   /// downstream legs) will be cancelled automatically.  No further methods
   /// will be called for this transaction.
   ///
-  /// @param  status_code  - Indicates the reason for the cancellation 
+  /// @param  status_code  - Indicates the reason for the cancellation
   ///                        (487 for a CANCEL, 408 for a transport error
   ///                        or transaction timeout)
   /// @param  cancel_req   - The received CANCEL request or NULL if cancellation
@@ -334,7 +365,7 @@ public:
 
 protected:
 
-  /// Returns a mutable clone of the original request.  This can be modified 
+  /// Returns a mutable clone of the original request.  This can be modified
   /// and sent by the Sproutlet using the send_request call.
   ///
   /// @returns             - A clone of the original request message.
@@ -373,14 +404,35 @@ protected:
   const pjsip_route_hdr* route_hdr() const
     {return _helper->route_hdr();}
 
+  /// Creates a new, blank request.  This is typically used when creating
+  /// a downstream request to another SIP server as part of handling a
+  /// request.
+  ///
+  /// @returns             - A new, blank request message.
+  ///
+  pjsip_msg* create_request()
+    {return _helper->create_request();}
+
   /// Clones the request.  This is typically used when forking a request if
   /// different request modifications are required on each fork.
+  ///
+  /// WARNING: This method is DEPRECATED and only exists for backwards
+  ///          compatibilty.
   ///
   /// @returns             - The cloned request message.
   /// @param  req          - The request message to clone.
   ///
   pjsip_msg* clone_request(pjsip_msg* req)
     {return _helper->clone_request(req);}
+
+  /// Clones the message.  This is typically used when we want to keep a
+  /// message after calling a mutative method on it.
+  ///
+  /// @returns             - The cloned message.
+  /// @param  msg          - The message to clone.
+  ///
+  pjsip_msg* clone_msg(pjsip_msg* msg)
+    {return _helper->clone_msg(msg);}
 
   /// Create a response from a given request, this response can be passed to
   /// send_response or stored for later.  It may be freed again by passing
@@ -405,7 +457,7 @@ protected:
   /// original upstream request and may also be called during response processing
   /// or an original request to create a late fork.  When processing an in-dialog
   /// request this function may only be called once.
-  /// 
+  ///
   /// This function may be called while processing initial requests,
   /// in-dialog requests and cancels but not during response handling.
   ///
@@ -418,7 +470,7 @@ protected:
   /// Indicate that the response should be forwarded following standard routing
   /// rules.  Note that, if this service created multiple forks, the responses
   /// will be aggregated before being sent downstream.
-  /// 
+  ///
   /// This function may be called while handling any response.
   ///
   /// @param  rsp          - The response message to use for forwarding.
@@ -446,7 +498,7 @@ protected:
   /// transaction state and whether a timeout or transport error has been
   /// detected on the fork.
   ///
-  /// @returns             - ForkState structure containing transaction and 
+  /// @returns             - ForkState structure containing transaction and
   ///                        error status for the fork.
   /// @param  fork_id      - The identifier of the fork.
   ///
@@ -482,7 +534,7 @@ protected:
 
   /// Schedules a timer with the specified identifier and expiry period.
   /// The on_timer_expiry callback will be called back with the timer identity
-  /// and context parameter when the timer expires.  If the identifier 
+  /// and context parameter when the timer expires.  If the identifier
   /// corresponds to a timer that is already running, the timer will be stopped
   /// and restarted with the new duration and context parameter.
   ///
@@ -516,6 +568,22 @@ protected:
   SAS::TrailId trail() const
     {return _helper->trail();}
 
+  /// Get a URI that routes to the given named service.
+  ///
+  /// @returns            - The new URI.
+  ///
+  /// @param service      - Name of the service to route to.
+  /// @param pool         - Pool to allocate the URI in.
+  /// @param existing_uri - An existing URI to use as a base for the new one.
+  ///                       Parameters from this URI will be preserved if
+  ///                       possible, but the user part will be stripped.
+  pjsip_sip_uri* get_uri_for_service(const std::string& service,
+                                     pj_pool_t* pool,
+                                     pjsip_sip_uri* existing_uri) const
+  {
+    return _helper->get_uri_for_service(service, pool, existing_uri);
+  }
+
 private:
   /// Transaction helper to use for underlying service-related processing.
   SproutletTsxHelper* _helper;
@@ -523,9 +591,9 @@ private:
 
 
 /// The Sproutlet class is a base class on which SIP services can be
-/// built.  
+/// built.
 ///
-/// Derived classes are instantiated during system initialization and 
+/// Derived classes are instantiated during system initialization and
 /// register a service name with Sprout.  Sprout calls the create_tsx method
 /// on an Sproutlet derived class when the ServiceManager determines that
 /// the next hop for a request contains a hostname of the form
@@ -544,6 +612,9 @@ public:
   /// Virtual destructor.
   virtual ~Sproutlet() {}
 
+  SNMP::SuccessFailCountByRequestTypeTable* _incoming_sip_transactions_tbl;
+  SNMP::SuccessFailCountByRequestTypeTable* _outgoing_sip_transactions_tbl;
+
   /// Called when the system determines the service should be invoked for a
   /// received request.  The Sproutlet can either return NULL indicating it
   /// does not want to process the request, or create a suitable object
@@ -561,6 +632,12 @@ public:
   /// Returns the name of this service.
   const std::string service_name() const { return _service_name; }
 
+  /// Returns the URI of this service (as a string)
+  const std::string uri_as_str() const { return _uri; }
+
+  /// Returns the API version required by this Sproutlet.
+  int api_version() const { return API_VERSION; }
+
   /// Returns the default port for this service.
   int port() const { return _port; }
 
@@ -574,10 +651,16 @@ public:
 protected:
   /// Constructor.
   Sproutlet(const std::string& service_name,
-            int port=0,
-            const std::string& service_host="") :
+            int port,
+            const std::string& uri,
+            const std::string& service_host="",
+            SNMP::SuccessFailCountByRequestTypeTable* incoming_sip_transactions_tbl = NULL,
+            SNMP::SuccessFailCountByRequestTypeTable* outgoing_sip_transactions_tbl = NULL) :
+    _incoming_sip_transactions_tbl(incoming_sip_transactions_tbl),
+    _outgoing_sip_transactions_tbl(outgoing_sip_transactions_tbl),
     _service_name(service_name),
     _port(port),
+    _uri(uri),
     _service_host(service_host)
   {
   }
@@ -588,6 +671,9 @@ private:
 
   /// The default port for this service (0 if no default).
   const int _port;
+
+  /// The URI of this service.
+  const std::string _uri;
 
   /// The host name of this service.
   const std::string _service_host;
