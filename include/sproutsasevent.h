@@ -226,6 +226,8 @@ namespace SASEvent
   const int BEGIN_SUBSCRIPTION_MODULE = SPROUT_BASE + 0x0127;
   const int BEGIN_THREAD_DISPATCHER = SPROUT_BASE + 0x0128;
 
+  const int SIFC_NO_SET_FOR_ID = SPROUT_BASE + 0x0140;
+
 } //namespace SASEvent
 
 #endif

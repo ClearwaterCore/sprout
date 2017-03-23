@@ -1384,6 +1384,7 @@ ACRFactory* scscf_acr_factory = NULL;
 EnumService* enum_service = NULL;
 ExceptionHandler* exception_handler = NULL;
 AlarmManager* alarm_manager = NULL;
+SIFCService* sifc_service = NULL;
 
 /*
  * main()
@@ -1894,6 +1895,7 @@ int main(int argc, char* argv[])
   {
     // Create a connection to the HSS.
     TRC_STATUS("Creating connection to HSS %s", opt.hss_server.c_str());
+    sifc_service = new SIFCService();
     hss_connection = new HSSConnection(opt.hss_server,
                                        http_resolver,
                                        load_monitor,
@@ -1905,6 +1907,7 @@ int main(int argc, char* argv[])
                                        homestead_lir_latency_table,
                                        hss_comm_monitor,
                                        opt.uri_scscf,
+                                       sifc_service,
                                        opt.allow_fallback_ifcs);
   }
 
@@ -2412,6 +2415,7 @@ int main(int argc, char* argv[])
   delete http_stack_mgmt; http_stack_mgmt = NULL;
   delete chronos_connection;
   delete hss_connection;
+  delete sifc_service;
   delete quiescing_mgr;
   delete exception_handler;
   delete load_monitor;
