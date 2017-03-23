@@ -305,7 +305,7 @@ pj_status_t user_lookup(pj_pool_t *pool,
       }
 
       cred_info->data_type = PJSIP_CRED_DATA_PLAIN_PASSWD;
-      pj_strdup2(pool, &cred_info->data, xres.c_str());
+      pj_strdup4(pool, &cred_info->data, xres.data(), xres.length());
       TRC_DEBUG("Found AKA XRES = %.*s", cred_info->data.slen, cred_info->data.ptr);
 
       // Use default realm as it isn't specified in the AV.
