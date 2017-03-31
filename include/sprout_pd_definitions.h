@@ -521,7 +521,7 @@ static const PDLog CL_SPROUT_SIFC_FILE_MISSING_SET_ID
   LOG_ERR,
   "An entry in the shared IFC sets file doesn't have the correct syntax; it's missing the SetId.",
   "The S-CSCF supports shared IFC sets, but one of the shared IFC sets in the configuration file for this doesn't match the expected syntax (no SetId).",
-  "The S-CSCF will not be able to correctly translate IDs in Service Profiles sent from the HSS into Initial Filter Criteria.",
+  "The S-CSCF will not be able to correctly translate some IDs in Service Profiles sent from the HSS into Initial Filter Criteria.",
   "The shared IFC sets should be defined in /etc/clearwater/sifc.xml. Populate this file according to the documentation."
 );
 
@@ -531,7 +531,7 @@ static const PDLog1<const char *> CL_SPROUT_SIFC_FILE_INVALID_SET_ID
   LOG_ERR,
   "An entry in the shared IFC sets file doesn't have the correct syntax; its SetId (%s) isn't an integer.",
   "The S-CSCF supports shared IFC sets, but one of the shared IFC sets in the configuration file for this doesn't match the expected syntax (invalid SetID).",
-  "The S-CSCF will not be able to correctly translate IDs in Service Profiles sent from the HSS into Initial Filter Criteria.",
+  "The S-CSCF will not be able to correctly translate some IDs in Service Profiles sent from the HSS into Initial Filter Criteria.",
   "The shared IFC sets should be defined in /etc/clearwater/sifc.xml. Populate this file according to the documentation."
 );
 
@@ -541,7 +541,7 @@ static const PDLog1<const char *> CL_SPROUT_SIFC_FILE_REPEATED_SET_ID
   LOG_ERR,
   "Multiple entries in the shared IFC sets file use the same SetId (%s)(",
   "The S-CSCF supports shared IFC sets, but the configuration file for this has multiple entries for one ID.",
-  "The S-CSCF will not be able to correctly translate IDs in Service Profiles sent from the HSS into Initial Filter Criteria.",
+  "The S-CSCF will not be able to correctly translate some IDs in Service Profiles sent from the HSS into Initial Filter Criteria.",
   "The shared IFC sets should be defined in /etc/clearwater/sifc.xml. Populate this file according to the documentation."
 );
 
@@ -551,7 +551,7 @@ static const PDLog1<const char *> CL_SPROUT_SIFC_FILE_INVALID_PRIORITY
   LOG_ERR,
   "An entry in the shared IFC sets file doesn't have the correct syntax; its Priority (%s) isn't an integer.",
   "The S-CSCF supports shared IFC sets, but one of the shared IFC sets in the configuration file for this doesn't match the expected syntax (invalid Priority).",
-  "The S-CSCF will not be able to correctly translate IDs in Service Profiles sent from the HSS into Initial Filter Criteria.",
+  "The S-CSCF will not be able to correctly translate some IDs in Service Profiles sent from the HSS into Initial Filter Criteria.",
   "The shared IFC sets should be defined in /etc/clearwater/sifc.xml. Populate this file according to the documentation."
 );
 
