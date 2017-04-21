@@ -43,6 +43,7 @@
 
 #include "utils.h"
 #include "sas.h"
+#include "stack.h"
 #include "fakehttpresolver.hpp"
 #include "hssconnection.h"
 #include "basetest.hpp"
@@ -75,6 +76,8 @@ class HssConnectionTest : public BaseTest
          &_cm,
          "server_name")
     {
+    init_pjsip_logging(99, false, "");
+    init_pjsip();
     fakecurl_responses.clear();
     fakecurl_responses_with_body[std::make_pair("http://10.42.42.42:80/impu/pubid42/reg-data", "{\"reqtype\": \"reg\", \"server_name\": \"server_name\"}")] =
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
@@ -223,7 +226,7 @@ class HssConnectionTest : public BaseTest
          "</ServiceProfile>"
         "</IMSSubscription>"
       "</ClearwaterRegData>";
-    fakecurl_responses_with_body[std::make_pair("http://10.42.42.42:80/impu/pubid46/reg-data", "{\"reqtype\": \"call\", \"server_name\": \"server_name\"}")] =
+    fakecurl_responses_with_body[std::make_pair("http://10.42.42.42:80/impu/sip%3Apubid46%40pub.com/reg-data", "{\"reqtype\": \"call\", \"server_name\": \"server_name\"}")] =
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
       "<ClearwaterRegData>"
         "<RegistrationState>REGISTERED</RegistrationState>"
@@ -256,7 +259,7 @@ class HssConnectionTest : public BaseTest
               "<Identity>sip:321@example.com</Identity>"
             "</PublicIdentity>"
             "<PublicIdentity>"
-              "<Identity>pubid46</Identity>"
+              "<Identity>sip:pubid46@pub.com</Identity>"
             "</PublicIdentity>"
             "<PublicIdentity>"
               "<Identity>tel:321</Identity>"
@@ -336,6 +339,7 @@ class HssConnectionTest : public BaseTest
 
   virtual ~HssConnectionTest()
   {
+    term_pjsip();
   }
 };
 
@@ -575,7 +579,7 @@ TEST_F(HssConnectionTest, SimpleAliases)
   std::string regstate;
   std::vector<std::string> unused_vector;
   std::deque<std::string> unused_deque;
-  _hss.update_registration_state("pubid46",
+  _hss.update_registration_state("sip:pubid46@pub.com",
                                  "",
                                  HSSConnection::CALL,
                                  regstate,
@@ -588,7 +592,7 @@ TEST_F(HssConnectionTest, SimpleAliases)
                                  0);
   ASSERT_EQ(3u, aliases.size());
   EXPECT_EQ("sip:321@example.com", aliases[0]);
-  EXPECT_EQ("pubid46", aliases[1]);
+  EXPECT_EQ("sip:pubid46@pub.com", aliases[1]);
   EXPECT_EQ("tel:321", aliases[2]);
 }
 
