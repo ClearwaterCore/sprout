@@ -59,6 +59,8 @@ const std::string HSSConnection::AUTH_FAIL = "dereg-auth-failed";
 const std::string HSSConnection::STATE_REGISTERED = "REGISTERED";
 const std::string HSSConnection::STATE_NOT_REGISTERED = "NOT_REGISTERED";
 
+const std::string HSSConnection::STATE_BARRED = "1";
+
 HSSConnection::HSSConnection(const std::string& server,
                              HttpResolver* resolver,
                              LoadMonitor *load_monitor,
@@ -275,6 +277,7 @@ bool compare_charging_addrs(const rapidxml::xml_node<>* ca1,
 bool decode_homestead_xml(const std::string public_user_identity,
                           std::shared_ptr<rapidxml::xml_document<> > root,
                           std::string& regstate,
+                          std::map<std::string, std::string>& barred_map,
                           std::map<std::string, Ifcs >& ifcs_map,
                           std::vector<std::string>& associated_uris,
                           std::vector<std::string>& aliases,
@@ -368,12 +371,20 @@ bool decode_homestead_xml(const std::string public_user_identity,
       if (identity)
       {
         std::string uri = std::string(identity->value());
+
+        rapidxml::xml_node<>* barring_indication = public_id->first_node("BarringIndication");
+
         TRC_DEBUG("Processing Identity node from HSS XML - %s\n",
                   uri.c_str());
 
         associated_uris.push_back(uri);
         ifcs_map[uri] = ifc;
-        
+
+        if (barring_indication)
+        {
+          barred_map[uri] = barring_indication->value();
+        }
+
         // The first set of IFCs are what we might want to fall back to if
         // the public ID we're looking for isn't found, so we store them off if
         // the PublicIdentity node we're handling is the first one.
@@ -427,7 +438,7 @@ bool decode_homestead_xml(const std::string public_user_identity,
     ifcs_map[public_user_identity] = fallback_ifc;
     associated_uris.push_back(public_user_identity);
   }
- 
+
   rapidxml::xml_node<>* charging_addrs_node = cw->first_node("ChargingAddresses");
 
   if (charging_addrs_node)
@@ -496,6 +507,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                                   std::vector<std::string>& associated_uris,
                                                   SAS::TrailId trail)
 {
+  std::map<std::string, std::string> unused_barred_map;
   std::vector<std::string> unused_aliases;
   std::deque<std::string> unused_ccfs;
   std::deque<std::string> unused_ecfs;
@@ -503,6 +515,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                    private_user_identity,
                                    type,
                                    regstate,
+                                   unused_barred_map,
                                    ifcs_map,
                                    associated_uris,
                                    unused_aliases,
@@ -515,11 +528,39 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
 HTTPCode HSSConnection::update_registration_state(const std::string& public_user_identity,
                                                   const std::string& private_user_identity,
                                                   const std::string& type,
+                                                  std::string& regstate,
+                                                  std::map<std::string, std::string>& barred_map,
+                                                  std::map<std::string, Ifcs >& ifcs_map,
+                                                  std::vector<std::string>& associated_uris,
+                                                  SAS::TrailId trail)
+{
+  std::vector<std::string> unused_aliases;
+  std::deque<std::string> unused_ccfs;
+  std::deque<std::string> unused_ecfs;
+  return update_registration_state(public_user_identity,
+                                   private_user_identity,
+                                   type,
+                                   regstate,
+                                   barred_map,
+                                   ifcs_map,
+                                   associated_uris,
+                                   unused_aliases,
+                                   unused_ccfs,
+                                   unused_ecfs,
+                                   true,
+                                   trail);
+}
+
+
+HTTPCode HSSConnection::update_registration_state(const std::string& public_user_identity,
+                                                  const std::string& private_user_identity,
+                                                  const std::string& type,
                                                   std::map<std::string, Ifcs >& ifcs_map,
                                                   std::vector<std::string>& associated_uris,
                                                   SAS::TrailId trail)
 {
   std::string unused_regstate;
+  std::map<std::string, std::string> unused_barred_map;
   std::vector<std::string> unused_aliases;
   std::deque<std::string> unused_ccfs;
   std::deque<std::string> unused_ecfs;
@@ -527,6 +568,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                    private_user_identity,
                                    type,
                                    unused_regstate,
+                                   unused_barred_map,
                                    ifcs_map,
                                    associated_uris,
                                    unused_aliases,
@@ -544,6 +586,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
   std::map<std::string, Ifcs > ifcs_map;
   std::vector<std::string> associated_uris;
   std::string unused_regstate;
+  std::map<std::string, std::string> unused_barred_map;
   std::vector<std::string> unused_aliases;
   std::deque<std::string> unused_ccfs;
   std::deque<std::string> unused_ecfs;
@@ -551,6 +594,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                    private_user_identity,
                                    type,
                                    unused_regstate,
+                                   unused_barred_map,
                                    ifcs_map,
                                    associated_uris,
                                    unused_aliases,
@@ -570,11 +614,13 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                                   std::deque<std::string>& ecfs,
                                                   SAS::TrailId trail)
 {
+  std::map<std::string, std::string> unused_barred_map;
   std::vector<std::string> unused_aliases;
   return update_registration_state(public_user_identity,
                                    private_user_identity,
                                    type,
                                    regstate,
+                                   unused_barred_map,
                                    ifcs_map,
                                    associated_uris,
                                    unused_aliases,
@@ -588,6 +634,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                                   const std::string& private_user_identity,
                                                   const std::string& type,
                                                   std::string& regstate,
+                                                  std::map<std::string, std::string>& barred_map,
                                                   std::map<std::string, Ifcs >& ifcs_map,
                                                   std::vector<std::string>& associated_uris,
                                                   std::vector<std::string>& aliases,
@@ -648,6 +695,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
   return decode_homestead_xml(public_user_identity,
                               root,
                               regstate,
+                              barred_map,
                               ifcs_map,
                               associated_uris,
                               aliases,
@@ -724,9 +772,11 @@ HTTPCode HSSConnection::get_registration_data(const std::string& public_user_ide
   // not return any IFCs (when the subscriber isn't registered), so a successful
   // response shouldn't be taken as a guarantee of IFCs.
   std::vector<std::string> unused_aliases;
+  std::map<std::string, std::string> unused_barred_map;
   return decode_homestead_xml(public_user_identity,
                               root,
                               regstate,
+                              unused_barred_map,
                               ifcs_map,
                               associated_uris,
                               unused_aliases,

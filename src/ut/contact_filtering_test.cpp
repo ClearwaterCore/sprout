@@ -703,6 +703,7 @@ TEST_F(ContactFilteringFullStackTest, NoFiltering)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   EXPECT_EQ((unsigned)1, targets.size());
@@ -727,6 +728,7 @@ TEST_F(ContactFilteringFullStackTest, ImplicitFiltering)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   // Since we explicitly say that only INVITE and OPTIONS are
@@ -754,6 +756,7 @@ TEST_F(ContactFilteringFullStackTest, ImplicitFilteringDeprioritize)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   // Since we don't explicitly include a "methods" parameter, and
@@ -794,6 +797,7 @@ TEST_F(ContactFilteringFullStackTest, ExplicitFilteringYesMatch)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   EXPECT_EQ((unsigned)1, targets.size());
@@ -830,6 +834,7 @@ TEST_F(ContactFilteringFullStackTest, ExplicitFilteringUnknownMatch)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   // Since the Accept-Header specifies a value that the binding doesn't
@@ -867,6 +872,7 @@ TEST_F(ContactFilteringFullStackTest, ExplicitFilteringNoMatch)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   // Since the Accept-Header specifies a value that the binding doesn't
@@ -905,6 +911,7 @@ TEST_F(ContactFilteringFullStackTest, RejectFilteringMatch)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   // Since the Accept-Header specifies a value that the binding doesn't
@@ -941,6 +948,7 @@ TEST_F(ContactFilteringFullStackTest, RejectFilteringNoMatch)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   // Since the Accept-Header specifies a value that the binding doesn't
@@ -1011,6 +1019,7 @@ TEST_F(ContactFilteringFullStackTest, LotsOfBindings)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   EXPECT_EQ((unsigned)5, targets.size());
@@ -1044,6 +1053,7 @@ TEST_F(ContactFilteringFullStackTest, GRUUNoMatch)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   EXPECT_EQ((unsigned)0, targets.size());
@@ -1086,6 +1096,7 @@ TEST_F(ContactFilteringFullStackTest, GRUUMatch)
                              pool,
                              5,
                              targets,
+                             false,
                              1);
 
   EXPECT_EQ((unsigned)1, targets.size());

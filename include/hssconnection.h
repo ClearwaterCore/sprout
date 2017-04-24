@@ -94,6 +94,7 @@ public:
                                      const std::string& private_user_identity,
                                      const std::string& type,
                                      std::string& regstate,
+                                     std::map<std::string, std::string>& barred_map,
                                      std::map<std::string, Ifcs >& service_profiles,
                                      std::vector<std::string>& associated_uris,
                                      std::vector<std::string>& aliases,
@@ -114,6 +115,14 @@ public:
                                      const std::string& private_user_identity,
                                      const std::string& type,
                                      std::string& regstate,
+                                     std::map<std::string, Ifcs >& service_profiles,
+                                     std::vector<std::string>& associated_uris,
+                                     SAS::TrailId trail);
+  HTTPCode update_registration_state(const std::string& public_user_identity,
+                                     const std::string& private_user_identity,
+                                     const std::string& type,
+                                     std::string& regstate,
+                                     std::map<std::string, std::string>& barred_map,
                                      std::map<std::string, Ifcs >& service_profiles,
                                      std::vector<std::string>& associated_uris,
                                      SAS::TrailId trail);
@@ -152,6 +161,8 @@ public:
 
   static const std::string STATE_REGISTERED;
   static const std::string STATE_NOT_REGISTERED;
+
+  static const std::string STATE_BARRED;
 
 private:
   virtual long get_json_object(const std::string& path,
