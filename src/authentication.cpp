@@ -143,8 +143,9 @@ get_expiry_for_binding_fn get_expiry_for_binding;
 pjsip_auth_srv auth_srv;
 pjsip_auth_srv auth_srv_proxy;
 
-// Controls when to challenge non-REGISTER messages.
-NonRegisterAuthentication non_register_auth_mode;
+// Controls when to challenge non-REGISTER messages.  This is a bitmask with
+// alues taken from NonRegisterAuthentication.
+uint32_t non_register_auth_mode;
 
 // Retrieve the digest credentials (from the Authorization header for REGISTERs, and the
 // Proxy-Authorization header otherwise).
@@ -834,14 +835,14 @@ static pj_bool_t needs_authentication(pjsip_rx_data* rdata, SAS::TrailId trail)
     }
 
     // Check to see if we should authenticate this non-REGISTER message - this
-    if (non_register_auth_mode == NonRegisterAuthentication::NEVER)
+    if (non_register_auth_mode == 0)
     {
       // Configured to never authenticate non-REGISTER requests.
       SAS::Event event(trail, SASEvent::AUTHENTICATION_NOT_NEEDED_NEVER_AUTH_NON_REG, 0);
       SAS::report_event(event);
       return PJ_FALSE;
     }
-    else if (non_register_auth_mode == NonRegisterAuthentication::IF_PROXY_AUTHORIZATION_PRESENT)
+    else if (non_register_auth_mode & NonRegisterAuthentication::IF_PROXY_AUTHORIZATION_PRESENT)
     {
       // Only authenticate the request if it has a Proxy-Authorization header.
       pjsip_proxy_authorization_hdr* auth_hdr = (pjsip_proxy_authorization_hdr*)
@@ -1305,7 +1306,7 @@ pj_status_t init_authentication(const std::string& realm_name,
                                 HSSConnection* hss_connection,
                                 ChronosConnection* chronos_connection,
                                 ACRFactory* rfacr_factory,
-                                NonRegisterAuthentication non_register_auth_mode_param,
+                                uint32_t non_register_auth_mode_param,
                                 AnalyticsLogger* analytics_logger,
                                 SNMP::AuthenticationStatsTables* auth_stats_tbls,
                                 bool nonce_count_supported_arg,

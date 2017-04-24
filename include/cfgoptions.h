@@ -62,6 +62,24 @@ enum struct MemcachedWriteFormat
   BINARY, JSON
 };
 
+// Struct containing the possible values for non-REGISTER authentication. These
+// are a set of flags that indicate different conditions that may can a
+// non-REGISTER to be authenticated. They are represented as a bitmask where
+// each value must be a power of two.
+struct NonRegisterAuthentication
+{
+  // Never authenticate non-REGISTER requests. This represents the case where no
+  // conditions are set, so this must have the value 0.
+  static const uint32_t NEVER = 0;
+
+  // Authenticate a non-REGISTER if it has a Proxy-Authorization header.
+  static const uint32_t IF_PROXY_AUTHORIZATION_PRESENT = 1;
+
+  // Authenticate a non-REGISTER if it came from a registered endpoint that uses
+  // SIP digest authentication (see TS 24.229, section 5.4.3.6).
+  static const uint32_t INITIAL_REQ_FROM_REG_DIGEST_ENDPOINT = 2;
+};
+
 struct options
 {
   bool                                 pcscf_enabled;
@@ -134,7 +152,7 @@ struct options
   std::set<std::string>                stateless_proxies;
   std::string                          pbxes;
   std::string                          pbx_service_route;
-  NonRegisterAuthentication            non_register_auth_mode;
+  uint32_t                             non_register_auth_mode;
   bool                                 force_third_party_register_body;
   std::string                          memento_notify_url;
   std::string                          pidfile;
