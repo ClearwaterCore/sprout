@@ -594,15 +594,6 @@ TEST_F(AuthenticationTest, IntegrityProtected)
   ret = inject_msg_direct(msg3.get());
   EXPECT_EQ(PJ_FALSE, ret);
 
-  AuthenticationMessage msg4("REGISTER");
-  msg4._auth_hdr = true;
-  msg4._integ_prot = "ip-assoc-yes";
-  ret = inject_msg_direct(msg4.get());
-  EXPECT_EQ(PJ_FALSE, ret);
-  msg4._response = "12341234123412341234123412341234";
-  ret = inject_msg_direct(msg4.get());
-  EXPECT_EQ(PJ_FALSE, ret);
-
   EXPECT_EQ(0,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_AUTHENTICATION_STATS_TABLES.sip_digest_auth_tbl)->_attempts);
   EXPECT_EQ(0,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_AUTHENTICATION_STATS_TABLES.ims_aka_auth_tbl)->_attempts);
 }

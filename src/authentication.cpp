@@ -924,18 +924,16 @@ static pj_bool_t needs_authentication(pjsip_rx_data* rdata, SAS::TrailId trail)
         pjsip_param_find(&auth_hdr->credential.digest.other_param,
                          &STR_INTEGRITY_PROTECTED);
 
-      if ((integrity != NULL) &&
-          ((pj_stricmp(&integrity->value, &STR_TLS_YES) == 0) ||
-           (pj_stricmp(&integrity->value, &STR_IP_ASSOC_YES) == 0)))
+      if ((integrity != NULL) && (pj_stricmp(&integrity->value, &STR_TLS_YES) == 0))
       {
         TRC_DEBUG("Integrity protected with %.*s",
                   integrity->value.slen, integrity->value.ptr);
 
-        // The integrity protected indicator is included and set to tls-yes or
-        // ip-assoc-yes.  This indicates the client has already been authenticated
-        // so we will accept this REGISTER even if there is a challenge response.
-        // Values of tls-pending or ip-assoc-pending indicate the challenge
-        // should be checked.
+        // The integrity protected indicator is included and set to tls-yes.
+        // This indicates the client has already been authenticated so we will
+        // accept this REGISTER even if there is a challenge response.  Values
+        // of tls-pending, ip-assoc-yes, or ip-assoc-pending indicate the
+        // challenge should be checked.
 
         // We should still challenge though if we find that the request wasn't
         // sent to this S-CSCF, as this triggers the HSS to accept an S-CSCF
