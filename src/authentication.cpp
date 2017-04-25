@@ -486,11 +486,10 @@ void create_challenge(pjsip_digest_credential* credentials,
 {
   // Get the public and private identities from the request.
   std::string impi;
-  std::string impu;
+  std::string impu_for_hss;
   bool av_source_unavailable = false;
   ImpiStore::Impi* impi_obj = nullptr;
 
-  PJUtils::get_impi_and_impu(rdata, impi, impu);
   // Set up the authorization type, following Annex P.4 of TS 33.203.  Currently
   // only support AKA and SIP Digest, so only implement the subset of steps
   // required to distinguish between the two.
@@ -526,9 +525,11 @@ void create_challenge(pjsip_digest_credential* credentials,
     // This is either a REGISTER, or a request that Sprout should authenticate
     // by treating it like a REGISTER. Get the Authentication Vector from the
     // HSS.
+    PJUtils::get_impi_and_impu(rdata, impi, impu_for_hss);
+
     rapidjson::Document* doc = NULL;
     HTTPCode http_code = hss->get_auth_vector(impi,
-                                              impu,
+                                              impu_for_hss,
                                               auth_type,
                                               resync,
                                               doc,
@@ -549,7 +550,7 @@ void create_challenge(pjsip_digest_credential* credentials,
     std::string username;
     std::string nonce;
 
-    if (get_top_route_param(rdata->msg_info.msg, &STR_USERNAME, username) &&
+    if (get_top_route_param(rdata->msg_info.msg, &STR_USERNAME, impi) &&
         get_top_route_param(rdata->msg_info.msg, &STR_NONCE, nonce))
     {
       // Store of the IMPI object we got back from the store so that we don't
@@ -778,13 +779,25 @@ void create_challenge(pjsip_digest_credential* credentials,
 
     if (status == Store::OK)
     {
-      // We've written the challenge into the store, so need to set a Chronos
-      // timer so that an AUTHENTICATION_TIMEOUT SAR is sent to the
-      // HSS when it expires.
-      std::string timer_id;
-      std::string chronos_body = "{\"impi\": \"" + impi + "\", \"impu\": \"" + impu +"\", \"nonce\": \"" + nonce +"\"}";
-      TRC_DEBUG("Sending %s to Chronos to set AV timer", chronos_body.c_str());
-      chronos->send_post(timer_id, 30, "/authentication-timeout", chronos_body, get_trail(rdata));
+      if (!impu_for_hss.empty())
+      {
+        TRC_DEBUG("Set chronos timer for AUTHENTICATION_TIMEOUT SAR");
+
+        // We've written the challenge into the store, so need to set a Chronos
+        // timer so that an AUTHENTICATION_TIMEOUT SAR is sent to the
+        // HSS when it expires.
+        std::string timer_id;
+        std::string chronos_body = "{\"impi\": \"" + impi +
+                                "\", \"impu\": \"" + impu_for_hss +
+                                "\", \"nonce\": \"" + nonce +
+                                "\"}";
+        TRC_DEBUG("Sending %s to Chronos to set AV timer", chronos_body.c_str());
+        chronos->send_post(timer_id,
+                           30,
+                           "/authentication-timeout",
+                           chronos_body,
+                           get_trail(rdata));
+      }
     }
     else
     {
