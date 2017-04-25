@@ -39,18 +39,10 @@
 #include <memory>
 #include <map>
 
-extern "C" {
-#include <pjsip.h>
-#include <pjlib-util.h>
-#include <pjlib.h>
-}
-
 #include "utils.h"
 #include "log.h"
 #include "sas.h"
 #include "sproutsasevent.h"
-#include "stack.h"
-#include "pjutils.h"
 #include "httpconnection.h"
 #include "hssconnection.h"
 #include "rapidjson/error/en.h"
@@ -289,8 +281,7 @@ bool decode_homestead_xml(const std::string public_user_identity,
                           std::deque<std::string>& ccfs,
                           std::deque<std::string>& ecfs,
                           bool fallback_if_no_matching_ifc,
-                          bool allowNoIMS,
-                          SAS::TrailId trail)
+                          bool allowNoIMS)
 {
   if (!root.get())
   {
@@ -368,9 +359,6 @@ bool decode_homestead_xml(const std::string public_user_identity,
       return false;
     }
 
-    // Create a temporary pool to allow us to check URIs for validity
-    pj_pool_t* tmp_pool = pj_pool_create(&stack_data.cp.factory, "hssconnection", 1024, 512, NULL);
-
     for (public_id = sp->first_node("PublicIdentity");
          public_id != NULL;
          public_id = public_id->next_sibling("PublicIdentity"))
@@ -383,53 +371,33 @@ bool decode_homestead_xml(const std::string public_user_identity,
         TRC_DEBUG("Processing Identity node from HSS XML - %s\n",
                   uri.c_str());
 
-        // Check that the URI is valid.  HSSes might not guarantee that URIs
-        // in ServiceProfiles are validly formatted (OpenIMS doesn't, for
-        // instance) and allowing such URIs through at this stage can lead to
-        // exceptions elsewhere.
-        if (PJUtils::uri_from_string(uri, tmp_pool) == NULL)
+        associated_uris.push_back(uri);
+        ifcs_map[uri] = ifc;
+        
+        // The first set of IFCs are what we might want to fall back to if
+        // the public ID we're looking for isn't found, so we store them off if
+        // the PublicIdentity node we're handling is the first one.
+        if (public_id == sp->first_node("PublicIdentity"))
         {
-          TRC_WARNING("Bad identity value %s", uri.c_str());
-          SAS::Event event(trail, SASEvent::HTTP_HOMESTEAD_BAD_IDENTITY, 0);
-          event.add_var_param(uri);
-          SAS::report_event(event);
+          fallback_ifc = ifc;
         }
-        else
+
+        if (!found_aliases)
         {
-          // URI is valid.  Add it to the list of associated URIs found.
-          associated_uris.push_back(uri);
-          ifcs_map[uri] = ifc;
+          sp_identities.push_back(uri);
 
-          // The first set of IFCs are what we might want to fall back to if
-          // the public ID we're looking for isn't found, so we store them off if
-          // the PublicIdentity node we're handling is the first one.
-          if (public_id == sp->first_node("PublicIdentity"))
+          if (uri == public_user_identity)
           {
-            fallback_ifc = ifc;
-          }
-
-          if (!found_aliases)
-          {
-            sp_identities.push_back(uri);
-
-            if (uri == public_user_identity)
-            {
-              current_sp_contains_public_id = true;
-            }
+            current_sp_contains_public_id = true;
           }
         }
       }
       else
       {
         TRC_WARNING("Malformed PublicIdentity XML - no Identity");
-        // Release the temporary pool
-        pj_pool_release(tmp_pool);
         return false;
       }
     }
-
-    // Release the temporary pool
-    pj_pool_release(tmp_pool);
 
     if (!found_aliases)
     {
@@ -459,7 +427,7 @@ bool decode_homestead_xml(const std::string public_user_identity,
     ifcs_map[public_user_identity] = fallback_ifc;
     associated_uris.push_back(public_user_identity);
   }
-
+ 
   rapidxml::xml_node<>* charging_addrs_node = cw->first_node("ChargingAddresses");
 
   if (charging_addrs_node)
@@ -686,8 +654,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                               ccfs,
                               ecfs,
                               _fallback_if_no_matching_ifc,
-                              false,
-                              trail) ? HTTP_OK : HTTP_SERVER_ERROR;
+                              false) ? HTTP_OK : HTTP_SERVER_ERROR;
 }
 
 HTTPCode HSSConnection::get_registration_data(const std::string& public_user_identity,
@@ -766,8 +733,7 @@ HTTPCode HSSConnection::get_registration_data(const std::string& public_user_ide
                               ccfs,
                               ecfs,
                               _fallback_if_no_matching_ifc,
-                              true,
-                              trail) ? HTTP_OK : HTTP_SERVER_ERROR;
+                              true) ? HTTP_OK : HTTP_SERVER_ERROR;
 }
 
 
