@@ -1039,13 +1039,29 @@ pj_bool_t authenticate_rx_request(pjsip_rx_data* rdata)
         // authentications before it happens.
         uint32_t new_nonce_count = nonce_count + 1;
 
-        // Work out when the challenge should expire. We only want to keep it
-        // around if nonce counts are supported and the UE authenticates by
-        // registering.
+        // Work out when the challenge should expire. We keep it around if we
+        // might need it later which is the case if either:
+        // - Nonce counts are supported.
+        // - It is a digest challenge and we need to challenge initial requests
+        //   from endpoints that use digest.
+        //
+        // We also only store challenges to REGISTERs, as these have a
+        // well-defined lifetime (the duration of the REGISTER).
         int new_expiry = auth_challenge->expires;
-        if (nonce_count_supported && is_register)
+        if (is_register)
         {
-          new_expiry = calculate_challenge_expiration_time(rdata);
+          if (nonce_count_supported)
+          {
+            TRC_DEBUG("Storing challenge because nonce counts are supported");
+            new_expiry = calculate_challenge_expiration_time(rdata);
+          }
+          else if ((auth_challenge->type == ImpiStore::AuthChallenge::DIGEST) &&
+                   (non_register_auth_mode &
+                       NonRegisterAuthentication::INITIAL_REQ_FROM_REG_DIGEST_ENDPOINT))
+          {
+            TRC_DEBUG("Storing challenge in order to challenge non-REGISTER requests");
+            new_expiry = calculate_challenge_expiration_time(rdata);
+          }
         }
 
         Store::Status store_status;
