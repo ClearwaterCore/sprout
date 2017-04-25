@@ -1048,13 +1048,50 @@ void process_register_request(pjsip_rx_data* rdata)
                     pjsip_msg_find_hdr_by_name(msg, &STR_PATH, path_hdr->next);
   }
 
-  // Add the Service-Route header.  It isn't safe to do this with the
-  // pre-built header from the global pool because the chaining data
-  // structures in the header may get overwritten, but it is safe to do a
-  // shallow clone.
-  pjsip_hdr* clone = (pjsip_hdr*)
-                          pjsip_hdr_shallow_clone(tdata->pool, service_route);
-  pjsip_msg_insert_first_hdr(tdata->msg, clone);
+  // Add the Service-Route header. We may modify this so need to do a full clone
+  // of the header.  Annoyingly this overwrites the custom name we set during
+  // module initialization, so reset it.
+  pjsip_routing_hdr* sr_hdr = (pjsip_routing_hdr*)pjsip_hdr_clone(tdata->pool, service_route);
+  sr_hdr->name = STR_SERVICE_ROUTE;
+  sr_hdr->sname = pj_str("");
+  pjsip_msg_insert_first_hdr(tdata->msg, (pjsip_hdr*)sr_hdr);
+
+  // If the UE authenticated using SIP digest, copy the username and nonce to
+  // the service route so the authentication module can challenge a subsequent
+  // non-register request if necessary.
+  pjsip_authorization_hdr* auth_hdr = (pjsip_authorization_hdr*)
+    pjsip_msg_find_hdr(rdata->msg_info.msg, PJSIP_H_AUTHORIZATION, NULL);
+
+  if (auth_hdr != NULL)
+  {
+    // This is a SIP digest authorization header if the scheme is digest, and
+    // the algorithm is either missing, or set to MD5 (looking at the scheme is
+    // not sufficient as AKA responses also have a scheme of "digest", but the
+    // algorithm is one of the AKA algorithms).
+    bool is_digest =
+      ((pj_stricmp2(&auth_hdr->scheme, "digest") == 0) &&
+       ((pj_strlen(&auth_hdr->credential.digest.response) == 0) ||
+        (pj_stricmp2(&auth_hdr->credential.digest.algorithm, "md5") == 0)));
+
+    if (is_digest && (pj_strlen(&auth_hdr->credential.digest.response) != 0))
+    {
+      if ((pj_strlen(&auth_hdr->credential.digest.username) != 0) &&
+          (pj_strlen(&auth_hdr->credential.digest.nonce) != 0))
+      {
+        pjsip_sip_uri* sr_uri = (pjsip_sip_uri*)pjsip_uri_get_uri(&sr_hdr->name_addr);
+
+        pjsip_param *username_param = PJ_POOL_ALLOC_T(tdata->pool, pjsip_param);
+        pj_strdup(tdata->pool, &username_param->name, &STR_USERNAME);
+        pj_strdup(tdata->pool, &username_param->value, &auth_hdr->credential.digest.username);
+        pj_list_insert_before(&sr_uri->other_param, username_param);
+
+        pjsip_param *nonce_param = PJ_POOL_ALLOC_T(tdata->pool, pjsip_param);
+        pj_strdup(tdata->pool, &nonce_param->name, &STR_NONCE);
+        pj_strdup(tdata->pool, &nonce_param->value, &auth_hdr->credential.digest.nonce);
+        pj_list_insert_before(&sr_uri->other_param, nonce_param);
+      }
+    }
+  }
 
   // Add P-Associated-URI headers for all of the associated URIs.
   for (std::vector<std::string>::iterator it = uris.begin();
