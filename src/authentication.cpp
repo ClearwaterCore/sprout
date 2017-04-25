@@ -573,8 +573,12 @@ void create_challenge(pjsip_digest_credential* credentials,
     if (get_top_route_param(rdata->msg_info.msg, &STR_USERNAME, impi) &&
         get_top_route_param(rdata->msg_info.msg, &STR_NONCE, nonce))
     {
-      // Store of the IMPI object we got back from the store so that we don't
-      // have to do another read when writing the new challenge back.
+      impi = Utils::url_unescape(impi);
+      nonce = Utils::url_unescape(nonce);
+
+      // Get an AV from the store. Store of the IMPI object we got back from the
+      // store so that we don't have to do another read when writing the new
+      // challenge back.
       TRC_DEBUG("Challenge ID: impi=%s nonce=%s",impi.c_str(), nonce.c_str());
       av = get_av_from_store(impi, nonce, &impi_obj, get_trail(rdata));
 

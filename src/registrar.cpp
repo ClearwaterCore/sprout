@@ -1080,14 +1080,20 @@ void process_register_request(pjsip_rx_data* rdata)
       {
         pjsip_sip_uri* sr_uri = (pjsip_sip_uri*)pjsip_uri_get_uri(&sr_hdr->name_addr);
 
+        std::string username =
+          Utils::url_escape(PJUtils::pj_str_to_string(&auth_hdr->credential.digest.username));
+
         pjsip_param *username_param = PJ_POOL_ALLOC_T(tdata->pool, pjsip_param);
         pj_strdup(tdata->pool, &username_param->name, &STR_USERNAME);
-        pj_strdup(tdata->pool, &username_param->value, &auth_hdr->credential.digest.username);
+        pj_strdup2(tdata->pool, &username_param->value, username.c_str());
         pj_list_insert_before(&sr_uri->other_param, username_param);
+
+        std::string nonce =
+          Utils::url_escape(PJUtils::pj_str_to_string(&auth_hdr->credential.digest.nonce));
 
         pjsip_param *nonce_param = PJ_POOL_ALLOC_T(tdata->pool, pjsip_param);
         pj_strdup(tdata->pool, &nonce_param->name, &STR_NONCE);
-        pj_strdup(tdata->pool, &nonce_param->value, &auth_hdr->credential.digest.nonce);
+        pj_strdup2(tdata->pool, &nonce_param->value, nonce.c_str());
         pj_list_insert_before(&sr_uri->other_param, nonce_param);
       }
     }
