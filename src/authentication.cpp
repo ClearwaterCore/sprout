@@ -526,6 +526,8 @@ void create_challenge(pjsip_digest_credential* credentials,
     // by treating it like a REGISTER. Get the Authentication Vector from the
     // HSS.
     PJUtils::get_impi_and_impu(rdata, impi, impu_for_hss);
+    TRC_DEBUG("Get AV from HSS for impi=%s impu=%s",
+              impi.c_str(), impu_for_hss.c_str());
 
     rapidjson::Document* doc = NULL;
     HTTPCode http_code = hss->get_auth_vector(impi,
@@ -547,6 +549,7 @@ void create_challenge(pjsip_digest_credential* credentials,
     // This is a non-REGISTER, so get an AV by finding the challenge that the
     // endpoint authenticated with when it registered. The information we need
     // to look up the challenge will be in the top route header.
+    TRC_DEBUG("Get AV from previous challenge");
     std::string username;
     std::string nonce;
 
@@ -555,13 +558,17 @@ void create_challenge(pjsip_digest_credential* credentials,
     {
       // Store of the IMPI object we got back from the store so that we don't
       // have to do another read when writing the new challenge back.
+      TRC_DEBUG("Challenge ID: impi=%s nonce=%s",impi.c_str(), nonce.c_str());
       av = get_av_from_store(impi, nonce, &impi_obj, get_trail(rdata));
 
-      if (av == nullptr)
+      if (av == NULL)
       {
         // We failed to get an AV so discard the impi store object we got when
         // reading from the store.
         delete impi_obj; impi_obj = NULL;
+
+        // TODO work out why we couldn't get an AV and set
+        // `av_source_unavailable` appropriately.
       }
     }
   }
@@ -723,6 +730,7 @@ void create_challenge(pjsip_digest_credential* credentials,
     {
       if (impi_obj == NULL)
       {
+        TRC_DEBUG("Lookup IMPI %s (with nonce %s)", impi.c_str(), nonce.c_str());
         impi_obj = impi_store->get_impi_with_nonce(impi, nonce, get_trail(rdata));
 
         if (impi_obj == NULL)
