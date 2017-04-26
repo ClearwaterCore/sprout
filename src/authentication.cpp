@@ -143,8 +143,93 @@ get_expiry_for_binding_fn get_expiry_for_binding;
 pjsip_auth_srv auth_srv;
 pjsip_auth_srv auth_srv_proxy;
 
-// Controls when to challenge non-REGISTER messages.
-NonRegisterAuthentication non_register_auth_mode;
+// Controls when to challenge non-REGISTER messages.  This is a bitmask with
+// alues taken from NonRegisterAuthentication.
+uint32_t non_register_auth_mode;
+
+
+// Classes representing authentication vectors. This allows most of the
+// authentication module to be agnostic with respect to where the AV came from
+// (the HSS which returns AVs as JSON objects, or the IMPI store which returns
+// them as desrialized objects).
+class AuthenticationVector
+{
+public:
+  virtual ~AuthenticationVector() {}
+
+  bool is_aka() { return (_type == AKA); }
+  bool is_digest() { return (_type == DIGEST); }
+
+protected:
+  enum AvType { DIGEST, AKA };
+
+  AuthenticationVector(AvType type) : _type(type) {}
+
+  AvType _type;
+};
+
+class DigestAv : public AuthenticationVector
+{
+public:
+  DigestAv() : AuthenticationVector(DIGEST) {}
+  virtual ~DigestAv() {}
+
+  std::string ha1;
+  std::string qop;
+  std::string realm;
+};
+
+class AkaAv : public AuthenticationVector
+{
+public:
+  AkaAv() :
+    AuthenticationVector(AKA),
+    // Defaults to 1, for back-compatibility with pre-AKAv2 Homestead versions.
+    akaversion(1)
+  {}
+  virtual ~AkaAv() {}
+
+  std::string nonce;
+  std::string cryptkey;
+  std::string integritykey;
+  std::string xres;
+  int akaversion;
+};
+
+
+// Utility function to determine if the top route header on a request contains a
+// particular parameter.
+bool get_top_route_param(const pjsip_msg* req,
+                         const pj_str_t* param_name,
+                         std::string& value)
+{
+  pjsip_route_hdr* route = (pjsip_route_hdr*)pjsip_msg_find_hdr(req,
+                                                                PJSIP_H_ROUTE,
+                                                                NULL);
+  if (route != nullptr)
+  {
+    pjsip_uri* route_uri = (pjsip_uri*)pjsip_uri_get_uri(&route->name_addr);
+
+    if ((route_uri != nullptr) && (PJSIP_URI_SCHEME_IS_SIP(route_uri)))
+    {
+      pjsip_sip_uri* route_sip_uri = (pjsip_sip_uri*)route_uri;
+      pjsip_param* p = pjsip_param_find(&route_sip_uri->other_param, param_name);
+      if (p != nullptr)
+      {
+        value.assign(p->value.ptr, p->value.slen);
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+bool get_top_route_param(const pjsip_msg* req, const pj_str_t* param_name)
+{
+  std::string ignored;
+  return get_top_route_param(req, param_name, ignored);
+}
 
 // Retrieve the digest credentials (from the Authorization header for REGISTERs, and the
 // Proxy-Authorization header otherwise).
@@ -200,56 +285,74 @@ int calculate_challenge_expiration_time(pjsip_rx_data* rdata)
 }
 
 /// Verifies that the supplied authentication vector is valid.
-bool verify_auth_vector(rapidjson::Document* av, const std::string& impi, SAS::TrailId trail)
+AuthenticationVector* verify_auth_vector(rapidjson::Document* doc,
+                                         const std::string& impi,
+                                         SAS::TrailId trail)
 {
-  bool rc = true;
+  AuthenticationVector *av = nullptr;
 
   rapidjson::StringBuffer buffer;
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  av->Accept(writer);
+  doc->Accept(writer);
   std::string av_str = buffer.GetString();
   TRC_DEBUG("Verifying AV: %s", av_str.c_str());
 
   // Check the AV is well formed.
-  if (av->HasMember("aka"))
+  if (doc->HasMember("aka"))
   {
     // AKA is specified, check all the expected parameters are present.
     TRC_DEBUG("AKA specified");
-    rapidjson::Value& aka = (*av)["aka"];
-    if (!(((aka.HasMember("challenge")) && (aka["challenge"].IsString())) &&
-          ((aka.HasMember("response")) && (aka["response"].IsString())) &&
-          ((aka.HasMember("cryptkey")) && (aka["cryptkey"].IsString())) &&
-          ((aka.HasMember("integritykey")) && (aka["integritykey"].IsString()))))
+    rapidjson::Value& aka_obj = (*doc)["aka"];
+    if (!(((aka_obj.HasMember("challenge")) && (aka_obj["challenge"].IsString())) &&
+          ((aka_obj.HasMember("response")) && (aka_obj["response"].IsString())) &&
+          ((aka_obj.HasMember("cryptkey")) && (aka_obj["cryptkey"].IsString())) &&
+          ((aka_obj.HasMember("integritykey")) && (aka_obj["integritykey"].IsString()))))
     {
       // Malformed AKA entry
       TRC_INFO("Badly formed AKA authentication vector for %s",
                impi.c_str());
-      rc = false;
-
       SAS::Event event(trail, SASEvent::AUTHENTICATION_FAILED_MALFORMED, 0);
       std::string error_msg = std::string("AKA authentication vector is malformed: ") + av_str.c_str();
       event.add_var_param(error_msg);
       SAS::report_event(event);
     }
+    else
+    {
+      AkaAv* aka = new AkaAv();
+      JSON_SAFE_GET_STRING_MEMBER(aka_obj, "challenge", aka->nonce);
+      JSON_SAFE_GET_STRING_MEMBER(aka_obj, "cryptkey", aka->cryptkey);
+      JSON_SAFE_GET_STRING_MEMBER(aka_obj, "integritykey", aka->integritykey);
+      JSON_SAFE_GET_STRING_MEMBER(aka_obj, "response", aka->xres);
+      JSON_SAFE_GET_INT_MEMBER(aka_obj, "version", aka->akaversion);
+
+      av = aka;
+    }
   }
-  else if (av->HasMember("digest"))
+  else if (doc->HasMember("digest"))
   {
     // Digest is specified, check all the expected parameters are present.
     TRC_DEBUG("Digest specified");
-    rapidjson::Value& digest = (*av)["digest"];
-    if (!(((digest.HasMember("realm")) && (digest["realm"].IsString())) &&
-          ((digest.HasMember("qop")) && (digest["qop"].IsString())) &&
-          ((digest.HasMember("ha1")) && (digest["ha1"].IsString()))))
+    rapidjson::Value& digest_obj = (*doc)["digest"];
+    if (!(((digest_obj.HasMember("realm")) && (digest_obj["realm"].IsString())) &&
+          ((digest_obj.HasMember("qop")) && (digest_obj["qop"].IsString())) &&
+          ((digest_obj.HasMember("ha1")) && (digest_obj["ha1"].IsString()))))
     {
       // Malformed digest entry
       TRC_INFO("Badly formed Digest authentication vector for %s",
                impi.c_str());
-      rc = false;
-
       SAS::Event event(trail, SASEvent::AUTHENTICATION_FAILED_MALFORMED, 0);
       std::string error_msg = std::string("Digest authentication vector is malformed: ") + av_str.c_str();;
       event.add_var_param(error_msg);
       SAS::report_event(event);
+    }
+    else
+    {
+      DigestAv* digest = new DigestAv();
+      JSON_SAFE_GET_STRING_MEMBER(digest_obj, "realm", digest->realm);
+      JSON_SAFE_GET_STRING_MEMBER(digest_obj, "qop", digest->qop);
+      JSON_SAFE_GET_STRING_MEMBER(digest_obj, "ha1", digest->ha1);
+
+      av = digest;
     }
   }
   else
@@ -257,15 +360,13 @@ bool verify_auth_vector(rapidjson::Document* av, const std::string& impi, SAS::T
     // Neither AKA nor Digest information present.
     TRC_INFO("No AKA or Digest object in authentication vector for %s",
              impi.c_str());
-    rc = false;
-
     SAS::Event event(trail, SASEvent::AUTHENTICATION_FAILED_MALFORMED, 0);
     std::string error_msg = std::string("Authentication vector is malformed: ") + av_str.c_str();
     event.add_var_param(error_msg);
     SAS::report_event(event);
   }
 
-  return rc;
+  return av;
 }
 
 pj_status_t user_lookup(pj_pool_t *pool,
@@ -347,6 +448,53 @@ pj_status_t user_lookup(pj_pool_t *pool,
   return status;
 }
 
+/// Get an AV from a previous challenge in the IMPI store.
+///
+/// @param impi         - The IMPI of the previous challenge.
+/// @param nonce        - The nonce of the previous challenge.
+/// @param out_impi_obj - An optional pointer that can receive the IMPI object
+///                       the challenge was retrieved from lookups. Returning
+///                       this may allow the caller to avoid unnecessary further
+///                       lookups.
+/// @param trail        - SAS trail ID.
+///
+/// @return             - The retrieved authentication vector, or NULL.
+AuthenticationVector* get_av_from_store(const std::string& impi,
+                                        const std::string& nonce,
+                                        ImpiStore::Impi** out_impi_obj,
+                                        SAS::TrailId trail)
+{
+  AuthenticationVector* av = nullptr;
+
+  ImpiStore::Impi* impi_obj = impi_store->get_impi_with_nonce(impi, nonce, trail);
+
+  if (impi_obj != nullptr)
+  {
+    ImpiStore::AuthChallenge* auth_challenge = impi_obj->get_auth_challenge(nonce);
+
+    if ((auth_challenge != nullptr) &&
+        (auth_challenge->type == ImpiStore::AuthChallenge::Type::DIGEST))
+    {
+      ImpiStore::DigestAuthChallenge* digest_challenge =
+        dynamic_cast<ImpiStore::DigestAuthChallenge*>(auth_challenge);
+
+      DigestAv* digest_av = new DigestAv();
+      digest_av->qop = digest_challenge->qop;
+      digest_av->realm = digest_challenge->realm;
+      digest_av->ha1 = digest_challenge->ha1;
+
+      av = digest_av;
+    }
+  }
+
+  if (out_impi_obj != nullptr)
+  {
+    *out_impi_obj = impi_obj;
+  }
+
+  return av;
+}
+
 void create_challenge(pjsip_digest_credential* credentials,
                       pj_bool_t stale,
                       std::string resync,
@@ -355,10 +503,10 @@ void create_challenge(pjsip_digest_credential* credentials,
 {
   // Get the public and private identities from the request.
   std::string impi;
-  std::string impu;
-  std::string nonce;
+  std::string impu_for_hss;
+  bool av_source_unavailable = false;
+  ImpiStore::Impi* impi_obj = nullptr;
 
-  PJUtils::get_impi_and_impu(rdata, impi, impu);
   // Set up the authorization type, following Annex P.4 of TS 33.203.  Currently
   // only support AKA and SIP Digest, so only implement the subset of steps
   // required to distinguish between the two.
@@ -385,16 +533,65 @@ void create_challenge(pjsip_digest_credential* credentials,
     }
   }
 
-  // Get the Authentication Vector from the HSS.
-  rapidjson::Document* av = NULL;
-  HTTPCode http_code = hss->get_auth_vector(impi, impu, auth_type, resync, av, get_trail(rdata));
+  // Get an authentication vector to challenge this request.
+  AuthenticationVector* av = NULL;
 
-  if ((av != NULL) &&
-      (!verify_auth_vector(av, impi, get_trail(rdata))))
+  if ((rdata->msg_info.msg->line.req.method.id == PJSIP_REGISTER_METHOD) ||
+      (get_top_route_param(rdata->msg_info.msg, &STR_AUTO_REG)))
   {
-    // Authentication Vector is badly formed.
-    delete av;
-    av = NULL;
+    // This is either a REGISTER, or a request that Sprout should authenticate
+    // by treating it like a REGISTER. Get the Authentication Vector from the
+    // HSS.
+    PJUtils::get_impi_and_impu(rdata, impi, impu_for_hss);
+    TRC_DEBUG("Get AV from HSS for impi=%s impu=%s",
+              impi.c_str(), impu_for_hss.c_str());
+
+    rapidjson::Document* doc = NULL;
+    HTTPCode http_code = hss->get_auth_vector(impi,
+                                              impu_for_hss,
+                                              auth_type,
+                                              resync,
+                                              doc,
+                                              get_trail(rdata));
+    av_source_unavailable = ((http_code == HTTP_SERVER_UNAVAILABLE) ||
+                             (http_code == HTTP_GATEWAY_TIMEOUT));
+    if (doc != NULL)
+    {
+      av = verify_auth_vector(doc, impi, get_trail(rdata));
+    }
+    delete doc; doc = NULL;
+  }
+  else
+  {
+    // This is a non-REGISTER, so get an AV by finding the challenge that the
+    // endpoint authenticated with when it registered. The information we need
+    // to look up the challenge will be in the top route header.
+    TRC_DEBUG("Get AV from previous challenge");
+    std::string username;
+    std::string nonce;
+
+    if (get_top_route_param(rdata->msg_info.msg, &STR_USERNAME, impi) &&
+        get_top_route_param(rdata->msg_info.msg, &STR_NONCE, nonce))
+    {
+      impi = Utils::url_unescape(impi);
+      nonce = Utils::url_unescape(nonce);
+
+      // Get an AV from the store. Store of the IMPI object we got back from the
+      // store so that we don't have to do another read when writing the new
+      // challenge back.
+      TRC_DEBUG("Challenge ID: impi=%s nonce=%s",impi.c_str(), nonce.c_str());
+      av = get_av_from_store(impi, nonce, &impi_obj, get_trail(rdata));
+
+      if (av == NULL)
+      {
+        // We failed to get an AV so discard the impi store object we got when
+        // reading from the store.
+        delete impi_obj; impi_obj = NULL;
+
+        // TODO work out why we couldn't get an AV and set
+        // `av_source_unavailable` appropriately.
+      }
+    }
   }
 
   if (av != NULL)
@@ -423,35 +620,20 @@ void create_challenge(pjsip_digest_credential* credentials,
     hdr->scheme = STR_DIGEST;
 
     ImpiStore::AuthChallenge* auth_challenge;
-    if (av->HasMember("aka"))
+    if (av->is_aka())
     {
       // AKA authentication.
       TRC_DEBUG("Add AKA information");
+      AkaAv* aka = dynamic_cast<AkaAv*>(av);
 
       SAS::Event event(get_trail(rdata), SASEvent::AUTHENTICATION_CHALLENGE_AKA, 0);
       SAS::report_event(event);
 
-      rapidjson::Value& aka = (*av)["aka"];
-
-      std::string cryptkey = "";
-      std::string integritykey = "";
-      std::string xres = "";
-
-      // AKA version defaults to 1, for back-compatibility with pre-AKAv2
-      // Homestead versions.
-      int akaversion = 1;
-
-      JSON_SAFE_GET_STRING_MEMBER(aka, "challenge", nonce);
-      JSON_SAFE_GET_STRING_MEMBER(aka, "cryptkey", cryptkey);
-      JSON_SAFE_GET_STRING_MEMBER(aka, "integritykey", integritykey);
-      JSON_SAFE_GET_STRING_MEMBER(aka, "response", xres);
-      JSON_SAFE_GET_INT_MEMBER(aka, "version", akaversion);
-
       // Use default realm for AKA as not specified in the AV.
       pj_strdup(tdata->pool, &hdr->challenge.digest.realm, &aka_realm);
-      hdr->challenge.digest.algorithm = ((akaversion == 2) ? STR_AKAV2_MD5 : STR_AKAV1_MD5);
+      hdr->challenge.digest.algorithm = ((aka->akaversion == 2) ? STR_AKAV2_MD5 : STR_AKAV1_MD5);
 
-      pj_strdup2(tdata->pool, &hdr->challenge.digest.nonce, nonce.c_str());
+      pj_strdup2(tdata->pool, &hdr->challenge.digest.nonce, aka->nonce.c_str());
       pj_create_random_string(buf, sizeof(buf));
       pj_strdup(tdata->pool, &hdr->challenge.digest.opaque, &random);
       hdr->challenge.digest.qop = STR_AUTH;
@@ -460,14 +642,14 @@ void create_challenge(pjsip_digest_credential* credentials,
       // Add the cryptography key parameter.
       pjsip_param* ck_param = (pjsip_param*)pj_pool_alloc(tdata->pool, sizeof(pjsip_param));
       ck_param->name = STR_CK;
-      std::string ck = "\"" + cryptkey + "\"";
+      std::string ck = "\"" + aka->cryptkey + "\"";
       pj_strdup2(tdata->pool, &ck_param->value, ck.c_str());
       pj_list_insert_before(&hdr->challenge.digest.other_param, ck_param);
 
       // Add the integrity key parameter.
       pjsip_param* ik_param = (pjsip_param*)pj_pool_alloc(tdata->pool, sizeof(pjsip_param));
       ik_param->name = STR_IK;
-      std::string ik = "\"" + integritykey + "\"";
+      std::string ik = "\"" + aka->integritykey + "\"";
       pj_strdup2(tdata->pool, &ik_param->value, ik.c_str());
       pj_list_insert_before(&hdr->challenge.digest.other_param, ik_param);
 
@@ -475,7 +657,7 @@ void create_challenge(pjsip_digest_credential* credentials,
       // but we will put it in the store.
       std::string response;
 
-      if (akaversion == 2)
+      if (aka->akaversion == 2)
       {
         // In AKAv2, the password for the SIP Digest calculation should be the
         // base64 encoding of:
@@ -491,7 +673,7 @@ void create_challenge(pjsip_digest_credential* credentials,
         //   "http-digest-akav2-password", using that binary concatenation as
         //   the key
         // - base64-encode that
-        std::string joined = unhex(xres + integritykey + cryptkey);
+        std::string joined = unhex(aka->xres + aka->integritykey + aka->cryptkey);
         std::string formality = "http-digest-akav2-password";
         unsigned int digest_len;
         unsigned char hmac[EVP_MAX_MD_SIZE];
@@ -513,11 +695,11 @@ void create_challenge(pjsip_digest_credential* credentials,
         // In AKAv1, the XRES is used directly as the password in the SIP
         // Digest calculation. We want it hex-encoded for storing in memcached,
         // but it's already been hex-encoded by Homestead, so nothing to do.
-        response = xres;
+        response = aka->xres;
       }
 
       // Now build the AuthChallenge so that we can store it in the ImpiStore.
-      auth_challenge = new ImpiStore::AKAAuthChallenge(nonce,
+      auth_challenge = new ImpiStore::AKAAuthChallenge(aka->nonce,
                                                        response,
                                                        time(NULL) + AUTH_CHALLENGE_INIT_EXPIRES);
     }
@@ -525,48 +707,27 @@ void create_challenge(pjsip_digest_credential* credentials,
     {
       // Digest authentication.
       TRC_DEBUG("Add Digest information");
+      std::string nonce;
+      DigestAv* digest = dynamic_cast<DigestAv*>(av);
 
       SAS::Event event(get_trail(rdata), SASEvent::AUTHENTICATION_CHALLENGE_DIGEST, 0);
       SAS::report_event(event);
 
-      rapidjson::Value& digest = (*av)["digest"];
-      std::string realm = "";
-      if ((digest.HasMember("realm")) &&
-          (digest["realm"].IsString()))
-      {
-        realm = digest["realm"].GetString();
-      }
-
-      std::string qop = "";
-      if ((digest.HasMember("qop")) &&
-          (digest["qop"].IsString()))
-      {
-        qop = digest["qop"].GetString();
-      }
-      pj_strdup2(tdata->pool, &hdr->challenge.digest.realm, realm.c_str());
+      pj_strdup2(tdata->pool, &hdr->challenge.digest.realm, digest->realm.c_str());
       hdr->challenge.digest.algorithm = STR_MD5;
       pj_create_random_string(buf, sizeof(buf));
       nonce.assign(buf, sizeof(buf));
       pj_strdup(tdata->pool, &hdr->challenge.digest.nonce, &random);
       pj_create_random_string(buf, sizeof(buf));
       pj_strdup(tdata->pool, &hdr->challenge.digest.opaque, &random);
-      pj_strdup2(tdata->pool, &hdr->challenge.digest.qop, qop.c_str());
+      pj_strdup2(tdata->pool, &hdr->challenge.digest.qop, digest->qop.c_str());
       hdr->challenge.digest.stale = stale;
-
-      // Get the HA1 digest.  We must not provide this on the SIP message, but
-      // we will put it in the store.
-      std::string ha1 = "";
-      if ((digest.HasMember("ha1")) &&
-          (digest["ha1"].IsString()))
-      {
-        ha1 = digest["ha1"].GetString();
-      }
 
       // Now build the AuthChallenge so that we can store it in the ImpiStore.
       auth_challenge = new ImpiStore::DigestAuthChallenge(nonce,
-                                                          realm,
-                                                          qop,
-                                                          ha1,
+                                                          digest->realm,
+                                                          digest->qop,
+                                                          digest->ha1,
                                                           time(NULL) + AUTH_CHALLENGE_INIT_EXPIRES);
     }
 
@@ -582,20 +743,21 @@ void create_challenge(pjsip_digest_credential* credentials,
     TRC_DEBUG("Write authentication challenge to IMPI store");
     Store::Status status;
 
+    // Save off the nonce. We will need it to reclaim the auth challenge from
+    // the IMPI at the end of the loop.
+    std::string nonce = auth_challenge->nonce;
+
     do
     {
-      // Save off the nonce. We will need it to reclaim the auth challenge from
-      // the IMPI at the end of the loop.
-      std::string nonce = auth_challenge->nonce;
-
-      ImpiStore::Impi* impi_obj =
-        impi_store->get_impi_with_nonce(impi,
-                                        nonce,
-                                        get_trail(rdata));
-
       if (impi_obj == NULL)
       {
-        impi_obj = new ImpiStore::Impi(impi);
+        TRC_DEBUG("Lookup IMPI %s (with nonce %s)", impi.c_str(), nonce.c_str());
+        impi_obj = impi_store->get_impi_with_nonce(impi, nonce, get_trail(rdata));
+
+        if (impi_obj == NULL)
+        {
+          impi_obj = new ImpiStore::Impi(impi);
+        }
       }
 
       // Check whether the IMPI has an existing auth challenge.
@@ -646,13 +808,25 @@ void create_challenge(pjsip_digest_credential* credentials,
 
     if (status == Store::OK)
     {
-      // We've written the challenge into the store, so need to set a Chronos
-      // timer so that an AUTHENTICATION_TIMEOUT SAR is sent to the
-      // HSS when it expires.
-      std::string timer_id;
-      std::string chronos_body = "{\"impi\": \"" + impi + "\", \"impu\": \"" + impu +"\", \"nonce\": \"" + nonce +"\"}";
-      TRC_DEBUG("Sending %s to Chronos to set AV timer", chronos_body.c_str());
-      chronos->send_post(timer_id, 30, "/authentication-timeout", chronos_body, get_trail(rdata));
+      if (!impu_for_hss.empty())
+      {
+        TRC_DEBUG("Set chronos timer for AUTHENTICATION_TIMEOUT SAR");
+
+        // We've written the challenge into the store, so need to set a Chronos
+        // timer so that an AUTHENTICATION_TIMEOUT SAR is sent to the
+        // HSS when it expires.
+        std::string timer_id;
+        std::string chronos_body = "{\"impi\": \"" + impi +
+                                "\", \"impu\": \"" + impu_for_hss +
+                                "\", \"nonce\": \"" + nonce +
+                                "\"}";
+        TRC_DEBUG("Sending %s to Chronos to set AV timer", chronos_body.c_str());
+        chronos->send_post(timer_id,
+                           30,
+                           "/authentication-timeout",
+                           chronos_body,
+                           get_trail(rdata));
+      }
     }
     else
     {
@@ -674,7 +848,7 @@ void create_challenge(pjsip_digest_credential* credentials,
   {
     // If we couldn't get the AV because a downstream node is overloaded then don't return
     // a 4xx error to the client.
-    if ((http_code == HTTP_SERVER_UNAVAILABLE) || (http_code == HTTP_GATEWAY_TIMEOUT))
+    if (av_source_unavailable)
     {
       TRC_DEBUG("Downstream node is overloaded or unresponsive, unable to get Authentication vector");
       tdata->msg->line.status.code = PJSIP_SC_SERVER_TIMEOUT;
@@ -754,18 +928,16 @@ static pj_bool_t needs_authentication(pjsip_rx_data* rdata, SAS::TrailId trail)
         pjsip_param_find(&auth_hdr->credential.digest.other_param,
                          &STR_INTEGRITY_PROTECTED);
 
-      if ((integrity != NULL) &&
-          ((pj_stricmp(&integrity->value, &STR_TLS_YES) == 0) ||
-           (pj_stricmp(&integrity->value, &STR_IP_ASSOC_YES) == 0)))
+      if ((integrity != NULL) && (pj_stricmp(&integrity->value, &STR_TLS_YES) == 0))
       {
         TRC_DEBUG("Integrity protected with %.*s",
                   integrity->value.slen, integrity->value.ptr);
 
-        // The integrity protected indicator is included and set to tls-yes or
-        // ip-assoc-yes.  This indicates the client has already been authenticated
-        // so we will accept this REGISTER even if there is a challenge response.
-        // Values of tls-pending or ip-assoc-pending indicate the challenge
-        // should be checked.
+        // The integrity protected indicator is included and set to tls-yes.
+        // This indicates the client has already been authenticated so we will
+        // accept this REGISTER even if there is a challenge response.  Values
+        // of tls-pending, ip-assoc-yes, or ip-assoc-pending indicate the
+        // challenge should be checked.
 
         // We should still challenge though if we find that the request wasn't
         // sent to this S-CSCF, as this triggers the HSS to accept an S-CSCF
@@ -786,8 +958,8 @@ static pj_bool_t needs_authentication(pjsip_rx_data* rdata, SAS::TrailId trail)
         }
         else
         {
-          TRC_DEBUG("Needs authentication despite integrity protection as next routing URI (%s) "
-                    " does not match this S-CSCF (%.*s)",
+          TRC_DEBUG("Needs authentication despite integrity protection as next routing URI (%.*s) "
+                    " does not match this S-CSCF (%s)",
                     stack_data.scscf_uri_str.slen, stack_data.scscf_uri_str.ptr,
                     PJUtils::uri_to_string(context, next_routing_uri).c_str());
         }
@@ -833,15 +1005,21 @@ static pj_bool_t needs_authentication(pjsip_rx_data* rdata, SAS::TrailId trail)
       return PJ_FALSE;
     }
 
+    if (!get_top_route_param(rdata->msg_info.msg, &STR_ORIG))
+    {
+      // This is not an originating request so does not get authenticated.
+      return PJ_FALSE;
+    }
+
     // Check to see if we should authenticate this non-REGISTER message - this
-    if (non_register_auth_mode == NonRegisterAuthentication::NEVER)
+    if (non_register_auth_mode == 0)
     {
       // Configured to never authenticate non-REGISTER requests.
       SAS::Event event(trail, SASEvent::AUTHENTICATION_NOT_NEEDED_NEVER_AUTH_NON_REG, 0);
       SAS::report_event(event);
       return PJ_FALSE;
     }
-    else if (non_register_auth_mode == NonRegisterAuthentication::IF_PROXY_AUTHORIZATION_PRESENT)
+    else if (non_register_auth_mode & NonRegisterAuthentication::IF_PROXY_AUTHORIZATION_PRESENT)
     {
       // Only authenticate the request if it has a Proxy-Authorization header.
       pjsip_proxy_authorization_hdr* auth_hdr = (pjsip_proxy_authorization_hdr*)
@@ -861,6 +1039,24 @@ static pj_bool_t needs_authentication(pjsip_rx_data* rdata, SAS::TrailId trail)
         // message so we don't need to perform further authentication.
         SAS::Event event(trail, SASEvent::AUTHENTICATION_NOT_NEEDED_PROXY_AUTHORIZATION, 0);
         SAS::report_event(event);
+        return PJ_FALSE;
+      }
+    }
+    else if (non_register_auth_mode & NonRegisterAuthentication::INITIAL_REQ_FROM_REG_DIGEST_ENDPOINT)
+    {
+      // Only authenticate the request if the endpoint authenticates with digest
+      // authentication. If this is the case the top route header will contain
+      // a username parameter.
+      if (get_top_route_param(rdata->msg_info.msg, &STR_USERNAME))
+      {
+        // The username parameter is present so we need to authenticate.
+        // TODO SAS
+        return PJ_TRUE;
+      }
+      else
+      {
+        // No username so don't authenticate.
+        // TODO SAS
         return PJ_FALSE;
       }
     }
@@ -1038,13 +1234,29 @@ pj_bool_t authenticate_rx_request(pjsip_rx_data* rdata)
         // authentications before it happens.
         uint32_t new_nonce_count = nonce_count + 1;
 
-        // Work out when the challenge should expire. We only want to keep it
-        // around if nonce counts are supported and the UE authenticates by
-        // registering.
+        // Work out when the challenge should expire. We keep it around if we
+        // might need it later which is the case if either:
+        // - Nonce counts are supported.
+        // - It is a digest challenge and we need to challenge initial requests
+        //   from endpoints that use digest.
+        //
+        // We also only store challenges to REGISTERs, as these have a
+        // well-defined lifetime (the duration of the REGISTER).
         int new_expiry = auth_challenge->expires;
-        if (nonce_count_supported && is_register)
+        if (is_register)
         {
-          new_expiry = calculate_challenge_expiration_time(rdata);
+          if (nonce_count_supported)
+          {
+            TRC_DEBUG("Storing challenge because nonce counts are supported");
+            new_expiry = calculate_challenge_expiration_time(rdata);
+          }
+          else if ((auth_challenge->type == ImpiStore::AuthChallenge::DIGEST) &&
+                   (non_register_auth_mode &
+                       NonRegisterAuthentication::INITIAL_REQ_FROM_REG_DIGEST_ENDPOINT))
+          {
+            TRC_DEBUG("Storing challenge in order to challenge non-REGISTER requests");
+            new_expiry = calculate_challenge_expiration_time(rdata);
+          }
         }
 
         Store::Status store_status;
@@ -1305,7 +1517,7 @@ pj_status_t init_authentication(const std::string& realm_name,
                                 HSSConnection* hss_connection,
                                 ChronosConnection* chronos_connection,
                                 ACRFactory* rfacr_factory,
-                                NonRegisterAuthentication non_register_auth_mode_param,
+                                uint32_t non_register_auth_mode_param,
                                 AnalyticsLogger* analytics_logger,
                                 SNMP::AuthenticationStatsTables* auth_stats_tbls,
                                 bool nonce_count_supported_arg,
