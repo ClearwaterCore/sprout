@@ -958,8 +958,8 @@ static pj_bool_t needs_authentication(pjsip_rx_data* rdata, SAS::TrailId trail)
         }
         else
         {
-          TRC_DEBUG("Needs authentication despite integrity protection as next routing URI (%s) "
-                    " does not match this S-CSCF (%.*s)",
+          TRC_DEBUG("Needs authentication despite integrity protection as next routing URI (%.*s) "
+                    " does not match this S-CSCF (%s)",
                     stack_data.scscf_uri_str.slen, stack_data.scscf_uri_str.ptr,
                     PJUtils::uri_to_string(context, next_routing_uri).c_str());
         }
