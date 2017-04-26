@@ -282,7 +282,7 @@ class AuthenticationChallengeDigestUEsTest : public BaseAuthenticationTest
                                           NonRegisterAuthentication::INITIAL_REQ_FROM_REG_DIGEST_ENDPOINT,
                                           _analytics,
                                           &SNMP::FAKE_AUTHENTICATION_STATS_TABLES,
-                                          true,
+                                          false,
                                           get_binding_expiry);
 
     ASSERT_EQ(PJ_SUCCESS, ret);
@@ -586,6 +586,17 @@ TEST_F(AuthenticationTest, NoAuthorizationEmergencyReg)
   AuthenticationMessage msg("REGISTER");
   msg._auth_hdr = false;
   msg._sos = true;
+  pj_bool_t ret = inject_msg_direct(msg.get());
+  EXPECT_EQ(PJ_FALSE, ret);
+}
+
+TEST_F(AuthenticationTest, NoAuthorizationDigest)
+{
+  // Test that the authentication module lets through non-REGISTER requests that
+  // comes from a digest UE.
+  AuthenticationMessage msg("INVITE");
+  msg._auth_hdr = false;
+  msg._route_uri += ";username=Alice;nonce=123456";
   pj_bool_t ret = inject_msg_direct(msg.get());
   EXPECT_EQ(PJ_FALSE, ret);
 }
@@ -2480,6 +2491,10 @@ TEST_F(AuthenticationChallengeDigestUEsTest, MainlineChallengeResponse)
   // the following INVITE we aren't accidentally querying the HSS.
   _hss_connection->delete_result("/impi/6505550001%40homedomain/av?impu=sip%3A6505550001%40homedomain");
 
+  // Advance time by 1 minute to check that the challenge has not been written
+  // with too-short a timeout.
+  cwtest_advance_time_ms(60000);
+
   // Send in a request with a Proxy-Authentication header.  This triggers
   // Digest authentication.
   AuthenticationMessage msg3("INVITE");
@@ -2528,6 +2543,54 @@ TEST_F(AuthenticationChallengeDigestUEsTest, MainlineChallengeResponse)
   pj_bool_t ret = _module->on_rx_request(rdata);
   ASSERT_EQ(ret, PJ_FALSE);
   EXPECT_EQ(get_headers(rdata->msg_info.msg, "Proxy-Authorization"), "");
+
+  // Expect no response, as the authentication module has let the request through.
+  ASSERT_EQ(0, txdata_count());
+}
+
+TEST_F(AuthenticationChallengeDigestUEsTest, NonDigestSubscriberMakesCall)
+{
+  // Send in a request from an unregistered digest endpoint. Note that this will
+  // not have a real nonce.
+  AuthenticationMessage msg("INVITE");
+  msg._auth_hdr = false;
+  msg._proxy_auth_hdr = false;
+  inject_msg(msg.get());
+
+  // Expect no response, as the authentication module has let the request through.
+  ASSERT_EQ(0, txdata_count());
+}
+
+TEST_F(AuthenticationChallengeDigestUEsTest, UnregSubscriberMakesCall)
+{
+  // Test a successful SIP Digest authentication flow.
+  pjsip_tx_data* tdata;
+
+  // Send in an INVITE that looks like it's from a digest UE, but the UE isn't
+  // actually registered.
+  AuthenticationMessage msg3("INVITE");
+  msg3._auth_hdr = false;
+  msg3._proxy_auth_hdr = false;
+  msg3._route_uri += ";username=6505550001%40homedomain;nonce=123456";
+  inject_msg(msg3.get());
+
+  // Expect a 403 Forbidden response.
+  ASSERT_EQ(1, txdata_count());
+  tdata = current_txdata();
+  RespMatcher(403).matches(tdata->msg);
+  free_txdata();
+}
+
+TEST_F(AuthenticationChallengeDigestUEsTest, NoAuthorizationTermRequest)
+{
+  // Test that the authentication module lets through terminating requests, even
+  // if the rest of the message means it would be challenged.
+  AuthenticationMessage msg3("INVITE");
+  msg3._auth_hdr = false;
+  msg3._proxy_auth_hdr = false;
+  msg3._route_uri.erase(msg3._route_uri.find(";orig"));
+  msg3._route_uri += ";username=6505550001%40homedomain;nonce=123456";
+  inject_msg(msg3.get());
 
   // Expect no response, as the authentication module has let the request through.
   ASSERT_EQ(0, txdata_count());
