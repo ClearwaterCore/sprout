@@ -1076,7 +1076,7 @@ void process_register_request(pjsip_rx_data* rdata)
       }
       else
       {
-        TRC_WARNING("Bad associated URI %s", it->c_str());
+        TRC_DEBUG("Bad associated URI %s", it->c_str());
         SAS::Event event(trail, SASEvent::HTTP_HOMESTEAD_BAD_IDENTITY, 0);
         event.add_var_param(*it);
         SAS::report_event(event);
