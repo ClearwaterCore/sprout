@@ -269,6 +269,33 @@ class AuthenticationNonceCountDisabledTest : public BaseAuthenticationTest
 };
 
 
+class AuthenticationChallengeDigestUEsTest : public BaseAuthenticationTest
+{
+  static void SetUpTestCase()
+  {
+    BaseAuthenticationTest::SetUpTestCase();
+    pj_status_t ret = init_authentication("homedomain",
+                                          _impi_store,
+                                          _hss_connection,
+                                          _chronos_connection,
+                                          _acr_factory,
+                                          NonRegisterAuthentication::INITIAL_REQ_FROM_REG_DIGEST_ENDPOINT,
+                                          _analytics,
+                                          &SNMP::FAKE_AUTHENTICATION_STATS_TABLES,
+                                          true,
+                                          get_binding_expiry);
+
+    ASSERT_EQ(PJ_SUCCESS, ret);
+  }
+
+  static void TearDownTestCase()
+  {
+    destroy_authentication();
+    BaseAuthenticationTest::TearDownTestCase();
+  }
+};
+
+
 class AuthenticationMessage
 {
 public:
@@ -295,7 +322,7 @@ public:
   string _extra_contact;
   string _to_tag;
   bool _force_aka;
-  string _route;
+  string _route_uri;
 
   AuthenticationMessage(std::string method) :
     _method(method),
@@ -320,7 +347,7 @@ public:
     _extra_contact(""),
     _to_tag(""),
     _force_aka(false),
-    _route("sip:scscf.sprout.homedomain:5058;transport=TCP;orig;auto-reg")
+    _route_uri("sip:scscf.sprout.homedomain:5058;transport=TCP;orig")
   {
   }
 
@@ -491,7 +518,7 @@ string AuthenticationMessage::get()
                               "",
                     /* 8 */ _cseq,
                     /* 9 */ _to_tag.c_str(),
-                    /* 10 */ _route.c_str()
+                    /* 10 */ _route_uri.c_str()
     );
 
   EXPECT_LT(n, (int)sizeof(buf));
@@ -581,7 +608,7 @@ TEST_F(AuthenticationTest, IntegrityProtected)
   AuthenticationMessage msg2("REGISTER");
   msg2._auth_hdr = true;
   msg2._integ_prot = "yes";
-  msg2._route = "sip:scscf.sprout.homedomain:5058;transport=TCP;lr;orig";
+  msg2._route_uri = "sip:scscf.sprout.homedomain:5058;transport=TCP;lr;orig";
   ret = inject_msg_direct(msg2.get());
   EXPECT_EQ(PJ_FALSE, ret);
 
@@ -630,7 +657,7 @@ TEST_F(AuthenticationTest, IntegrityProtectedChangedSCSCF)
   AuthenticationMessage msg("REGISTER");
   msg._auth_hdr = true;
   msg._integ_prot = "tls-yes";
-  msg._route = "sip:differentscscf:5058;transport=TCP";
+  msg._route_uri = "sip:differentscscf:5058;transport=TCP";
   pj_bool_t ret = inject_msg_direct(msg.get());
   EXPECT_EQ(PJ_TRUE, ret);
 
@@ -1965,6 +1992,7 @@ TEST_F(AuthenticationPxyAuthHdrTest, ProxyAuthorizationSuccess)
   AuthenticationMessage msg("INVITE");
   msg._auth_hdr = false;
   msg._proxy_auth_hdr = true;
+  msg._route_uri += ";auto-reg";
   inject_msg(msg.get());
 
   // Expect a 407 Proxy Authorization Required response.
@@ -1998,6 +2026,7 @@ TEST_F(AuthenticationPxyAuthHdrTest, ProxyAuthorizationSuccess)
   msg2._cnonce = "8765432187654321";
   msg2._qop = "auth";
   msg2._integ_prot = "ip-assoc-pending";
+  msg2._route_uri += ";auto-reg";
 
   // Inject the request into the auth module. Check that it passes the request
   // through, and strips the Proxy-Authorization header.
@@ -2030,6 +2059,7 @@ TEST_F(AuthenticationPxyAuthHdrTest, ProxyAuthorizationOneResponsePerChallenge)
   AuthenticationMessage msg("INVITE");
   msg._auth_hdr = false;
   msg._proxy_auth_hdr = true;
+  msg._route_uri += ";auto-reg";
   inject_msg(msg.get());
 
   // Expect a 407 Proxy Authorization Required response.
@@ -2063,6 +2093,7 @@ TEST_F(AuthenticationPxyAuthHdrTest, ProxyAuthorizationOneResponsePerChallenge)
   msg2._cnonce = "8765432187654321";
   msg2._qop = "auth";
   msg2._integ_prot = "ip-assoc-pending";
+  msg2._route_uri += ";auto-reg";
   inject_msg(msg2.get());
 
   // Expect no response, as the authentication module has let the request through.
@@ -2081,6 +2112,7 @@ TEST_F(AuthenticationPxyAuthHdrTest, ProxyAuthorizationOneResponsePerChallenge)
   msg3._cnonce = "8765432187654321";
   msg3._qop = "auth";
   msg3._integ_prot = "ip-assoc-pending";
+  msg3._route_uri += ";auto-reg";
   inject_msg(msg3.get());
 
   // Expect a 407 Proxy Authorization Required response.
@@ -2114,6 +2146,7 @@ TEST_F(AuthenticationPxyAuthHdrTest, ProxyAuthorizationOneResponsePerChallenge)
   msg4._cnonce = "8765432187654321";
   msg4._qop = "auth";
   msg4._integ_prot = "ip-assoc-pending";
+  msg4._route_uri += ";auto-reg";
   inject_msg(msg4.get());
 
   // Expect a 407 Proxy Authorization Required response.
@@ -2153,6 +2186,7 @@ TEST_F(AuthenticationPxyAuthHdrTest, ProxyAuthorizationFailure)
   AuthenticationMessage msg("INVITE");
   msg._auth_hdr = false;
   msg._proxy_auth_hdr = true;
+  msg._route_uri += ";auto-reg";
   inject_msg(msg.get());
 
   // Expect a 407 Proxy Authorization Required response.
@@ -2187,6 +2221,7 @@ TEST_F(AuthenticationPxyAuthHdrTest, ProxyAuthorizationFailure)
   msg2._cnonce = "8765432187654321";
   msg2._qop = "auth";
   msg2._integ_prot = "ip-assoc-pending";
+  msg2._route_uri += ";auto-reg";
   inject_msg(msg2.get());
 
   // Expect a 403 Forbidden response.
@@ -2397,4 +2432,103 @@ TEST_F(AuthenticationTest, DigestAuthFailureWithSetError)
   ASSERT_EQ(1, txdata_count());
   tdata = current_txdata();
   RespMatcher(500).matches(tdata->msg);
+}
+
+TEST_F(AuthenticationChallengeDigestUEsTest, MainlineChallengeResponse)
+{
+  // Test a successful SIP Digest authentication flow.
+  pjsip_tx_data* tdata;
+
+  // Set up the HSS response for the AV query using a default private user identity.
+  _hss_connection->set_result("/impi/6505550001%40homedomain/av?impu=sip%3A6505550001%40homedomain",
+                              "{\"digest\":{\"realm\":\"homedomain\",\"qop\":\"auth\",\"ha1\":\"12345678123456781234567812345678\"}}");
+
+  // Send in a REGISTER request with no authentication header.  This triggers
+  // Digest authentication.
+  AuthenticationMessage msg1("REGISTER");
+  msg1._auth_hdr = false;
+  inject_msg(msg1.get());
+
+  // Expect a 401 Not Authorized response.
+  ASSERT_EQ(1, txdata_count());
+  tdata = current_txdata();
+  RespMatcher(401).matches(tdata->msg);
+
+  // Extract the nonce, nc, cnonce and qop fields from the WWW-Authenticate header.
+  std::string auth = get_headers(tdata->msg, "WWW-Authenticate");
+  std::map<std::string, std::string> auth_params;
+  parse_www_authenticate(auth, auth_params);
+  free_txdata();
+
+  // Send a new REGISTER request with an authentication header including the
+  // response.
+  AuthenticationMessage msg2("REGISTER");
+  msg2._algorithm = "MD5";
+  msg2._key = "12345678123456781234567812345678";
+  msg2._nonce = auth_params["nonce"];
+  msg2._opaque = auth_params["opaque"];
+  msg2._nc = "00000001";
+  msg2._cnonce = "8765432187654321";
+  msg2._qop = "auth";
+  msg2._integ_prot = "ip-assoc-pending";
+  inject_msg(msg2.get());
+
+  // Expect no response, as the authentication module has let the request through.
+  ASSERT_EQ(0, txdata_count());
+
+  // Delete the result from the HSS. This makes sure that when authenticating
+  // the following INVITE we aren't accidentally querying the HSS.
+  _hss_connection->delete_result("/impi/6505550001%40homedomain/av?impu=sip%3A6505550001%40homedomain");
+
+  // Send in a request with a Proxy-Authentication header.  This triggers
+  // Digest authentication.
+  AuthenticationMessage msg3("INVITE");
+  msg3._auth_hdr = false;
+  msg3._proxy_auth_hdr = false;
+  msg3._route_uri += ";username=6505550001%40homedomain;nonce=" + auth_params["nonce"];
+  inject_msg(msg3.get());
+
+  // Expect a 407 Proxy Authorization Required response.
+  ASSERT_EQ(1, txdata_count());
+  tdata = current_txdata();
+  RespMatcher(407).matches(tdata->msg);
+
+  // Extract the nonce, nc, cnonce and qop fields from the header.
+  auth = get_headers(tdata->msg, "Proxy-Authenticate");
+  auth_params.clear();
+  parse_www_authenticate(auth, auth_params);
+  EXPECT_NE("", auth_params["nonce"]);
+  EXPECT_EQ("auth", auth_params["qop"]);
+  EXPECT_EQ("MD5", auth_params["algorithm"]);
+  free_txdata();
+
+  // ACK that response
+  AuthenticationMessage ack("ACK");
+  ack._cseq = 1;
+  inject_msg_direct(ack.get());
+
+  // Send a new request with an authentication header including the response.
+  AuthenticationMessage msg4("INVITE");
+  msg4._auth_hdr = false;
+  msg4._proxy_auth_hdr = true;
+  msg4._algorithm = "MD5";
+  msg4._key = "12345678123456781234567812345678";
+  msg4._nonce = auth_params["nonce"];
+  msg4._opaque = auth_params["opaque"];
+  msg4._nc = "00000001";
+  msg4._cnonce = "8765432187654321";
+  msg4._qop = "auth";
+  msg4._integ_prot = "ip-assoc-pending";
+  msg4._route_uri = msg3._route_uri;
+
+  // Inject the request into the auth module. Check that it passes the request
+  // through, and strips the Proxy-Authorization header.
+  pjsip_rx_data* rdata = build_rxdata(msg4.get());
+  parse_rxdata(rdata);
+  pj_bool_t ret = _module->on_rx_request(rdata);
+  ASSERT_EQ(ret, PJ_FALSE);
+  EXPECT_EQ(get_headers(rdata->msg_info.msg, "Proxy-Authorization"), "");
+
+  // Expect no response, as the authentication module has let the request through.
+  ASSERT_EQ(0, txdata_count());
 }
