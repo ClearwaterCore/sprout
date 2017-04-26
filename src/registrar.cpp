@@ -65,6 +65,7 @@ extern "C" {
 #include "notify_utils.h"
 #include "snmp_success_fail_count_table.h"
 #include "uri_classifier.h"
+#include "wildcard_utils.h"
 
 static SubscriberDataManager* sdm;
 static std::vector<SubscriberDataManager*> remote_sdms;
@@ -1056,15 +1057,31 @@ void process_register_request(pjsip_rx_data* rdata)
                           pjsip_hdr_shallow_clone(tdata->pool, service_route);
   pjsip_msg_insert_first_hdr(tdata->msg, clone);
 
-  // Add P-Associated-URI headers for all of the associated URIs.
+  // Add P-Associated-URI headers for all of the associated URIs that are real
+  // URIs, ignoring wildcard URIs and logging any URIs that aren't wildcards
+  // but are still unparseable as URIs.
   for (std::vector<std::string>::iterator it = uris.begin();
        it != uris.end();
        it++)
   {
-    pjsip_routing_hdr* pau =
+    if (!WildcardUtils::is_wildcard_uri(*it))
+    {
+      pjsip_uri* this_uri = PJUtils::uri_from_string(*it, tdata->pool);
+      if (this_uri != NULL)
+      {
+        pjsip_routing_hdr* pau =
                         identity_hdr_create(tdata->pool, STR_P_ASSOCIATED_URI);
-    pau->name_addr.uri = PJUtils::uri_from_string(*it, tdata->pool);
-    pjsip_msg_add_hdr(tdata->msg, (pjsip_hdr*)pau);
+        pau->name_addr.uri = this_uri;
+        pjsip_msg_add_hdr(tdata->msg, (pjsip_hdr*)pau);
+      }
+      else
+      {
+        TRC_DEBUG("Bad associated URI %s", it->c_str());
+        SAS::Event event(trail, SASEvent::HTTP_HOMESTEAD_BAD_IDENTITY, 0);
+        event.add_var_param(*it);
+        SAS::report_event(event);
+      }
+    }
   }
 
   // Add a PCFA header.
