@@ -65,6 +65,7 @@ extern "C" {
 #include "notify_utils.h"
 #include "snmp_success_fail_count_table.h"
 #include "uri_classifier.h"
+#include "associated_uris.h"
 
 static SubscriberDataManager* sdm;
 static std::vector<SubscriberDataManager*> remote_sdms;
@@ -578,7 +579,7 @@ void process_register_request(pjsip_rx_data* rdata)
   SAS::report_marker(start_marker);
 
   // Query the HSS for the associated URIs.
-  std::vector<std::string> uris;
+  AssociatedURIs associated_uris = {};
   std::map<std::string, Ifcs> ifc_map;
   std::string private_id;
   std::string private_id_for_binding;
@@ -628,7 +629,7 @@ void process_register_request(pjsip_rx_data* rdata)
                                                       HSSConnection::REG,
                                                       regstate,
                                                       ifc_map,
-                                                      uris,
+                                                      associated_uris,
                                                       ccfs,
                                                       ecfs,
                                                       trail);
@@ -666,8 +667,20 @@ void process_register_request(pjsip_rx_data* rdata)
     return;
   }
 
-  // Determine the AOR from the first entry in the uris array.
-  std::string aor = uris.front();
+  // Get the default URI to use as a key in the binding store.
+  std::string aor;
+  success = associated_uris.get_default(aor,
+                                        num_emergency_bindings > 0);
+  if (!success)
+  {
+    // Don't have a default IMPU so send an error response. We only hit this
+    // if the subscriber is misconfigured at the HSS, so send a generic server
+    // error.
+    st_code = PJSIP_SC_INTERNAL_SERVER_ERROR;
+  }
+
+  // Use the unbarred URIs for when we send NOTIFYs.
+  std::vector<std::string> uris = associated_uris.unbarred_uris();
   TRC_DEBUG("REGISTER for public ID %s uses AOR %s", public_id.c_str(), aor.c_str());
 
   if (reject_with_400)
@@ -1103,13 +1116,25 @@ void process_register_request(pjsip_rx_data* rdata)
   }
 
   // Add P-Associated-URI headers for all of the associated URIs.
-  for (std::vector<std::string>::iterator it = uris.begin();
-       it != uris.end();
-       it++)
+  if (!uris.empty())
   {
+    for (std::vector<std::string>::iterator it = uris.begin();
+         it != uris.end();
+         it++)
+    {
+      pjsip_routing_hdr* pau =
+                       identity_hdr_create(tdata->pool, STR_P_ASSOCIATED_URI);
+      pau->name_addr.uri = PJUtils::uri_from_string(*it, tdata->pool);
+      pjsip_msg_add_hdr(tdata->msg, (pjsip_hdr*)pau);
+    }
+  }
+  else
+  {
+    // There aren't any associated URIs so just add the AoR in the P-Associated
+    // URI header. We should only have to do this for emergency registrations.
     pjsip_routing_hdr* pau =
-                        identity_hdr_create(tdata->pool, STR_P_ASSOCIATED_URI);
-    pau->name_addr.uri = PJUtils::uri_from_string(*it, tdata->pool);
+                     identity_hdr_create(tdata->pool, STR_P_ASSOCIATED_URI);
+    pau->name_addr.uri = PJUtils::uri_from_string(aor, tdata->pool);
     pjsip_msg_add_hdr(tdata->msg, (pjsip_hdr*)pau);
   }
 
@@ -1137,13 +1162,21 @@ void process_register_request(pjsip_rx_data* rdata)
 
   if (num_emergency_bindings == 0)
   {
+    // If the public ID is unbarred, we use that for third party registers. If
+    // it is barred, we use the default URI.
+    std::string as_reg_id = public_id;
+    if (associated_uris.is_barred(public_id))
+    {
+      as_reg_id = aor;
+    }
+
     RegistrationUtils::register_with_application_servers(ifc_map[public_id],
                                                          sdm,
                                                          rdata,
                                                          tdata,
                                                          expiry,
                                                          is_initial_registration,
-                                                         public_id,
+                                                         as_reg_id,
                                                          trail);
   }
 
