@@ -61,13 +61,6 @@ bool AssociatedURIs::get_default(std::string& uri,
   return false;
 }
 
-// Checks if the uri is in the list of associated URIs.
-bool AssociatedURIs::contains(std::string uri)
-{
-  return (std::find(_associated_uris.begin(), _associated_uris.end(), uri) !=
-          _associated_uris.end());
-}
-
 // Adds a uri and its barring state to the list of associated URIs.
 void AssociatedURIs::add(std::string uri,
                          bool barred)

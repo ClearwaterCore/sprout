@@ -47,8 +47,6 @@ public:
   bool get_default(std::string& uri,
                    bool emergency);
 
-  bool contains(std::string uri);
-
   void add(std::string uri, bool barred);
 
   void clear();

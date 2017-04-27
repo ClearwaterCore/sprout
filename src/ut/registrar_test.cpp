@@ -1278,7 +1278,7 @@ TEST_F(RegistrarTest, AppServersPassthrough)
 /// when the first IMPU is barred.
 TEST_F(RegistrarTest, AppServersBarredIMPU)
 {
-  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", RegDataXMLUtils::STATE_REGISTERED,
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED,
                               "<IMSSubscription><ServiceProfile>\n"
                               "  <PublicIdentity><Identity>sip:6505550231@homedomain</Identity><BarringIndication>1</BarringIndication></PublicIdentity>\n"
                               "  <PublicIdentity><Identity>sip:6505550232@homedomain</Identity></PublicIdentity>\n"
@@ -1310,9 +1310,24 @@ TEST_F(RegistrarTest, AppServersBarredIMPU)
   inject_msg(msg.get());
   SCOPED_TRACE("REGISTER (injected)");
   ASSERT_EQ(2, txdata_count());
-  SCOPED_TRACE("REGISTER (forwarded)");
-  // REGISTER passed on to AS
+
+  // Test that the pub gruu identifies the first unbarred IMPU.
+  SCOPED_TRACE("REGISTER (200 OK)");
   pjsip_msg* out = current_txdata()->msg;
+  EXPECT_EQ(200, out->line.status.code);
+  EXPECT_EQ("OK", str_pj(out->line.status.reason));
+  EXPECT_EQ("Supported: outbound", get_headers(out, "Supported"));
+  EXPECT_EQ("Contact: <sip:f5cc3de4334589d89c661a7acf228ed7@10.114.61.213:5061;transport=tcp;ob>;expires=300;+sip.ice;+sip.instance=\"<urn:uuid:00000000-0000-0000-0000-b665231f1213>\";reg-id=1;pub-gruu=\"sip:6505550232@homedomain;gr=urn:uuid:00000000-0000-0000-0000-b665231f1213\"",
+            get_headers(out, "Contact"));  // that's a bit odd; we glom together the params
+  EXPECT_EQ("Require: outbound", get_headers(out, "Require")); // because we have path
+  EXPECT_EQ(msg._path, get_headers(out, "Path"));
+  EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_REGISTRATION_STATS_TABLES.init_reg_tbl)->_attempts);
+  EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_REGISTRATION_STATS_TABLES.init_reg_tbl)->_successes);
+  free_txdata();
+
+  // REGISTER passed on to AS
+  SCOPED_TRACE("REGISTER (forwarded)");
+  out = current_txdata()->msg;
   ReqMatcher r1("REGISTER");
   ASSERT_NO_FATAL_FAILURE(r1.matches(out));
 
@@ -1324,20 +1339,6 @@ TEST_F(RegistrarTest, AppServersBarredIMPU)
 
   EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_THIRD_PARTY_REGISTRATION_STATS_TABLES.init_reg_tbl)->_attempts);
   EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_THIRD_PARTY_REGISTRATION_STATS_TABLES.init_reg_tbl)->_successes);
-
-  // Test that the pub gruu identifies the first unbarred IMPU.
-  SCOPED_TRACE("REGISTER (200 OK)");
-  out = current_txdata()->msg;
-  EXPECT_EQ(200, out->line.status.code);
-  EXPECT_EQ("OK", str_pj(out->line.status.reason));
-  EXPECT_EQ("Supported: outbound", get_headers(out, "Supported"));
-  EXPECT_EQ("Contact: <sip:f5cc3de4334589d89c661a7acf228ed7@10.114.61.213:5061;transport=tcp;ob>;expires=300;+sip.ice;+sip.instance=\"<urn:uuid:00000000-0000-0000-0000-b665231f1213>\";reg-id=1;pub-gruu=\"sip:6505550232@homedomain;gr=urn:uuid:00000000-0000-0000-0000-b665231f1213\"",
-            get_headers(out, "Contact"));  // that's a bit odd; we glom together the params
-  EXPECT_EQ("Require: outbound", get_headers(out, "Require")); // because we have path
-  EXPECT_EQ(msg._path, get_headers(out, "Path"));
-  EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_REGISTRATION_STATS_TABLES.init_reg_tbl)->_attempts);
-  EXPECT_EQ(1,((SNMP::FakeSuccessFailCountTable*)SNMP::FAKE_REGISTRATION_STATS_TABLES.init_reg_tbl)->_successes);
-  free_txdata();
 }
 
 /// Check that the network-initiated deregistration code works as expected
