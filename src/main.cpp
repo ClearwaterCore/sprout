@@ -418,7 +418,7 @@ static void usage(void)
        "                            - 'if_proxy_authorization_present' means sprout will challenge\n"
        "                              requests that already have a Proxy-Authorization header.\n"
        "                            - 'initial_req_from_reg_digest_endpoint' means sprout will challenge\n"
-       "                              requests from an endpoint that reigsters with SIP digest authentication.\n"
+       "                              requests from an endpoint that registers with SIP digest authentication.\n"
        "     --force-3pr-body       Always include the original REGISTER and 200 OK in the body of\n"
        "                            third-party REGISTER messages to application servers, even if the\n"
        "                            User-Data doesn't specify it\n"
@@ -1114,7 +1114,7 @@ static pj_status_t init_options(int argc, char* argv[], struct options* options)
             options->non_register_auth_mode |=
               NonRegisterAuthentication::IF_PROXY_AUTHORIZATION_PRESENT;
           }
-          else if (tok == "inital_req_from_reg_digest_endpoint")
+          else if (tok == "initial_req_from_reg_digest_endpoint")
           {
             options->non_register_auth_mode |=
               NonRegisterAuthentication::INITIAL_REQ_FROM_REG_DIGEST_ENDPOINT;
