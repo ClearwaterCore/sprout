@@ -1472,7 +1472,7 @@ int main(int argc, char* argv[])
   opt.http_blacklist_duration = HttpResolver::DEFAULT_BLACKLIST_DURATION;
   opt.sip_tcp_connect_timeout = 2000;
   opt.sip_tcp_send_timeout = 2000;
-  opt.dns_timeout = 200;
+  opt.dns_timeout = DnsCachedResolver::DEFAULT_TIMEOUT;
   opt.session_continued_timeout_ms = SCSCFSproutlet::DEFAULT_SESSION_CONTINUED_TIMEOUT;
   opt.session_terminated_timeout_ms = SCSCFSproutlet::DEFAULT_SESSION_TERMINATED_TIMEOUT;
   opt.stateless_proxies.clear();
