@@ -1,37 +1,12 @@
 /**
  * @file scscf_test.cpp UT for S-CSCF functionality
  *
- * Project Clearwater - IMS in the Cloud
- * Copyright (C) 2013  Metaswitch Networks Ltd
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation, either version 3 of the License, or (at your
- * option) any later version, along with the "Special Exception" for use of
- * the program along with SSL, set forth below. This program is distributed
- * in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR
- * A PARTICULAR PURPOSE.  See the GNU General Public License for more
- * details. You should have received a copy of the GNU General Public
- * License along with this program.  If not, see
- * <http://www.gnu.org/licenses/>.
- *
- * The author can be reached by email at clearwater@metaswitch.com or by
- * post at Metaswitch Networks Ltd, 100 Church St, Enfield EN2 6BQ, UK
- *
- * Special Exception
- * Metaswitch Networks Ltd  grants you permission to copy, modify,
- * propagate, and distribute a work formed by combining OpenSSL with The
- * Software, or a work derivative of such a combination, even if such
- * copying, modification, propagation, or distribution would otherwise
- * violate the terms of the GPL. You must comply with the GPL in all
- * respects for all of the code used other than OpenSSL.
- * "OpenSSL" means OpenSSL toolkit software distributed by the OpenSSL
- * Project and licensed under the OpenSSL Licenses, or a work based on such
- * software and licensed under the OpenSSL Licenses.
- * "OpenSSL Licenses" means the OpenSSL License and Original SSLeay License
- * under which the OpenSSL Project distributes the OpenSSL toolkit software,
- * as those licenses appear in the file LICENSE-OPENSSL.
+ * Copyright (C) Metaswitch Networks 2017
+ * If license terms are provided to you in a COPYING file in the root directory
+ * of the source code repository by which you are accessing this code, then
+ * the license outlined in that COPYING file applies to your use.
+ * Otherwise no rights are granted except for those provided to you by
+ * Metaswitch Networks in a separate written agreement.
  */
 
 #include <string>
@@ -1312,6 +1287,64 @@ TEST_F(SCSCFTest, TestBadScheme)
   msg._toscheme = "sips";
   doFastFailureFlow(msg, 416);  // bad scheme
 }
+
+TEST_F(SCSCFTest, TestBarredCaller)
+{
+  // Tests that a call attempt from a barred caller is rejected with a 403.
+  SCOPED_TRACE("");
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", "REGISTERED",
+                                "<IMSSubscription><ServiceProfile>\n"
+                                "<PublicIdentity><Identity>sip:6505551000@homedomain</Identity><BarringIndication>1</BarringIndication></PublicIdentity>\n"
+                                "  <InitialFilterCriteria>\n"
+                                "    <Priority>1</Priority>\n"
+                                "    <TriggerPoint>\n"
+                                "    <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                                "    <SPT>\n"
+                                "      <ConditionNegated>1</ConditionNegated>\n"
+                                "      <Group>0</Group>\n"
+                                "      <Method>INVITE</Method>\n"
+                                "      <Extension></Extension>\n"
+                                "    </SPT>\n"
+                                "  </TriggerPoint>\n"
+                                "  <ApplicationServer>\n"
+                                "    <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                                "    <DefaultHandling>0</DefaultHandling>\n"
+                                "  </ApplicationServer>\n"
+                                "  </InitialFilterCriteria>\n"
+                                "</ServiceProfile></IMSSubscription>");
+  Message msg;
+  msg._route = "Route: <sip:homedomain;orig>";
+  doSlowFailureFlow(msg, 403);
+}
+
+TEST_F(SCSCFTest, TestBarredCallee)
+{
+  // Tests that a call to a barred callee is rejected with a 404.
+  SCOPED_TRACE("");
+  _hss_connection->set_impu_result("sip:6505551234@homedomain", "call", "REGISTERED",
+                                "<IMSSubscription><ServiceProfile>\n"
+                                "<PublicIdentity><Identity>sip:6505551234@homedomain</Identity><BarringIndication>1</BarringIndication></PublicIdentity>\n"
+                                "  <InitialFilterCriteria>\n"
+                                "    <Priority>1</Priority>\n"
+                                "    <TriggerPoint>\n"
+                                "    <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                                "    <SPT>\n"
+                                "      <ConditionNegated>1</ConditionNegated>\n"
+                                "      <Group>0</Group>\n"
+                                "      <Method>INVITE</Method>\n"
+                                "      <Extension></Extension>\n"
+                                "    </SPT>\n"
+                                "  </TriggerPoint>\n"
+                                "  <ApplicationServer>\n"
+                                "    <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                                "    <DefaultHandling>0</DefaultHandling>\n"
+                                "  </ApplicationServer>\n"
+                                "  </InitialFilterCriteria>\n"
+                                "</ServiceProfile></IMSSubscription>");
+  Message msg;
+  doSlowFailureFlow(msg, 404);
+}
+
 
 TEST_F(SCSCFTest, TestSimpleTelURI)
 {
@@ -9372,3 +9405,133 @@ TEST_F(SCSCFTest, TestAddStoredPathURI)
   doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs);
 }
 
+TEST_F(SCSCFTest, TestCallerNotBarred)
+{
+  SCOPED_TRACE("");
+  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+
+  // The primary IMPU is barred, but this shouldn't stop us making a call since
+  // we are calling from one of the other IMPUs.
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", "REGISTERED",
+                                "<IMSSubscription><ServiceProfile>\n"
+                                "<PublicIdentity><Identity>sip:6505551001@homedomain</Identity><BarringIndication>1</BarringIndication></PublicIdentity>\n"
+                                "<PublicIdentity><Identity>sip:6505551000@homedomain</Identity></PublicIdentity>\n"
+                                "  <InitialFilterCriteria>\n"
+                                "    <Priority>1</Priority>\n"
+                                "    <TriggerPoint>\n"
+                                "    <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                                "    <SPT>\n"
+                                "      <ConditionNegated>1</ConditionNegated>\n"
+                                "      <Group>0</Group>\n"
+                                "      <Method>INVITE</Method>\n"
+                                "      <Extension></Extension>\n"
+                                "    </SPT>\n"
+                                "  </TriggerPoint>\n"
+                                "  <ApplicationServer>\n"
+                                "    <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                                "    <DefaultHandling>0</DefaultHandling>\n"
+                                "  </ApplicationServer>\n"
+                                "  </InitialFilterCriteria>\n"
+                                "</ServiceProfile></IMSSubscription>");
+  Message msg;
+  msg._route = "Route: <sip:homedomain;orig>";
+  list<HeaderMatcher> hdrs;
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs);
+}
+
+TEST_F(SCSCFTest, TestCalleeNotBarred)
+{
+  SCOPED_TRACE("");
+
+  // Need to use the first unbarred identity since that is the key used in memcached.
+  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
+
+  // The primary IMPU is barred, but this shouldn't stop us making a call since
+  // we are calling one of the other IMPUs.
+  _hss_connection->set_impu_result("sip:6505551234@homedomain", "call", "REGISTERED",
+                                "<IMSSubscription><ServiceProfile>\n"
+                                "<PublicIdentity><Identity>sip:6505551235@homedomain</Identity><BarringIndication>1</BarringIndication></PublicIdentity>\n"
+                                "<PublicIdentity><Identity>sip:6505551234@homedomain</Identity></PublicIdentity>\n"
+                                "  <InitialFilterCriteria>\n"
+                                "    <Priority>1</Priority>\n"
+                                "    <TriggerPoint>\n"
+                                "    <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                                "    <SPT>\n"
+                                "      <ConditionNegated>1</ConditionNegated>\n"
+                                "      <Group>0</Group>\n"
+                                "      <Method>INVITE</Method>\n"
+                                "      <Extension></Extension>\n"
+                                "    </SPT>\n"
+                                "  </TriggerPoint>\n"
+                                "  <ApplicationServer>\n"
+                                "    <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                                "    <DefaultHandling>0</DefaultHandling>\n"
+                                "  </ApplicationServer>\n"
+                                "  </InitialFilterCriteria>\n"
+                                "</ServiceProfile></IMSSubscription>");
+  Message msg;
+  list<HeaderMatcher> hdrs;
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs);
+}
+
+// Test emergency registrations receive calls when barred.
+TEST_F(SCSCFTest, TestEmergencyCalleeNotBarred)
+{
+  SCOPED_TRACE("");
+  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;sos;ob", 3600, "", true);
+  _hss_connection->set_impu_result("sip:6505551234@homedomain", "call", "REGISTERED",
+                                "<IMSSubscription><ServiceProfile>\n"
+                                "<PublicIdentity><Identity>sip:6505551234@homedomain</Identity><BarringIndication>1</BarringIndication></PublicIdentity>\n"
+                                "  <InitialFilterCriteria>\n"
+                                "    <Priority>1</Priority>\n"
+                                "    <TriggerPoint>\n"
+                                "    <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                                "    <SPT>\n"
+                                "      <ConditionNegated>1</ConditionNegated>\n"
+                                "      <Group>0</Group>\n"
+                                "      <Method>INVITE</Method>\n"
+                                "      <Extension></Extension>\n"
+                                "    </SPT>\n"
+                                "  </TriggerPoint>\n"
+                                "  <ApplicationServer>\n"
+                                "    <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                                "    <DefaultHandling>0</DefaultHandling>\n"
+                                "  </ApplicationServer>\n"
+                                "  </InitialFilterCriteria>\n"
+                                "</ServiceProfile></IMSSubscription>");
+  Message msg;
+  list<HeaderMatcher> hdrs;
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs);
+}
+
+// Test only emergency registrations in an implicit registration set receive
+// calls to barred IMPUs.
+TEST_F(SCSCFTest, TestEmergencyMultipleBindings)
+{
+  SCOPED_TRACE("");
+  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;sos;ob", 3600, "", true);
+  register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:fowertreetoowun@10.114.61.213:5061;transport=tcp;ob", 3600, "", false);
+  _hss_connection->set_impu_result("sip:6505551234@homedomain", "call", "REGISTERED",
+                                "<IMSSubscription><ServiceProfile>\n"
+                                "<PublicIdentity><Identity>sip:6505551234@homedomain</Identity><BarringIndication>1</BarringIndication></PublicIdentity>\n"
+                                "  <InitialFilterCriteria>\n"
+                                "    <Priority>1</Priority>\n"
+                                "    <TriggerPoint>\n"
+                                "    <ConditionTypeCNF>0</ConditionTypeCNF>\n"
+                                "    <SPT>\n"
+                                "      <ConditionNegated>1</ConditionNegated>\n"
+                                "      <Group>0</Group>\n"
+                                "      <Method>INVITE</Method>\n"
+                                "      <Extension></Extension>\n"
+                                "    </SPT>\n"
+                                "  </TriggerPoint>\n"
+                                "  <ApplicationServer>\n"
+                                "    <ServerName>sip:1.2.3.4:56789;transport=UDP</ServerName>\n"
+                                "    <DefaultHandling>0</DefaultHandling>\n"
+                                "  </ApplicationServer>\n"
+                                "  </InitialFilterCriteria>\n"
+                                "</ServiceProfile></IMSSubscription>");
+  Message msg;
+  list<HeaderMatcher> hdrs;
+  doSuccessfulFlow(msg, testing::MatchesRegex(".*wuntootreefower.*"), hdrs);
+}

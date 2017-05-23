@@ -1,37 +1,12 @@
 /**
  * @file hssconnection.cpp HSSConnection class methods.
  *
- * Project Clearwater - IMS in the Cloud
- * Copyright (C) 2013  Metaswitch Networks Ltd
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation, either version 3 of the License, or (at your
- * option) any later version, along with the "Special Exception" for use of
- * the program along with SSL, set forth below. This program is distributed
- * in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR
- * A PARTICULAR PURPOSE.  See the GNU General Public License for more
- * details. You should have received a copy of the GNU General Public
- * License along with this program.  If not, see
- * <http://www.gnu.org/licenses/>.
- *
- * The author can be reached by email at clearwater@metaswitch.com or by
- * post at Metaswitch Networks Ltd, 100 Church St, Enfield EN2 6BQ, UK
- *
- * Special Exception
- * Metaswitch Networks Ltd  grants you permission to copy, modify,
- * propagate, and distribute a work formed by combining OpenSSL with The
- * Software, or a work derivative of such a combination, even if such
- * copying, modification, propagation, or distribution would otherwise
- * violate the terms of the GPL. You must comply with the GPL in all
- * respects for all of the code used other than OpenSSL.
- * "OpenSSL" means OpenSSL toolkit software distributed by the OpenSSL
- * Project and licensed under the OpenSSL Licenses, or a work based on such
- * software and licensed under the OpenSSL Licenses.
- * "OpenSSL Licenses" means the OpenSSL License and Original SSLeay License
- * under which the OpenSSL Project distributes the OpenSSL toolkit software,
- * as those licenses appear in the file LICENSE-OPENSSL.
+ * Copyright (C) Metaswitch Networks 2017
+ * If license terms are provided to you in a COPYING file in the root directory
+ * of the source code repository by which you are accessing this code, then
+ * the license outlined in that COPYING file applies to your use.
+ * Otherwise no rights are granted except for those provided to you by
+ * Metaswitch Networks in a separate written agreement.
  */
 
 #include <cassert>
@@ -325,7 +300,7 @@ bool decode_homestead_xml(const std::string public_user_identity,
                           std::shared_ptr<rapidxml::xml_document<> > root,
                           std::string& regstate,
                           std::map<std::string, Ifcs >& ifcs_map,
-                          std::vector<std::string>& associated_uris,
+                          AssociatedURIs& associated_uris,
                           std::vector<std::string>& aliases,
                           std::deque<std::string>& ccfs,
                           std::deque<std::string>& ecfs,
@@ -414,7 +389,7 @@ bool decode_homestead_xml(const std::string public_user_identity,
   bool found_aliases = false;
   bool maybe_found_aliases = false;
   bool found_multiple_matches = false;
-  associated_uris.clear();
+  associated_uris.clear_uris();
   rapidxml::xml_node<>* sp = NULL;
 
   if (!imss->first_node(RegDataXMLUtils::SERVICE_PROFILE))
@@ -452,13 +427,24 @@ bool decode_homestead_xml(const std::string public_user_identity,
           RegDataXMLUtils::parse_extension_identity(uri, extension);
         }
 
+        rapidxml::xml_node<>* barring_indication = public_id->first_node(RegDataXMLUtils::BARRING_INDICATION);
+
         TRC_DEBUG("Processing Identity node from HSS XML - %s\n",
                   uri.c_str());
 
-        if (std::find(associated_uris.begin(), associated_uris.end(), uri) ==
-            associated_uris.end())
+        if (!associated_uris.contains_uri(uri))
         {
-          associated_uris.push_back(uri);
+          bool barred = false;
+          if (barring_indication)
+          {
+            std::string value = barring_indication->value();
+            if (value == RegDataXMLUtils::STATE_BARRED)
+            {
+              barred = true;
+            }
+          }
+
+          associated_uris.add_uri(uri, barred);
           ifcs_map[uri] = ifc;
         }
 
@@ -551,7 +537,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                                   const std::string& type,
                                                   std::string& regstate,
                                                   std::map<std::string, Ifcs >& ifcs_map,
-                                                  std::vector<std::string>& associated_uris,
+                                                  AssociatedURIs& associated_uris,
                                                   SAS::TrailId trail)
 {
   std::vector<std::string> unused_aliases;
@@ -575,7 +561,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                                   const std::string& private_user_identity,
                                                   const std::string& type,
                                                   std::map<std::string, Ifcs >& ifcs_map,
-                                                  std::vector<std::string>& associated_uris,
+                                                  AssociatedURIs& associated_uris,
                                                   SAS::TrailId trail)
 {
   std::string unused_regstate;
@@ -602,7 +588,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                                   SAS::TrailId trail)
 {
   std::map<std::string, Ifcs > ifcs_map;
-  std::vector<std::string> associated_uris;
+  AssociatedURIs associated_uris = {};
   std::string unused_regstate;
   std::vector<std::string> unused_aliases;
   std::deque<std::string> unused_ccfs;
@@ -626,7 +612,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                                   const std::string& type,
                                                   std::string& regstate,
                                                   std::map<std::string, Ifcs >& ifcs_map,
-                                                  std::vector<std::string>& associated_uris,
+                                                  AssociatedURIs& associated_uris,
                                                   std::deque<std::string>& ccfs,
                                                   std::deque<std::string>& ecfs,
                                                   SAS::TrailId trail)
@@ -651,7 +637,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
                                                   const std::string& type,
                                                   std::string& regstate,
                                                   std::map<std::string, Ifcs >& ifcs_map,
-                                                  std::vector<std::string>& associated_uris,
+                                                  AssociatedURIs& associated_uris,
                                                   std::vector<std::string>& aliases,
                                                   std::deque<std::string>& ccfs,
                                                   std::deque<std::string>& ecfs,
@@ -729,7 +715,7 @@ HTTPCode HSSConnection::update_registration_state(const std::string& public_user
 HTTPCode HSSConnection::get_registration_data(const std::string& public_user_identity,
                                               std::string& regstate,
                                               std::map<std::string, Ifcs >& ifcs_map,
-                                              std::vector<std::string>& associated_uris,
+                                              AssociatedURIs& associated_uris,
                                               SAS::TrailId trail)
 {
   std::deque<std::string> unused_ccfs;
@@ -746,7 +732,7 @@ HTTPCode HSSConnection::get_registration_data(const std::string& public_user_ide
 HTTPCode HSSConnection::get_registration_data(const std::string& public_user_identity,
                                               std::string& regstate,
                                               std::map<std::string, Ifcs >& ifcs_map,
-                                              std::vector<std::string>& associated_uris,
+                                              AssociatedURIs& associated_uris,
                                               std::deque<std::string>& ccfs,
                                               std::deque<std::string>& ecfs,
                                               SAS::TrailId trail)
