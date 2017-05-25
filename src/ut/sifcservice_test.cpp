@@ -44,8 +44,11 @@
 #include "sifcservice.h"
 #include "fakelogger.h"
 #include "test_utils.hpp"
+#include "ifc_parsing_utils.h"
+#include "mockalarm.h"
 
 using ::testing::UnorderedElementsAreArray;
+using ::testing::AtLeast;
 
 using namespace std;
 
@@ -54,11 +57,17 @@ class SIFCServiceTest : public ::testing::Test
 {
   SIFCServiceTest()
   {
+    _am = new AlarmManager();
+    _mock_alarm = new MockAlarm(_am);
   }
 
   virtual ~SIFCServiceTest()
   {
+    delete _am; _am = NULL;
   }
+
+  AlarmManager* _am;
+  MockAlarm* _mock_alarm;
 };
 
 std::string get_server_name(Ifc ifc)
@@ -80,7 +89,8 @@ int32_t get_priority(Ifc ifc)
 // Test a valid shared IFC file is parsed correctly
 TEST_F(SIFCServiceTest, ValidSIFCFile)
 {
-  SIFCService sifc(string(UT_DIR).append("/test_sifc.xml"));
+  EXPECT_CALL(*_mock_alarm, clear()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc.xml"));
 
   // Pull out a single IFC (the test file is set up to only return a single
   // IFC for ID 2).
@@ -134,7 +144,8 @@ TEST_F(SIFCServiceTest, ValidSIFCFile)
 // Test that reloading a shared IFC file works correctly
 TEST_F(SIFCServiceTest, SIFCReload)
 {
-  SIFCService sifc(string(UT_DIR).append("/test_sifc.xml"));
+  EXPECT_CALL(*_mock_alarm, clear()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc.xml"));
 
   // Load the IFC file, and check that it's been parsed correctly
   std::set<int> id; id.insert(2);
@@ -145,6 +156,8 @@ TEST_F(SIFCServiceTest, SIFCReload)
 
   // Reload the file, then repeat the check. Nothing should have changed,
   // and there should be no memory issues
+  EXPECT_CALL(*_mock_alarm, set()).Times(AtLeast(1));
+  sifc._configuration = string(UT_DIR).append("/test_sifc_parse_error.xml");
   sifc.update_sets();
   std::multimap<int32_t, Ifc> ifc_map_reload;
   sifc.get_ifcs_from_id(ifc_map_reload, id, 0);
@@ -156,7 +169,8 @@ TEST_F(SIFCServiceTest, SIFCReload)
 // valid entries to be lost
 TEST_F(SIFCServiceTest, SIFCReloadInvalidFile)
 {
-  SIFCService sifc(string(UT_DIR).append("/test_sifc.xml"));
+  EXPECT_CALL(*_mock_alarm, clear()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc.xml"));
 
   // Load the IFC file, and check that it's been parsed correctly
   std::set<int> id; id.insert(2);
@@ -168,7 +182,8 @@ TEST_F(SIFCServiceTest, SIFCReloadInvalidFile)
   // Change the file the sifc service is using (to mimic the file being changed),
   // then reload the file, and repeat the check. Nothing should have changed,
   // and there should be no memory issues
-  sifc._configuration = string(UT_DIR).append("/test_sifc_parse_error.xml");
+  EXPECT_CALL(*_mock_alarm, clear()).Times(AtLeast(1));
+  sifc._configuration = string(UT_DIR).append("/test_sifc_changed.xml");
   sifc.update_sets();
   std::multimap<int32_t, Ifc> ifc_map_reload;
   sifc.get_ifcs_from_id(ifc_map_reload, id, 0);
@@ -187,7 +202,8 @@ TEST_F(SIFCServiceTest, SIFCReloadInvalidFile)
 TEST_F(SIFCServiceTest, MissingFile)
 {
   CapturingTestLogger log;
-  SIFCService sifc(string(UT_DIR).append("/non_existent_file.xml"));
+  EXPECT_CALL(*_mock_alarm, set()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/non_existent_file.xml"));
   EXPECT_TRUE(log.contains("No shared IFCs configuration"));
   EXPECT_TRUE(sifc._shared_ifc_sets.empty());
 }
@@ -196,7 +212,8 @@ TEST_F(SIFCServiceTest, MissingFile)
 TEST_F(SIFCServiceTest, EmptyFile)
 {
   CapturingTestLogger log;
-  SIFCService sifc(string(UT_DIR).append("/test_sifc_empty_file.xml"));
+  EXPECT_CALL(*_mock_alarm, set()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc_empty_file.xml"));
   EXPECT_TRUE(log.contains("Failed to read shared IFCs configuration"));
   EXPECT_TRUE(sifc._shared_ifc_sets.empty());
 }
@@ -205,7 +222,8 @@ TEST_F(SIFCServiceTest, EmptyFile)
 TEST_F(SIFCServiceTest, ParseError)
 {
   CapturingTestLogger log;
-  SIFCService sifc(string(UT_DIR).append("/test_sifc_parse_error.xml"));
+  EXPECT_CALL(*_mock_alarm, set()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc_parse_error.xml"));
   EXPECT_TRUE(log.contains("Failed to parse the shared IFCs configuration data"));
   EXPECT_TRUE(sifc._shared_ifc_sets.empty());
 }
@@ -214,7 +232,8 @@ TEST_F(SIFCServiceTest, ParseError)
 TEST_F(SIFCServiceTest, MissingSetBlock)
 {
   CapturingTestLogger log;
-  SIFCService sifc(string(UT_DIR).append("/test_sifc_missing_set.xml"));
+  EXPECT_CALL(*_mock_alarm, set()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc_missing_set.xml"));
   EXPECT_TRUE(log.contains("Invalid shared IFCs configuration file - missing SharedIFCsSets block"));
   EXPECT_TRUE(sifc._shared_ifc_sets.empty());
 }
@@ -223,7 +242,8 @@ TEST_F(SIFCServiceTest, MissingSetBlock)
 TEST_F(SIFCServiceTest, NoEntries)
 {
   CapturingTestLogger log;
-  SIFCService sifc(string(UT_DIR).append("/test_sifc_no_entries.xml"));
+  EXPECT_CALL(*_mock_alarm, clear()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc_no_entries.xml"));
   EXPECT_FALSE(log.contains("Failed"));
   EXPECT_TRUE(sifc._shared_ifc_sets.empty());
 }
@@ -239,7 +259,8 @@ TEST_F(SIFCServiceTest, NoEntries)
 TEST_F(SIFCServiceTest, MissingSetID)
 {
   CapturingTestLogger log;
-  SIFCService sifc(string(UT_DIR).append("/test_sifc_missing_set_id.xml"));
+  EXPECT_CALL(*_mock_alarm, set()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc_missing_set_id.xml"));
   EXPECT_TRUE(log.contains("Invalid shared IFC block - missing SetID. Skipping this entry"));
 
   // The test file has an invalid entry, and an entry for ID 2. Check that this
@@ -255,7 +276,8 @@ TEST_F(SIFCServiceTest, MissingSetID)
 TEST_F(SIFCServiceTest, InvalidSetID)
 {
   CapturingTestLogger log;
-  SIFCService sifc(string(UT_DIR).append("/test_sifc_invalid_set_id.xml"));
+  EXPECT_CALL(*_mock_alarm, set()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc_invalid_set_id.xml"));
   EXPECT_TRUE(log.contains("Invalid shared IFC block - SetID (NaN) isn't an int. Skipping this entry"));
 
   // The test file has an invalid entry, and an entry for ID 2. Check that this
@@ -272,7 +294,8 @@ TEST_F(SIFCServiceTest, InvalidSetID)
 TEST_F(SIFCServiceTest, RepeatedSetID)
 {
   CapturingTestLogger log;
-  SIFCService sifc(string(UT_DIR).append("/test_sifc_repeated_id.xml"));
+  EXPECT_CALL(*_mock_alarm, set()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc_repeated_id.xml"));
   EXPECT_TRUE(log.contains("Invalid shared IFC block - SetID (1) is repeated. Skipping this entry"));
 
   // The test file has two entries for ID 1 (with different server names).
@@ -290,7 +313,8 @@ TEST_F(SIFCServiceTest, SIFCPriorities)
   // The test file has 3 IFCs under ID 1. One IFC doesn't have the priority set,
   // one has it set to 200, and one has an invalid value.
   CapturingTestLogger log;
-  SIFCService sifc(string(UT_DIR).append("/test_sifc_priorities.xml"));
+  EXPECT_CALL(*_mock_alarm, set()).Times(AtLeast(1));
+  SIFCService sifc(_mock_alarm, NULL, string(UT_DIR).append("/test_sifc_priorities.xml"));
   EXPECT_TRUE(log.contains("Invalid shared IFC block - Priority (NaN) isn't an int. Skipping this entry"));
 
   // Get the IFCs for ID. There should be two (as one was invalid)

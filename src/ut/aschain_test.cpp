@@ -137,6 +137,7 @@ TEST_F(AsChainTest, Basics)
   EXPECT_TRUE(res.complete());
 }
 
+<<<<<<< HEAD
 TEST_F(AsChainTest, AsInvocation)
 {
   Ifcs ifcs1 = simple_ifcs(0);
@@ -179,11 +180,3 @@ TEST_F(AsChainTest, AsInvocation)
   as_chain_link2.on_initial_request(tdata->msg, server_name, 1u);
   EXPECT_EQ(server_name, "sip:pancommunicon.cw-ngv.com");
 }
-
-// ++@@@ aschain.to_string
-// @@@ initial request: has MMTEL, orig and term
-// ++@@@ has ASs but URI is invalid.
-// ++@@@ no ASs configured.- next
-// ++@@@ is_mmtel
-// ++@@@ get served user
-

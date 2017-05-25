@@ -273,6 +273,7 @@ public:
     _enum_service = new JSONEnumService(string(UT_DIR).append("/test_stateful_proxy_enum.json"));
 
     _acr_factory = new ACRFactory();
+
     // Schedule timers.
     SipTest::poll();
   }
@@ -304,6 +305,7 @@ public:
 
 
     // Create the S-CSCF Sproutlet.
+    IFCConfiguration ifc_configuration(false, false, "sip:DUMMY_AS", NULL, NULL);
     _scscf_sproutlet = new SCSCFSproutlet("scscf",
                                           "sip:homedomain:5058",
                                           "sip:127.0.0.1:5058",
