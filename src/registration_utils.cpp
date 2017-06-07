@@ -291,7 +291,7 @@ void send_register_to_as(pjsip_rx_data *received_register,
                                       &as_uri,               // Target
                                       &stack_data.scscf_uri, // From
                                       &user_uri,             // To
-                                      &stack_data.scscf_uri, // Contact
+                                      &stack_data.scscf_contact, // Contact
                                       NULL,                  // Auto-generate Call-ID
                                       1,                     // CSeq
                                       NULL,                  // No body

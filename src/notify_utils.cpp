@@ -303,7 +303,7 @@ pj_status_t create_request_from_subscription(
                                                   &uri,
                                                   &from,
                                                   &to,
-                                                  &stack_data.scscf_uri,
+                                                  &stack_data.scscf_contact,
                                                   &cid,
                                                   cseq,
                                                   body,

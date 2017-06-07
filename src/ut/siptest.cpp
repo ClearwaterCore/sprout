@@ -127,6 +127,7 @@ void SipTest::SetUpTestCase(bool clear_host_mapping)
   URIClassifier::home_domains.push_back(&stack_data.default_home_domain);
   URIClassifier::home_domains.push_back(&scscf_domain);
   stack_data.scscf_uri = pj_str("sip:scscf.sprout.homedomain:5058;transport=TCP");
+  stack_data.scscf_contact = pj_str("<sip:scscf.sprout.homedomain:5058;transport=TCP>");
   stack_data.cdf_domain = pj_str("cdfdomain");
   stack_data.name_cnt = 0;
   stack_data.name[stack_data.name_cnt] = stack_data.local_host;

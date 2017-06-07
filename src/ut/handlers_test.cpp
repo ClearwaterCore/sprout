@@ -478,6 +478,7 @@ class DeregistrationTaskTest : public SipTest
     _subscriber_data_manager = new MockSubscriberDataManager();
     _hss = new FakeHSSConnection();
     stack_data.scscf_uri = pj_str("sip:all.the.sprouts:5058;transport=TCP");
+    stack_data.scscf_contact = pj_str("<sip:all.the.sprouts:5058;transport=TCP>");
   }
 
   void TearDown()
