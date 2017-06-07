@@ -297,22 +297,13 @@ pj_status_t create_request_from_subscription(
   pj_cstr(&uri, subscription->_req_uri.c_str());
   pj_cstr(&cid, subscription->_cid.c_str());
 
-  // Contact URI needs to be surrounded by angle brackets to get the parameters
-  // handled correctly.
-  std::string contact_str = "<" +
-                            std::string(pj_strbuf(&stack_data.scscf_uri), 
-                                        pj_strlen(&stack_data.scscf_uri)) +
-                            ">";
-  pj_str_t contact_uri;
-  pj_cstr(&contact_uri, contact_str.c_str());
-
   TRC_DEBUG("Create NOTIFY request");
   pj_status_t status = pjsip_endpt_create_request(stack_data.endpt,
                                                   pjsip_get_notify_method(),
                                                   &uri,
                                                   &from,
                                                   &to,
-                                                  &contact_uri,
+                                                  &stack_data.scscf_contact,
                                                   &cid,
                                                   cseq,
                                                   body,

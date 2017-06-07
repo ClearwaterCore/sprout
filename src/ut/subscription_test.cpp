@@ -75,6 +75,7 @@ public:
     pj_status_t ret = init_subscription(_sdm, _remote_sdm, _hss_connection, _acr_factory, _analytics, 300);
     ASSERT_EQ(PJ_SUCCESS, ret);
     stack_data.scscf_uri = pj_str("sip:all.the.sprout.nodes:5058;transport=TCP");
+    stack_data.scscf_contact = pj_str("<sip:all.the.sprout.nodes:5058;transport=TCP>");
 
     _hss_connection->set_impu_result("sip:6505550231@homedomain", "", HSSConnection::STATE_REGISTERED, "");
     _hss_connection->set_impu_result("tel:6505550231", "", HSSConnection::STATE_REGISTERED, "");
@@ -851,6 +852,7 @@ public:
     pj_status_t ret = init_subscription(_sdm, NULL, _hss_connection, _acr_factory, _analytics, 300);
     ASSERT_EQ(PJ_SUCCESS, ret);
     stack_data.scscf_uri = pj_str("sip:all.the.sprout.nodes:5058;transport=TCP");
+    stack_data.scscf_contact = pj_str("<sip:all.the.sprout.nodes:5058;transport=TCP>");
 
     _hss_connection->set_impu_result("sip:6505550231@homedomain", "", HSSConnection::STATE_REGISTERED, "");
     _hss_connection->set_impu_result("tel:6505550231", "", HSSConnection::STATE_REGISTERED, "");

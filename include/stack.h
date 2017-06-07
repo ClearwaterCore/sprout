@@ -82,6 +82,7 @@ struct stack_data_struct
   std::unordered_set<std::string> aliases;
   pj_str_t             cdf_domain;
   pj_str_t             scscf_uri;
+  pj_str_t             scscf_contact;
 
   int                  addr_family;
 

@@ -169,7 +169,8 @@ public:
   {
     SipTest::SetUpTestCase();
 
-    stack_data.scscf_uri = pj_str("sip:all.the.sprout.nodes:5058;transport=TCP");
+    stack_data.scscf_uri     = pj_str("sip:all.the.sprout.nodes:5058;transport=TCP");
+    stack_data.scscf_contact = pj_str("<sip:all.the.sprout.nodes:5058;transport=TCP>");
 
     _chronos_connection = new FakeChronosConnection();
     _local_data_store = new LocalStore();
@@ -520,6 +521,7 @@ public:
     SipTest::SetUpTestCase();
 
     stack_data.scscf_uri = pj_str("sip:all.the.sprout.nodes:5058;transport=TCP");
+    stack_data.scscf_contact = pj_str("<sip:all.the.sprout.nodes:5058;transport=TCP>");
 
     _chronos_connection = new FakeChronosConnection();
     _local_data_store = new LocalStore();
@@ -2539,6 +2541,7 @@ public:
   {
     SipTest::SetUpTestCase();
     stack_data.scscf_uri = pj_str("sip:all.the.sprout.nodes:5058;transport=TCP");
+    stack_data.scscf_contact = pj_str("<sip:all.the.sprout.nodes:5058;transport=TCP>");
   }
 
   void SetUp()

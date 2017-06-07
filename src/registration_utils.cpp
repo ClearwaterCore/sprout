@@ -286,21 +286,12 @@ void send_register_to_as(pjsip_rx_data *received_register,
   pj_str_t as_uri;
   pj_cstr(&as_uri, as.server_name.c_str());
 
-  // Contact URI needs to be surrounded by angle brackets to get the parameters
-  // handled correctly.
-  std::string contact_str = "<" +
-                            std::string(pj_strbuf(&stack_data.scscf_uri), 
-                                        pj_strlen(&stack_data.scscf_uri)) +
-                            ">";
-  pj_str_t contact_uri;
-  pj_cstr(&contact_uri, contact_str.c_str());
-  
   status = pjsip_endpt_create_request(stack_data.endpt,
                                       &method,               // Method
                                       &as_uri,               // Target
                                       &stack_data.scscf_uri, // From
                                       &user_uri,             // To
-                                      &contact_uri,          // Contact
+                                      &stack_data.scscf_contact, // Contact
                                       NULL,                  // Auto-generate Call-ID
                                       1,                     // CSeq
                                       NULL,                  // No body
