@@ -1383,6 +1383,9 @@ TEST_F(SCSCFTest, TestSimpleTelURI)
   msg._route = "Route: <sip:homedomain;orig>";
   msg._todomain = "";
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match so we don't expect any Route headers (as we're just
+  // following the URI that ENUM gave back.
+  hdrs.push_back(HeaderMatcher("Route"));
   doSuccessfulFlow(msg, testing::MatchesRegex(".*16505551234@ut.cw-ngv.com.*"), hdrs, false);
 
   // Successful originating call.  We should have tracked a single session
@@ -1406,6 +1409,9 @@ TEST_F(SCSCFTest, TestSimpleTelURIVideo)
   msg._todomain = "";
   msg._body = "\r\nv=0\r\no=Andrew 2890844526 2890844526 IN IP4 10.120.42.3\r\nc=IN IP4 10.120.42.3\r\nt=0 0\r\nm=audio 49170 RTP/AVP 0 8 97\r\na=rtpmap:0 PCMU/8000\r\nm=video 51372 RTP/AVP 31 32\r\na=rtpmap:31 H261/90000\r\n";
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match so we don't expect any Route headers (as we're just
+  // following the URI that ENUM gave back.
+  hdrs.push_back(HeaderMatcher("Route"));
   doSuccessfulFlow(msg, testing::MatchesRegex(".*16505551234@ut.cw-ngv.com.*"), hdrs, false);
 
   // Successful originating call.  We should have tracked a single session
@@ -1708,6 +1714,9 @@ TEST_F(SCSCFTest, TestEnumExternalSuccess)
   msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match so we don't expect any Route headers (as we're just
+  // following the URI that ENUM gave back.
+  hdrs.push_back(HeaderMatcher("Route"));
   // Skip the ACK and BYE on this request by setting the last
   // parameter to false, as we're only testing Sprout functionality
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580271@ut.cw-ngv.com.*"), hdrs, false);
@@ -1727,6 +1736,7 @@ TEST_F(SCSCFTest, TestNoEnumWhenGRUU)
   msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  hdrs.push_back(HeaderMatcher("Route"));
 
   // Even though "+15108580271" is configured for ENUM, the presence
   // of a GRUU parameter should indicate to Sprout that this wasn't
@@ -1773,6 +1783,9 @@ TEST_F(SCSCFTest, TestEnumExternalSuccessFromFromHeader)
 
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match so we don't expect any Route headers (as we're just
+  // following the URI that ENUM gave back.
+  hdrs.push_back(HeaderMatcher("Route"));
   // Skip the ACK and BYE on this request by setting the last
   // parameter to false, as we're only testing Sprout functionality
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580271@ut.cw-ngv.com.*"), hdrs, false);
@@ -1790,6 +1803,9 @@ TEST_F(SCSCFTest, TestEnumExternalOffNetDialingAllowed)
 
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match so we don't expect any Route headers (as we're just
+  // following the URI that ENUM gave back.
+  hdrs.push_back(HeaderMatcher("Route"));
   // Skip the ACK and BYE on this request by setting the last
   // parameter to false, as we're only testing Sprout functionality
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580271@ut.cw-ngv.com.*"), hdrs, false);
@@ -1809,6 +1825,10 @@ TEST_F(SCSCFTest, TestEnumUserPhone)
   msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match so we don't expect any Route headers (as we're just
+  // following the URI that ENUM gave back.
+  hdrs.push_back(HeaderMatcher("Route"));
+
   // Skip the ACK and BYE on this request by setting the last
   // parameter to false, as we're only testing Sprout functionality
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580271@ut.cw-ngv.com.*"), hdrs, false);
@@ -1898,6 +1918,9 @@ TEST_F(SCSCFTest, TestEnumNPData)
   msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match but the resulting URI is another phone number so we
+  // route to the BGCF (and should have a route header).
+  hdrs.push_back(HeaderMatcher("Route", ".*"));
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580401;rn.*+151085804;npdi@homedomain.*"), hdrs, false);
 }
 
@@ -1914,6 +1937,8 @@ TEST_F(SCSCFTest, TestEnumReqURIwithNPData)
   msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  // Request is routed to the BGCF so should have a route header).
+  hdrs.push_back(HeaderMatcher("Route", ".*"));
   doSuccessfulFlow(msg, testing::MatchesRegex(".*15108580401;rn.*+16;npdi@homedomain"), hdrs, false);
 }
 
@@ -1932,6 +1957,9 @@ TEST_F(SCSCFTest, TestEnumReqURIwithNPDataOverride)
   msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match but the resulting URI is another phone number so we
+  // route to the BGCF (and should have a route header).
+  hdrs.push_back(HeaderMatcher("Route", ".*"));
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580401;rn.*+151085804;npdi@homedomain.*"), hdrs, false);
 }
 
@@ -1951,6 +1979,9 @@ TEST_F(SCSCFTest, TestEnumReqURIwithNPDataToSIP)
   msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match so we don't expect any Route headers (as we're just
+  // following the URI that ENUM gave back.
+  hdrs.push_back(HeaderMatcher("Route"));
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580272@ut.cw-ngv.com"), hdrs, false);
 }
 
@@ -2032,10 +2063,36 @@ TEST_F(SCSCFTest, TestWithoutEnum)
   msg._extra = "Record-Route: <sip:homedomain>\nP-Asserted-Identity: <sip:+16505551000@homedomain>";
   add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
   list<HeaderMatcher> hdrs;
+  // ENUM finds a match so we don't expect any Route headers (as we're just
+  // following the URI that ENUM gave back.
+  hdrs.push_back(HeaderMatcher("Route"));
 
   // Skip the ACK and BYE on this request by setting the last
   // parameter to false, as we're only testing Sprout functionality
   doSuccessfulFlow(msg, testing::MatchesRegex(".*+15108580271@homedomain;user=phone.*"), hdrs, false);
+}
+
+// Test where ENUM is configured but there is no match. This request gets routed
+// to the BGCF.
+TEST_F(SCSCFTest, TestEnumExternalNoMatch)
+{
+  SCOPED_TRACE("");
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
+
+  Message msg;
+  msg._to = "+16608580271";
+  // We only do ENUM on originating calls
+  msg._route = "Route: <sip:homedomain;orig>";
+  msg._requri = "sip:+16608580271@homedomain;user=phone";
+  add_host_mapping("ut.cw-ngv.com", "10.9.8.7");
+  list<HeaderMatcher> hdrs;
+
+  // There is a route header as we route via the BGCF.
+  hdrs.push_back(HeaderMatcher("Route", ".*"));
+
+  // Skip the ACK and BYE on this request by setting the last
+  // parameter to false, as we're only testing Sprout functionality
+  doSuccessfulFlow(msg, testing::MatchesRegex("sip:\\+16608580271@homedomain;user=phone"), hdrs, false);
 }
 
 
@@ -5165,6 +5222,8 @@ TEST_F(SCSCFTest, Cdiv)
 // Test call-diversion AS flow where the AS diverts to a different domain.
 TEST_F(SCSCFTest, CdivToDifferentDomain)
 {
+  add_host_mapping("domainvalid", "10.9.8.7");
+
   register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
   register_uri(_sdm, _hss_connection, "6505551000", "homedomain", "sip:wuntootree@10.14.61.213:5061;transport=tcp;ob");
   register_uri(_sdm, _hss_connection, "6505555678", "homedomain", "sip:andunnuvvawun@10.114.61.214:5061;transport=tcp;ob");
@@ -5312,8 +5371,10 @@ TEST_F(SCSCFTest, CdivToDifferentDomain)
 
   tpBono.expect_target(current_txdata(), false);
   EXPECT_EQ("sip:newuser@domainvalid", r1.uri());
-  // This route header is determined from the BGCF config.
-  EXPECT_EQ("Route: <sip:10.0.0.1:5060;transport=TCP;lr>", get_headers(out, "Route"));
+
+  // There should be no route header as we just route directly to the request
+  // URI.
+  EXPECT_EQ("", get_headers(out, "Route"));
 
   free_txdata();
 }
@@ -8477,8 +8538,7 @@ TEST_F(SCSCFTest, AutomaticRegistration)
 
   add_host_mapping("domainvalid", "10.9.8.7");
   list<HeaderMatcher> hdrs;
-  hdrs.push_back(HeaderMatcher("Route", "Route: <sip:10.0.0.1:5060;transport=TCP;lr>"));
-  doSuccessfulFlow(msg, testing::MatchesRegex("sip:newuser@domainvalid"), hdrs);
+  doSuccessfulFlow(msg, testing::MatchesRegex("sip:newuser@domainvalid"), {});
 }
 
 TEST_F(SCSCFTest, AutomaticRegistrationDerivedIMPI)
@@ -8497,8 +8557,7 @@ TEST_F(SCSCFTest, AutomaticRegistrationDerivedIMPI)
 
   add_host_mapping("domainvalid", "10.9.8.7");
   list<HeaderMatcher> hdrs;
-  hdrs.push_back(HeaderMatcher("Route", "Route: <sip:10.0.0.1:5060;transport=TCP;lr>"));
-  doSuccessfulFlow(msg, testing::MatchesRegex("sip:newuser@domainvalid"), hdrs);
+  doSuccessfulFlow(msg, testing::MatchesRegex("sip:newuser@domainvalid"), {});
 }
 
 TEST_F(SCSCFTest, TestSessionExpires)
