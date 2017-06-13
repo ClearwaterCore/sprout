@@ -1278,7 +1278,7 @@ TEST_F(RegistrarTest, AppServersPassthrough)
 /// when the first IMPU is barred.
 TEST_F(RegistrarTest, AppServersBarredIMPU)
 {
-  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED,
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", RegDataXMLUtils::STATE_REGISTERED,
                               "<IMSSubscription><ServiceProfile>\n"
                               "  <PublicIdentity><Identity>sip:6505550231@homedomain</Identity><BarringIndication>1</BarringIndication></PublicIdentity>\n"
                               "  <PublicIdentity><Identity>sip:6505550232@homedomain</Identity></PublicIdentity>\n"
@@ -2700,7 +2700,7 @@ TEST_F(RegistrarTest, ServiceRouteWithAKAAlgorithm)
 {
   // We have a private ID in this test, so set up the expect response
   // to the query.
-  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED, "", "?private_id=Alice");
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", RegDataXMLUtils::STATE_REGISTERED, "", "?private_id=Alice");
 
   Message msg;
   msg._expires = "Expires: 300";
@@ -2722,7 +2722,7 @@ TEST_F(RegistrarTest, ServiceRouteImpiNonceUrlEncoded)
 {
   // We have a private ID in this test, so set up the expect response
   // to the query.
-  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED, "", "?private_id=6505550231%40homedomain");
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", RegDataXMLUtils::STATE_REGISTERED, "", "?private_id=6505550231%40homedomain");
 
   Message msg;
   msg._expires = "Expires: 300";
@@ -2745,7 +2745,7 @@ TEST_F(RegistrarTest, BarredEmergencyRegistration)
 {
   // We have a private ID in this test, so set up the expect response
   // to the query.
-  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED,
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", RegDataXMLUtils::STATE_REGISTERED,
                                    "<IMSSubscription><ServiceProfile>\n"
                                    "<PublicIdentity><Identity>sip:6505550231@homedomain</Identity><BarringIndication>1</BarringIndicaton></PublicIdentity>"
                                    "  <InitialFilterCriteria>\n"
@@ -2789,7 +2789,7 @@ TEST_F(RegistrarTest, AllIMPUsBarred)
 {
   // We have a private ID in this test, so set up the expect response
   // to the query.
-  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", HSSConnection::STATE_REGISTERED,
+  _hss_connection->set_impu_result("sip:6505550231@homedomain", "reg", RegDataXMLUtils::STATE_REGISTERED,
                                    "<IMSSubscription><ServiceProfile>\n"
                                    "<PublicIdentity><Identity>sip:6505550231@homedomain</Identity><BarringIndication>1</BarringIndicaton></PublicIdentity>"
                                    "  <InitialFilterCriteria>\n"

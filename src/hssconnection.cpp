@@ -429,7 +429,7 @@ bool decode_homestead_xml(const std::string public_user_identity,
         if (barring_indication)
         {
           std::string value = barring_indication->value();
-          if (value == HSSConnection::STATE_BARRED)
+          if (value == RegDataXMLUtils::STATE_BARRED)
           {
             barred = true;
           }
@@ -447,7 +447,7 @@ bool decode_homestead_xml(const std::string public_user_identity,
         // The first set of IFCs are what we might want to fall back to if
         // the public ID we're looking for isn't found, so we store them off if
         // the PublicIdentity node we're handling is the first one.
-        if (public_id == sp->first_node(RegDataXmlUtils::PUBLIC_IDENTITY))
+        if (public_id == sp->first_node(RegDataXMLUtils::PUBLIC_IDENTITY))
         {
           fallback_ifc = ifc;
         }
@@ -498,7 +498,7 @@ bool decode_homestead_xml(const std::string public_user_identity,
     associated_uris.add(public_user_identity, false);
   }
 
-  rapidxml::xml_node<>* charging_addrs_node = cw->first_node(RegDataXmlUtils::CHARGING_ADDRESSES);
+  rapidxml::xml_node<>* charging_addrs_node = cw->first_node(RegDataXMLUtils::CHARGING_ADDRESSES);
 
   if (charging_addrs_node)
   {

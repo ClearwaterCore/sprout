@@ -2077,7 +2077,7 @@ TEST_F(SCSCFTest, TestWithoutEnum)
 TEST_F(SCSCFTest, TestEnumExternalNoMatch)
 {
   SCOPED_TRACE("");
-  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", HSSConnection::STATE_REGISTERED, "");
+  _hss_connection->set_impu_result("sip:6505551000@homedomain", "call", RegDataXMLUtils::STATE_REGISTERED, "");
 
   Message msg;
   msg._to = "+16608580271";
@@ -8901,7 +8901,6 @@ TEST_F(SCSCFTest, TestCalleeNotBarred)
 {
   SCOPED_TRACE("");
 
-<<<<<<< HEAD
   // Need to use the first unbarred identity since that is the key used in memcached.
   register_uri(_sdm, _hss_connection, "6505551234", "homedomain", "sip:wuntootreefower@10.114.61.213:5061;transport=tcp;ob");
 
