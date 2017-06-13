@@ -137,7 +137,6 @@ TEST_F(AsChainTest, Basics)
   EXPECT_TRUE(res.complete());
 }
 
-<<<<<<< HEAD
 TEST_F(AsChainTest, AsInvocation)
 {
   Ifcs ifcs1 = simple_ifcs(0);

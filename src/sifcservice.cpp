@@ -44,6 +44,8 @@
 #include "sproutsasevent.h"
 #include "sprout_pd_definitions.h"
 #include "utils.h"
+#include "rapidxml/rapidxml_print.hpp"
+
 
 SIFCService::SIFCService(Alarm* alarm,
                          SNMP::CounterTable* no_shared_ifcs_set_tbl,
@@ -51,8 +53,7 @@ SIFCService::SIFCService(Alarm* alarm,
   _alarm(alarm),
   _no_shared_ifcs_set_tbl(no_shared_ifcs_set_tbl),
   _configuration(configuration),
-  _updater(NULL),
-  _root(NULL)
+  _updater(NULL)
 {
   // Create an updater to keep the shared IFC sets configured appropriately.
   _updater = new Updater<void, SIFCService>
@@ -121,10 +122,9 @@ void SIFCService::update_sets()
   // Update our map, taking a lock while we do so.
   boost::lock_guard<boost::shared_mutex> write_lock(_sets_rw_lock);
   _shared_ifc_sets.clear();
-  delete _root; _root = root;
   bool any_errors = false;
 
-  rapidxml::xml_node<>* sets = _root->first_node(SIFCService::SHARED_IFCS_SETS);
+  rapidxml::xml_node<>* sets = root->first_node(SIFCService::SHARED_IFCS_SETS);
   rapidxml::xml_node<>* set = NULL;
 
   for (set = sets->first_node(SIFCService::SHARED_IFCS_SET);
@@ -163,7 +163,7 @@ void SIFCService::update_sets()
       continue;
     }
 
-    std::vector<std::pair<int32_t, Ifc>> ifc_set;
+    std::vector<std::pair<int32_t, std::string>> ifc_set;
 
     for (rapidxml::xml_node<>* ifc = set->first_node(RegDataXMLUtils::IFC);
          ifc != NULL;
@@ -190,14 +190,14 @@ void SIFCService::update_sets()
 
       // Creating the IFC always passes; we don't validate the IFC any further
       // at this stage. This is a fairly complicated thing to do however.
-      ifc_set.push_back(std::make_pair(priority, Ifc(ifc)));
+      std::string ifc_str;
+      rapidxml::print(std::back_inserter(ifc_str), *ifc, 0);
+      ifc_set.push_back(std::make_pair(priority, ifc_str));
     }
 
     TRC_STATUS("Adding %lu IFCs for ID %d", ifc_set.size(), set_id);
     _shared_ifc_sets.insert(std::make_pair(set_id, ifc_set));
   }
-<<<<<<< HEAD
-=======
 
   if (any_errors)
   {
@@ -209,22 +209,18 @@ void SIFCService::update_sets()
   }
 
   delete root; root = NULL;
->>>>>>> 06c5775... Updates to match spec
 }
 
 SIFCService::~SIFCService()
 {
   delete _updater; _updater = NULL;
   _shared_ifc_sets.clear();
-<<<<<<< HEAD
-  delete _root; _root = NULL;
-=======
   delete _alarm; _alarm = NULL;
->>>>>>> 06c5775... Updates to match spec
 }
 
 void SIFCService::get_ifcs_from_id(std::multimap<int32_t, Ifc>& ifc_map,
                                    const std::set<int32_t>& ids,
+                                   std::shared_ptr<xml_document<> > ifc_doc,
                                    SAS::TrailId trail) const
 {
   // Take a read lock on the mutex in RAII style
@@ -233,16 +229,16 @@ void SIFCService::get_ifcs_from_id(std::multimap<int32_t, Ifc>& ifc_map,
   for (int id : ids)
   {
     TRC_DEBUG("Getting the shared IFCs for ID %d", id);
-    std::map<int, std::vector<std::pair<int32_t, Ifc>>>::const_iterator i =
+    std::map<int, std::vector<std::pair<int32_t, std::string>>>::const_iterator i =
                                                       _shared_ifc_sets.find(id);
 
     if (i != _shared_ifc_sets.end())
     {
       TRC_DEBUG("Found IFC set for ID %d", id);
 
-      for (std::pair<int32_t, Ifc> ifc : i->second)
+      for (std::pair<int32_t, std::string> ifc : i->second)
       {
-        ifc_map.insert(ifc);
+        ifc_map.insert(std::make_pair(ifc.first, Ifc(ifc.second, ifc_doc.get())));
       }
     }
     else

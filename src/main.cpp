@@ -1919,15 +1919,6 @@ int main(int argc, char* argv[])
                                        opt.allow_fallback_ifcs);
   }
 
-<<<<<<< HEAD
-=======
-  // Create DIFC service
-  difc_service = new DIFCService(new Alarm(alarm_manager,
-                                           "sprout",
-                                           AlarmDef::SPROUT_DIFC_STATUS,
-                                           AlarmDef::CRITICAL));
-
->>>>>>> 06c5775... Updates to match spec
   // Create ENUM service.
   if (!opt.enum_servers.empty())
   {

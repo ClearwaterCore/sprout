@@ -305,7 +305,6 @@ public:
 
 
     // Create the S-CSCF Sproutlet.
-    IFCConfiguration ifc_configuration(false, false, "sip:DUMMY_AS", NULL, NULL);
     _scscf_sproutlet = new SCSCFSproutlet("scscf",
                                           "sip:homedomain:5058",
                                           "sip:127.0.0.1:5058",
@@ -324,8 +323,7 @@ public:
                                           3000, // Session continue timeout - different from default
                                           6000, // Session terminated timeout - different from default
                                           _sess_term_comm_tracker,
-                                          _sess_cont_comm_tracker
-                                          );
+                                          _sess_cont_comm_tracker);
     _scscf_sproutlet->init();
 
     // Create the BGCF Sproutlet.

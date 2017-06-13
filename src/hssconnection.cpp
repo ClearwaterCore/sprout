@@ -439,12 +439,6 @@ bool decode_homestead_xml(const std::string public_user_identity,
           }
         }
 
-        rapidxml::xml_node<>* extension = public_id->first_node(RegDataXMLUtils::EXTENSION);
-        if (extension)
-        {
-          RegDataXMLUtils::parse_extension_identity(uri, extension);
-        }
-
         associated_uris.add(uri, barred);
         ifcs_map[uri] = ifc;
 
