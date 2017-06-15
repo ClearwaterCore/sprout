@@ -38,6 +38,9 @@
 #ifndef AUTHENTICATION_H__
 #define AUTHENTICATION_H__
 
+#include "updater.h"
+#include "ifc.h"
+#include "alarm.h"
 #include "impistore.h"
 #include "hssconnection.h"
 #include "chronosconnection.h"

@@ -247,7 +247,7 @@ void BGCFSproutletTsx::on_rx_initial_request(pjsip_msg* req)
     {
       // Previous behaviour on no route was to try to forward the request as-is,
       // (so trying to route to the domain in the request URI directly).
-      send_request(req);
+      send_request(req); // LCOV_EXCL_LINE
     }
   }
 }

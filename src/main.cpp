@@ -1384,6 +1384,7 @@ ACRFactory* scscf_acr_factory = NULL;
 EnumService* enum_service = NULL;
 ExceptionHandler* exception_handler = NULL;
 AlarmManager* alarm_manager = NULL;
+SIFCService* sifc_service = NULL;
 
 /*
  * main()
@@ -1654,6 +1655,7 @@ int main(int argc, char* argv[])
   SNMP::EventAccumulatorTable* homestead_sar_latency_table = NULL;
   SNMP::EventAccumulatorTable* homestead_uar_latency_table = NULL;
   SNMP::EventAccumulatorTable* homestead_lir_latency_table = NULL;
+  SNMP::CounterTable* no_shared_ifcs_set_table = NULL;
 
   SNMP::ContinuousAccumulatorByScopeTable* token_rate_table = NULL;
   SNMP::ScalarByScopeTable* smoothed_latency_scalar = NULL;
@@ -1721,6 +1723,9 @@ int main(int argc, char* argv[])
 
     auth_stats_tbls.non_register_auth_tbl = SNMP::SuccessFailCountTable::create("non_register_auth_success_fail_count",
                                                                                 ".1.2.826.0.1.1578918.9.3.17");
+
+    no_shared_ifcs_set_table = SNMP::CounterTable::create("no_shared_ifcs_set",
+                                                          ".1.2.826.0.1.1578918.9.3.40");
 
     token_rate_table = SNMP::ContinuousAccumulatorByScopeTable::create("sprout_token_rate",
                                                                        ".1.2.826.0.1.1578918.9.3.27");
@@ -1894,6 +1899,11 @@ int main(int argc, char* argv[])
   {
     // Create a connection to the HSS.
     TRC_STATUS("Creating connection to HSS %s", opt.hss_server.c_str());
+    sifc_service = new SIFCService(new Alarm(alarm_manager,
+                                             "sprout",
+                                             AlarmDef::SPROUT_SIFC_STATUS,
+                                             AlarmDef::CRITICAL),
+                                   no_shared_ifcs_set_table);
     hss_connection = new HSSConnection(opt.hss_server,
                                        http_resolver,
                                        load_monitor,
@@ -1905,6 +1915,7 @@ int main(int argc, char* argv[])
                                        homestead_lir_latency_table,
                                        hss_comm_monitor,
                                        opt.uri_scscf,
+                                       sifc_service,
                                        opt.allow_fallback_ifcs);
   }
 
@@ -2412,6 +2423,7 @@ int main(int argc, char* argv[])
   delete http_stack_mgmt; http_stack_mgmt = NULL;
   delete chronos_connection;
   delete hss_connection;
+  delete sifc_service;
   delete quiescing_mgr;
   delete exception_handler;
   delete load_monitor;
@@ -2454,6 +2466,7 @@ int main(int argc, char* argv[])
   delete homestead_sar_latency_table;
   delete homestead_uar_latency_table;
   delete homestead_lir_latency_table;
+  delete no_shared_ifcs_set_table;
 
   delete token_rate_table;
   delete smoothed_latency_scalar;
