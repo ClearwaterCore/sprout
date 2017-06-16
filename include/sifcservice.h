@@ -1,8 +1,8 @@
 /**
- * @file ifchandler.h The iFC handler data type.
+ * @file sifcservice.h
  *
  * Project Clearwater - IMS in the Cloud
- * Copyright (C) 2013  Metaswitch Networks Ltd
+ * Copyright (C) 2017  Metaswitch Networks Ltd
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -34,72 +34,57 @@
  * as those licenses appear in the file LICENSE-OPENSSL.
  */
 
-#pragma once
+#ifndef SIFCSERVICE_H__
+#define SIFCSERVICE_H__
 
-extern "C" {
-#include <pjsip.h>
-#include <pjlib-util.h>
-#include <pjlib.h>
-}
-
+#include <map>
 #include <string>
-#include <vector>
-#include <memory>
-
+#include <boost/thread.hpp>
 #include "rapidxml/rapidxml.hpp"
-#include "sessioncase.h"
+#include <functional>
 
+#include "updater.h"
 #include "sas.h"
 #include "ifc.h"
-#include "sifcservice.h"
+#include "alarm.h"
+#include "snmp_counter_table.h"
 
-/// A set of iFCs.
-//
-// Owns the iFCs document, and provides access to each iFC within it.
-class Ifcs
+class SIFCService
 {
 public:
-  Ifcs();
-  Ifcs(std::shared_ptr<rapidxml::xml_document<>> ifc_doc,
-       rapidxml::xml_node<>* sp,
-       SIFCService* sifc_service,
-       SAS::TrailId trail);
-  ~Ifcs();
+  SIFCService(Alarm* alarm,
+              SNMP::CounterTable* no_shared_ifcs_set_tbl,
+              std::string configuration = "./shared_ifcs.xml");
+  virtual ~SIFCService();
 
-  size_t size() const
-  {
-    return _ifcs.size();
-  }
+  // Node names within the Shared IFC configuration file.
+  const char* const SHARED_IFCS_SETS = "SharedIFCsSets";
+  const char* const SHARED_IFCS_SET = "SharedIFCsSet";
+  const char* const SET_ID = "SetID";
 
-  const Ifc& operator[](size_t index) const
-  {
-    return _ifcs[index];
-  }
+  /// Updates the shared IFC sets
+  void update_sets();
 
-  void interpret(const SessionCase& session_case,
-                 bool is_registered,
-                 bool is_initial_registration,
-                 pjsip_msg *msg,
-                 std::vector<AsInvocation>& application_servers,
-                 SAS::TrailId trail) const;
+  /// Get the IFCs that belong to a set of IDs
+  virtual void get_ifcs_from_id(std::multimap<int32_t, Ifc>& ifc_map,
+                                const std::set<int32_t>& id,
+                                std::shared_ptr<xml_document<> > ifc_doc,
+                                SAS::TrailId trail) const;
 
 private:
-  std::shared_ptr<rapidxml::xml_document<> > _ifc_doc;
-  std::vector<Ifc> _ifcs;
+  Alarm* _alarm;
+  SNMP::CounterTable* _no_shared_ifcs_set_tbl;
+  std::map<int32_t, std::vector<std::pair<int32_t, std::string>>> _shared_ifc_sets;
+  std::string _configuration;
+  Updater<void, SIFCService>* _updater;
+
+  // Mark as mutable to flag that this can be modified without affecting the
+  // external behaviour of the class, allowing for locking in 'const' methods.
+  mutable boost::shared_mutex _sets_rw_lock;
+
+  // Helper functions to set/clear the alarm.
+  void set_alarm();
+  void clear_alarm();
 };
 
-
-/// iFC handler.
-class IfcHandler
-{
-public:
-  IfcHandler();
-  ~IfcHandler();
-
-  static std::string served_user_from_msg(const SessionCase& session_case,
-                                          pjsip_msg* msg,
-                                          pj_pool_t* pool);
-
-private:
-  static std::string user_from_uri(pjsip_uri *uri);
-};
+#endif

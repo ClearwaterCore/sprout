@@ -47,6 +47,7 @@
 #include "snmp_event_accumulator_table.h"
 #include "load_monitor.h"
 #include "associated_uris.h"
+#include "sifcservice.h"
 
 /// @class HSSConnection
 ///
@@ -58,7 +59,7 @@ class HSSConnection
 public:
   HSSConnection(const std::string& server,
                 HttpResolver* resolver,
-                LoadMonitor *load_monitor,
+                LoadMonitor* load_monitor,
                 SNMP::IPCountTable* homestead_count_tbl,
                 SNMP::EventAccumulatorTable* homestead_overall_latency_tbl,
                 SNMP::EventAccumulatorTable* homestead_mar_latency_tbl,
@@ -67,6 +68,7 @@ public:
                 SNMP::EventAccumulatorTable* homestead_lir_latency_tbl,
                 CommunicationMonitor* comm_monitor,
                 std::string scscf_uri,
+                SIFCService* sifc_service,
                 bool fallback_if_no_matching_ifc = false);
   virtual ~HSSConnection();
 
@@ -168,6 +170,7 @@ private:
   SNMP::EventAccumulatorTable* _uar_latency_tbl;
   SNMP::EventAccumulatorTable* _lir_latency_tbl;
   std::string _scscf_uri;
+  SIFCService* _sifc_service;
   bool _fallback_if_no_matching_ifc;
 };
 

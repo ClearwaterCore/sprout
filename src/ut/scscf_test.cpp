@@ -273,6 +273,7 @@ public:
     _enum_service = new JSONEnumService(string(UT_DIR).append("/test_stateful_proxy_enum.json"));
 
     _acr_factory = new ACRFactory();
+
     // Schedule timers.
     SipTest::poll();
   }
@@ -322,8 +323,7 @@ public:
                                           3000, // Session continue timeout - different from default
                                           6000, // Session terminated timeout - different from default
                                           _sess_term_comm_tracker,
-                                          _sess_cont_comm_tracker
-                                          );
+                                          _sess_cont_comm_tracker);
     _scscf_sproutlet->init();
 
     // Create the BGCF Sproutlet.

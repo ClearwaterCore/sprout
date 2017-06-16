@@ -91,7 +91,8 @@ SPROUT_COMMON_SOURCES := logger.cpp \
                          astaire_resolver.cpp \
                          associated_uris.cpp \
                          xml_utils.cpp \
-                         ifc.cpp
+                         ifc.cpp \
+                         sifcservice.cpp
 
 sprout_SOURCES := ${SPROUT_COMMON_SOURCES} \
                   snmp_counter_table.cpp \
@@ -182,7 +183,9 @@ sprout_test_SOURCES := ${SPROUT_COMMON_SOURCES} \
                        httpnotifier_test.cpp \
                        bgcf_test.cpp \
                        as_communication_tracker_test.cpp \
-                       pthread_cond_var_helper.cpp
+                       pthread_cond_var_helper.cpp \
+                       sifcservice_test.cpp \
+                       mock_sifc_parser.cpp
 
 COVERAGE_ROOT := ..
 sprout_test_COVERAGE_EXCLUSIONS := ^src/ut|^usr|^modules/gmock|^modules/cpp-common|^modules/rapidjson|^include|^src/mangelwurzel/ut|^modules/gemini/src/ut|^modules/gemini/include|^modules/memento-as/modules|^modules/memento-as/src/ut|^modules/memento-as/include
