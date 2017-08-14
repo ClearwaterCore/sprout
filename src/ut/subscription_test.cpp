@@ -114,6 +114,7 @@ public:
     b1->_params["+sip.instance"] = "\"<urn:uuid:00000000-0000-0000-0000-b4dd32817622>\"";
     b1->_params["reg-id"] = "1";
     b1->_params["+sip.ice"] = "";
+    b1->_params["+g.3gpp.smsip"] = "";
     b1->_emergency_registration = false;
 
     // Add the AoR record to the store.
@@ -870,6 +871,8 @@ std::string SubscriptionTest::check_OK_and_NOTIFY(std::string reg_state,
   char buf[16384];
   int n = out->body->print_body(out->body, buf, sizeof(buf));
   string body(buf, n);
+
+  printf("************\n%s\n************", body.c_str());
 
   // Parse the XML document, saving off the passed in string first (as parsing
   // is destructive)
