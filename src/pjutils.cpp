@@ -124,18 +124,6 @@ std::string PJUtils::uri_to_string(pjsip_uri_context_e context,
 }
 
 
-std::string PJUtils::strip_uri_scheme(const std::string& uri)
-{
-  std::string s(uri);
-  size_t colon = s.find(':');
-  if (colon != std::string::npos)
-  {
-    s.erase(0, colon + 1);
-  }
-  return s;
-}
-
-
 /// Parse the supplied string to a PJSIP URI structure.  Note that if this
 /// finds a name-addr instead of a URI it will parse it to a pjsip_name_addr
 /// structure, so you must use pjsip_uri_get_uri to get to the URI piece.
@@ -1683,7 +1671,7 @@ void PJUtils::mark_sas_call_branch_ids(const SAS::TrailId trail, pjsip_cid_hdr* 
                                 ((msg->line.req.method.id == PJSIP_REGISTER_METHOD) ||
                                  (pjsip_method_cmp(&msg->line.req.method, pjsip_get_subscribe_method()) == 0) ||
                                  (pjsip_method_cmp(&msg->line.req.method, pjsip_get_notify_method()) == 0)));
-  
+
   if (cid_hdr != NULL)
   {
     TRC_DEBUG("Logging SAS Call-ID marker, Call-ID %.*s", cid_hdr->id.slen, cid_hdr->id.ptr);
@@ -1977,7 +1965,7 @@ void PJUtils::report_sas_to_from_markers(SAS::TrailId trail, pjsip_msg* msg)
       pj_str_t to_user = user_from_uri(to_uri);
 
       SAS::Marker sip_all_register(trail, MARKER_ID_SIP_ALL_REGISTER, 1u);
-      sip_all_register.add_var_param(strip_uri_scheme(to_uri_str));
+      sip_all_register.add_var_param(Utils::strip_uri_scheme(to_uri_str));
       // Add the DN parameter. If the user part is not numeric just log it in
       // its entirety.
       sip_all_register.add_var_param(URIClassifier::is_user_numeric(to_user) ?
@@ -2000,7 +1988,7 @@ void PJUtils::report_sas_to_from_markers(SAS::TrailId trail, pjsip_msg* msg)
       sip_subscribe_notify.add_static_param(is_subscribe ?
                                             SASEvent::SubscribeNotifyType::SUBSCRIBE :
                                             SASEvent::SubscribeNotifyType::NOTIFY);
-      sip_subscribe_notify.add_var_param(strip_uri_scheme(to_uri_str));
+      sip_subscribe_notify.add_var_param(Utils::strip_uri_scheme(to_uri_str));
       // Add the DN parameter. If the user part is not numeric just log it in
       // its entirety.
       sip_subscribe_notify.add_var_param(URIClassifier::is_user_numeric(to_user) ?
@@ -2027,7 +2015,7 @@ void PJUtils::report_sas_to_from_markers(SAS::TrailId trail, pjsip_msg* msg)
         }
 
         SAS::Marker called_uri(trail, MARKER_ID_INBOUND_CALLED_URI, 1u);
-        called_uri.add_var_param(strip_uri_scheme(
+        called_uri.add_var_param(Utils::strip_uri_scheme(
                                    uri_to_string(PJSIP_URI_IN_FROMTO_HDR, to_uri)));
         SAS::report_marker(called_uri);
       }
@@ -2043,7 +2031,7 @@ void PJUtils::report_sas_to_from_markers(SAS::TrailId trail, pjsip_msg* msg)
         }
 
         SAS::Marker calling_uri(trail, MARKER_ID_INBOUND_CALLING_URI, 1u);
-        calling_uri.add_var_param(strip_uri_scheme(
+        calling_uri.add_var_param(Utils::strip_uri_scheme(
                                     uri_to_string(PJSIP_URI_IN_FROMTO_HDR, from_uri)));
         SAS::report_marker(calling_uri);
       }
@@ -2153,19 +2141,11 @@ pjsip_uri* PJUtils::translate_sip_uri_to_tel_uri(const pjsip_sip_uri* sip_uri,
   return (pjsip_uri*)tel_uri;
 }
 
-static const boost::regex CHARS_TO_STRIP = boost::regex("[.)(-]");
-
-// Strip any visual separators from the number
-std::string PJUtils::remove_visual_separators(const std::string& number)
-{
-  return boost::regex_replace(number, CHARS_TO_STRIP, std::string(""));
-};
-
 // Strip any visual separators from the number
 std::string PJUtils::remove_visual_separators(const pj_str_t& number)
 {
   std::string s = pj_str_to_string(&number);
-  return remove_visual_separators(s);
+  return Utils::remove_visual_separators(s);
 };
 
 bool PJUtils::get_npdi(pjsip_uri* uri)
