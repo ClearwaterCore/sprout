@@ -56,6 +56,9 @@ extern "C" {
 #include <list>
 #include <queue>
 #include <string>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
 
 #include "constants.h"
 #include "eventq.h"
@@ -170,7 +173,11 @@ static int pjsip_thread_func(void *p)
 
   PJ_UNUSED_ARG(p);
 
-  TRC_STATUS("PJSIP thread started");
+  // Get the Kernel's ID for this thread so we can log it out.
+  pid_t tid;
+  tid = syscall(SYS_gettid);
+
+  TRC_STATUS("PJSIP transport thread started with kernel thread ID %d", tid);
 
   pj_bool_t curr_quiescing = PJ_FALSE;
   pj_bool_t new_quiescing = quiescing;
