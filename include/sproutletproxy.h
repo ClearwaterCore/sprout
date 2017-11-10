@@ -146,7 +146,7 @@ protected:
     virtual void process_tsx_request(pjsip_rx_data* rdata);
 
     /// Handle a received CANCEL request.
-    virtual void process_cancel_request(pjsip_rx_data* rdata);
+    virtual void process_cancel_request(pjsip_rx_data* rdata, const std::string& reason);
 
     /// Handle a timer pop.
     static void on_timer_pop(pj_timer_heap_t* th, pj_timer_entry* tentry);
@@ -158,7 +158,8 @@ protected:
 
     /// Notification that an client transaction is not responding.
     virtual void on_client_not_responding(UACTsx* uac_tsx,
-                                          pjsip_event_id_e event);
+                                          pjsip_event_id_e event,
+                                          const std::string& reason);
 
     virtual void on_tsx_state(pjsip_event* event);
 
@@ -180,7 +181,9 @@ protected:
 
     void tx_cancel(SproutletWrapper* sproutlet,
                    int fork_id,
-                   pjsip_tx_data* cancel);
+                   pjsip_tx_data* cancel,
+                   int st_code,
+                   const std::string& reason);
 
     /// Gets the next target Sproutlet for the message by analysing the top
     /// Route header.
@@ -283,8 +286,8 @@ public:
   /// the following.
   void add_to_dialog(const std::string& dialog_id="");
   pjsip_msg* original_request();
-  const char* msg_info(pjsip_msg*);
   const pjsip_route_hdr* route_hdr() const;
+  const char* msg_info(pjsip_msg*);
   const std::string& dialog_id() const;
   pjsip_msg* create_request();
   pjsip_msg* clone_request(pjsip_msg* req);
@@ -293,8 +296,8 @@ public:
                              const std::string& status_text="");
   int send_request(pjsip_msg*& req);
   void send_response(pjsip_msg*& rsp);
-  void cancel_fork(int fork_id, int reason=0);
-  void cancel_pending_forks(int reason=0);
+  void cancel_fork(int fork_id, int st_code = 0, std::string reason = "");
+  void cancel_pending_forks(int st_code = 0, std::string reason = "");
   const ForkState& fork_state(int fork_id);
   void free_msg(pjsip_msg*& msg);
   pj_pool_t* get_pool(const pjsip_msg* msg);
@@ -308,8 +311,8 @@ public:
 private:
   void rx_request(pjsip_tx_data* req);
   void rx_response(pjsip_tx_data* rsp, int fork_id);
-  void rx_cancel(pjsip_tx_data* cancel);
-  void rx_error(int status_code);
+  void rx_cancel(pjsip_tx_data* cancel, const std::string& reason);
+  void rx_error(int status_code, const std::string& reason);
   void rx_fork_error(pjsip_event_id_e event, int fork_id);
   void on_timer_pop(TimerID id, void* context);
   void register_tdata(pjsip_tx_data* tdata);
@@ -375,7 +378,8 @@ private:
     ForkState state;
     pjsip_tx_data* req;
     bool pending_cancel;
-    int cancel_reason;
+    int cancel_st_code;
+    std::string cancel_reason;
   } ForkStatus;
   std::vector<ForkStatus> _forks;
 
