@@ -248,9 +248,9 @@ void SproutletAppServerTsxHelper::send_response(pjsip_msg*& rsp)
   _helper->send_response(rsp);
 }
 
-void SproutletAppServerTsxHelper::cancel_fork(int fork_id, int reason)
+void SproutletAppServerTsxHelper::cancel_fork(int fork_id, int st_code, std::string reason)
 {
-  _helper->cancel_fork(fork_id, reason);
+  _helper->cancel_fork(fork_id, st_code, reason);
 }
 
 /// Frees the specified message.  Received responses or messages that have
