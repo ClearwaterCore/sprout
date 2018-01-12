@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# @file poll_sprout.sh
+# @file poll_sprout_sip.sh
 #
 # Project Clearwater - IMS in the Cloud
 # Copyright (C) 2014  Metaswitch Networks Ltd
@@ -54,6 +54,16 @@ fi
 if [ $rc = 0 ] && [ "$icscf" != "0" ] ; then
   $namespace_prefix /usr/share/clearwater/bin/poll-sip $icscf
   rc=$?
+fi
+
+# If the sprout process is not stable, we ignore a non-zero return code and
+# return zero.
+if [ $rc != 0 ]; then
+  /usr/share/clearwater/infrastructure/monit_stability/sprout-stability check
+  if [ $? != 0 ]; then
+    echo "return code $rc ignored" >&2
+    rc=0
+  fi
 fi
 
 exit $rc
