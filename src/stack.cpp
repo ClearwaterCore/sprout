@@ -48,6 +48,9 @@ extern "C" {
 
 #include <arpa/inet.h>
 
+#include <pthread.h>
+#include <sched.h>
+
 // Common STL includes.
 #include <cassert>
 #include <vector>
@@ -56,6 +59,10 @@ extern "C" {
 #include <list>
 #include <queue>
 #include <string>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <sys/resource.h>
 
 #include "constants.h"
 #include "eventq.h"
@@ -170,7 +177,27 @@ static int pjsip_thread_func(void *p)
 
   PJ_UNUSED_ARG(p);
 
-  TRC_STATUS("PJSIP thread started");
+  // Get the Kernel's ID for this thread so we can log it out.
+  pid_t tid;
+  tid = syscall(SYS_gettid);
+
+  TRC_STATUS("PJSIP transport thread started with kernel thread ID %d", tid);
+
+  // Increase the priority of the transport thread (by giving it a real-time
+  // scheduling policy and a non-zero priority). This means that the transport
+  // thread is scheduled more aggressively than the worker threads which means
+  // that messages are read from the network promptly, but then rejected due to
+  // unavailability of the worker threads.
+  pthread_t this_thread = pthread_self();
+
+  struct sched_param params;
+  params.sched_priority = sched_get_priority_min(SCHED_FIFO);
+
+  if (pthread_setschedparam(this_thread, SCHED_FIFO, &params) != 0)
+  {
+    TRC_WARNING("Unable to set SCHED_FIFO scheduling policy on the transport thread. "
+                "Overload may not be handled gracefully");
+  }
 
   pj_bool_t curr_quiescing = PJ_FALSE;
   pj_bool_t new_quiescing = quiescing;
@@ -545,6 +572,17 @@ pj_status_t init_pjsip()
   // Create the endpoint.
   status = pjsip_endpt_create(&stack_data.cp.factory, NULL, &stack_data.endpt);
   PJ_ASSERT_RETURN(status == PJ_SUCCESS, status);
+
+  // Increase the limit on the number of timers that PJSIP processes each time
+  // it polls the timer heap.
+  //
+  // By default PJSIP will process up to 64 timers and 16 epoll events per call
+  // to pjsip_endpt_handle_events. This ratio means that if inbound messages
+  // spawn more than a handlful of timers we can set timers faster than they can
+  // be expired.
+  pj_timer_heap_set_max_timed_out_per_poll(
+                                   pjsip_endpt_get_timer_heap(stack_data.endpt),
+                                   4096);
 
   // Init transaction layer.
   status = pjsip_tsx_layer_init_module(stack_data.endpt);
