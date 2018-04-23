@@ -449,7 +449,7 @@ static const PDLog1<const char *> CL_SPROUT_SESS_TERM_AS_COMM_SUCCESS
 (
   PDLogBase::CL_SPROUT_ID + 49,
   LOG_NOTICE,
-  "Sprout is able to successfully communicate with an Application Server that uses session terminated default handling. ",
+  "Sprout is able to successfully communicate with an Application Server that uses session terminated default handling. The server's URI is: %s.",
   "Communication has been restored to an Application Server",
   "Full service has been restored.",
   "No action"
@@ -469,7 +469,7 @@ static const PDLog1<const char *> CL_SPROUT_SESS_CONT_AS_COMM_SUCCESS
 (
   PDLogBase::CL_SPROUT_ID + 51,
   LOG_NOTICE,
-  "Sprout is able to successfully communicate with an Application Server that uses session continued default handling.",
+  "Sprout is able to successfully communicate with an Application Server that uses session continued default handling. The server's URI is: %s.",
   "Communication has been restored to an Application Server",
   "Full service has been restored.",
   "No action"
