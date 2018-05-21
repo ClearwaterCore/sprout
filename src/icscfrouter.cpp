@@ -174,6 +174,9 @@ int ICSCFRouter::get_scscf(pj_pool_t* pool, pjsip_sip_uri*& scscf_sip_uri, bool 
       {
         TRC_WARNING("Invalid SCSCF URI %s", scscf.c_str());
         status_code = PJSIP_SC_TEMPORARILY_UNAVAILABLE;
+        SAS::Event event(_trail, SASEvent::SCSCF_SELECTION_INVALID_SIP_URI, 0);
+        event.add_var_param(scscf);
+        SAS::report_event(event);
       }
     }
     else
